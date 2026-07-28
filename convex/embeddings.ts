@@ -1,4 +1,5 @@
-import { action, internalMutation, internalQuery } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
@@ -91,9 +92,36 @@ export const getAllContent = internalQuery({
     const tracks = await ctx.db.query("tracks").collect();
     const lessons = await ctx.db.query("lessons").collect();
     const questions = await ctx.db.query("quizQuestions").collect();
-    return { tracks, lessons, questions };
+    const knowledge = await ctx.db.query("knowledgeDocs").collect();
+    return { tracks, lessons, questions, knowledge };
   },
 });
+
+/** Split a long doc into ~1200-char chunks on blank lines so retrieval stays focused. */
+function chunkText(text: string, maxLen = 1200): string[] {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLen) return [trimmed];
+
+  const paragraphs = trimmed.split(/\n\s*\n/);
+  const chunks: string[] = [];
+  let current = "";
+  for (const para of paragraphs) {
+    if (current && (current.length + para.length + 2) > maxLen) {
+      chunks.push(current.trim());
+      current = "";
+    }
+    // A single very long paragraph: hard-split it.
+    if (para.length > maxLen) {
+      for (let i = 0; i < para.length; i += maxLen) {
+        chunks.push(para.slice(i, i + maxLen).trim());
+      }
+    } else {
+      current += (current ? "\n\n" : "") + para;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks.filter(Boolean);
+}
 
 export const clearEmbeddings = internalMutation({
   args: {},
@@ -117,25 +145,23 @@ export const insertEmbedding = internalMutation({
   },
 });
 
-// ── Public action: (re)build the entire embedding index ─────────────────────
+// ── Shared rebuild logic ────────────────────────────────────────────────────
 
-export const generateAllEmbeddings = action({
-  args: {},
-  handler: async (ctx): Promise<{ embedded: number }> => {
-    const { tracks, lessons, questions } = await ctx.runQuery(
-      internal.embeddings.getAllContent,
-      {}
-    );
+async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
+  const { tracks, lessons, questions, knowledge } = await ctx.runQuery(
+    internal.embeddings.getAllContent,
+    {}
+  );
 
-    // Build a flat list of chunks to embed
-    type Chunk = {
-      lessonId?: Doc<"lessons">["_id"];
-      trackId?: Doc<"tracks">["_id"];
-      source: string;
-      title: string;
-      chunkText: string;
-    };
-    const chunks: Chunk[] = [];
+  // Build a flat list of chunks to embed
+  type Chunk = {
+    lessonId?: Doc<"lessons">["_id"];
+    trackId?: Doc<"tracks">["_id"];
+    source: string;
+    title: string;
+    chunkText: string;
+  };
+  const chunks: Chunk[] = [];
 
     // Track-level chunks
     for (const t of tracks) {
@@ -213,6 +239,20 @@ export const generateAllEmbeddings = action({
       chunks.push({ source: "faq", title: f.title, chunkText: `${f.title}. ${f.text}` });
     }
 
+    // Teacher-authored knowledge docs (chunked if long)
+    for (const doc of knowledge) {
+      const header = doc.category ? `${doc.category} — ${doc.title}` : doc.title;
+      const pieces = chunkText(doc.content);
+      pieces.forEach((piece, idx) => {
+        const partLabel = pieces.length > 1 ? ` (part ${idx + 1})` : "";
+        chunks.push({
+          source: "knowledge",
+          title: `${header}${partLabel}`,
+          chunkText: `${header}\n${piece}`,
+        });
+      });
+    }
+
     // Embed in batches of 64, then store
     await ctx.runMutation(internal.embeddings.clearEmbeddings, {});
 
@@ -236,6 +276,23 @@ export const generateAllEmbeddings = action({
       embedded += batch.length;
     }
 
-    return { embedded };
+  return { embedded };
+}
+
+// ── Public action: (re)build the entire embedding index ─────────────────────
+
+export const generateAllEmbeddings = action({
+  args: {},
+  handler: async (ctx): Promise<{ embedded: number }> => {
+    return await rebuildIndex(ctx);
+  },
+});
+
+// ── Internal action: scheduled by knowledge mutations to refresh the index ──
+
+export const rebuildAll = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ embedded: number }> => {
+    return await rebuildIndex(ctx);
   },
 });

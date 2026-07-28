@@ -5,7 +5,9 @@ import { ScoresDashboard } from "@/components/teacher/ScoresDashboard";
 import { CalendarWidget } from "@/components/teacher/CalendarWidget";
 import { EmailComposer } from "@/components/teacher/EmailComposer";
 import { HomeworkTab } from "@/components/teacher/HomeworkTab";
-import { BarChart3, Calendar, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked } from "lucide-react";
+import { KnowledgeManager } from "@/components/teacher/KnowledgeManager";
+import { VideoManager } from "@/components/teacher/VideoManager";
+import { BarChart3, Calendar, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
@@ -16,8 +18,10 @@ const TABS = [
   { id: "students", label: "Students",       icon: Users       },
   { id: "homework", label: "Homework",       icon: BookMarked  },
   { id: "calendar", label: "Calendar",       icon: Calendar    },
+  { id: "videos",   label: "Videos",         icon: Video       },
   { id: "email",    label: "Email Students", icon: Mail        },
   { id: "quote",    label: "Quote",          icon: Quote       },
+  { id: "knowledge", label: "Stark Knowledge", icon: Sparkles   },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -267,6 +271,18 @@ export default function TeacherDashboard() {
         </div>
       )}
 
+      {activeTab === "videos" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Class Videos</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Upload recorded classes (e.g. Zoom recordings). Add a title and the class date — students can watch them anytime.
+            </p>
+          </div>
+          <VideoManager />
+        </div>
+      )}
+
       {activeTab === "email" && (
         <div>
           <div className="mb-6">
@@ -286,6 +302,18 @@ export default function TeacherDashboard() {
             </p>
           </div>
           <QuoteEditor />
+        </div>
+      )}
+
+      {activeTab === "knowledge" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Stark Knowledge</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Add info sheets that teach Stark about anything — your bio, schedules, policies, resource links, or extra tech notes. Stark uses these to answer student questions.
+            </p>
+          </div>
+          <KnowledgeManager />
         </div>
       )}
     </div>

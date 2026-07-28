@@ -4,10 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
-import {
-  Send, Zap, ShieldCheck, Cpu, Sparkles,
-  SquarePen, Trash2, MessageSquare, Menu, X,
-} from "lucide-react";
+import { SquarePen, Trash2, Menu, X, ArrowUp, PanelLeftClose, PanelLeft } from "lucide-react";
+import { StarkMessage } from "@/components/stark/StarkMessage";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -24,48 +22,71 @@ const SUGGESTIONS = [
   "What is the CIA triad?",
 ];
 
-const FEATURES = [
-  { icon: Zap,         label: "Lightning fast" },
-  { icon: ShieldCheck, label: "Safe & private" },
-  { icon: Cpu,         label: "Course-tuned" },
-  { icon: Sparkles,    label: "Bias-aware" },
-];
+const STARK_VARS = {
+  light: {
+    "--stark-bg": "#f5f3ef",
+    "--stark-sidebar": "#ebe8e3",
+    "--stark-surface": "#ffffff",
+    "--stark-border": "#d4d0c8",
+    "--stark-text": "#1a1a1a",
+    "--stark-muted": "#6b6560",
+    "--stark-accent": "#c96442",
+    "--stark-hover": "#e0dcd4",
+    "--stark-active": "#d8d3cb",
+  },
+  dark: {
+    "--stark-bg": "#212121",
+    "--stark-sidebar": "#171717",
+    "--stark-surface": "#2f2f2f",
+    "--stark-border": "#3a3a3a",
+    "--stark-text": "#ececec",
+    "--stark-muted": "#9b9b9b",
+    "--stark-accent": "#d97757",
+    "--stark-hover": "#2a2a2a",
+    "--stark-active": "#333333",
+  },
+} as const;
 
-const STARK_GRADIENT = "linear-gradient(135deg, #0d4f4a, #14B8A6)";
+function useStarkTheme(): "light" | "dark" {
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
 
-function StarkAvatar() {
-  return (
-    <div
-      className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 font-black text-white text-xs mt-0.5"
-      style={{ background: STARK_GRADIENT, fontFamily: "var(--font-stark)", boxShadow: "0 0 10px rgba(20,184,166,0.25)" }}
-    >
-      S
-    </div>
-  );
+  useEffect(() => {
+    const root = document.documentElement;
+    const read = () => setTheme(root.classList.contains("dark") ? "dark" : "light");
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  return theme;
 }
 
 export default function StarkPage() {
-  const sendMessage  = useAction(api.chat.sendMessage);
+  const theme = useStarkTheme();
+  const vars = STARK_VARS[theme];
+
+  const sendMessage = useAction(api.chat.sendMessage);
   const conversations = useQuery(api.conversations.list);
-  const deleteConvo  = useMutation(api.conversations.deleteConversation);
+  const deleteConvo = useMutation(api.conversations.deleteConversation);
 
   const [activeConvoId, setActiveConvoId] = useState<Id<"starkConversations"> | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
-  const [input, setInput]     = useState("");
+  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [deletingId, setDeletingId]   = useState<Id<"starkConversations"> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<Id<"starkConversations"> | null>(null);
 
   const dbMessages = useQuery(
     api.conversations.getMessages,
     activeConvoId ? { conversationId: activeConvoId } : "skip"
   );
 
-  const bottomRef  = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // When a conversation is selected, load its messages from DB
   useEffect(() => {
     if (!dbMessages) return;
     if (dbMessages.length === 0) {
@@ -79,12 +100,11 @@ export default function StarkPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Auto-grow textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "24px";
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
   const startNewChat = useCallback(() => {
@@ -92,13 +112,13 @@ export default function StarkPage() {
     setMessages([GREETING]);
     setInput("");
     setError(null);
-    setSidebarOpen(false);
+    setMobileSidebarOpen(false);
   }, []);
 
   const loadConversation = useCallback((id: Id<"starkConversations">) => {
     setActiveConvoId(id);
     setError(null);
-    setSidebarOpen(false);
+    setMobileSidebarOpen(false);
   }, []);
 
   async function handleDelete(id: Id<"starkConversations">, e: React.MouseEvent) {
@@ -116,7 +136,6 @@ export default function StarkPage() {
     const text = (textOverride ?? input).trim();
     if (!text || loading) return;
 
-    // Optimistically add the user message
     const history = messages.filter((m) => m.content !== GREETING.content);
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
@@ -145,52 +164,61 @@ export default function StarkPage() {
     }
   }
 
-  // ── Sidebar ──────────────────────────────────────────────────────────────
+  const activeTitle = conversations?.find((c) => c._id === activeConvoId)?.title;
+  const isFreshChat = messages.length === 1 && messages[0]?.content === GREETING.content;
 
-  const Sidebar = (
-    <aside
-      className="flex flex-col h-full"
-      style={{ background: "var(--surface)", borderRight: "1px solid var(--border)", width: "100%" }}
-    >
-      {/* Logo + close (mobile) */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+  const SidebarContent = (
+    <>
+      <div className="flex items-center justify-between px-3 pt-3 pb-2">
         <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center font-black text-white text-xs"
-            style={{ background: STARK_GRADIENT, fontFamily: "var(--font-stark)" }}
-          >
-            S
-          </div>
-          <span className="font-black text-sm tracking-wide" style={{ fontFamily: "var(--font-stark)", color: "var(--text)" }}>
-            STARK
-          </span>
+          <span className="stark-logo-dot inline-block w-2 h-2 rounded-full" style={{ background: "#14B8A6" }} />
+          <span className="stark-logo-text text-xl">STARK</span>
         </div>
-        <button
-          onClick={() => setSidebarOpen(false)}
-          className="md:hidden w-7 h-7 rounded-lg flex items-center justify-center"
-          style={{ color: "var(--text-muted)" }}
-        >
-          <X size={15} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="hidden md:flex w-8 h-8 rounded-lg items-center justify-center transition-colors"
+            style={{ color: "var(--stark-muted)" }}
+            aria-label="Close sidebar"
+          >
+            <PanelLeftClose size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ color: "var(--stark-muted)" }}
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* New Chat */}
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-2">
         <button
+          type="button"
           onClick={startNewChat}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
-          style={{ background: "#14B8A615", color: "#14B8A6", border: "1px solid #14B8A630" }}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors"
+          style={{ color: "var(--stark-text)", background: "transparent" }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--stark-hover)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
-          <SquarePen size={15} />
-          New Chat
+          <SquarePen size={16} />
+          New chat
         </button>
       </div>
 
-      {/* Conversation list */}
+      <div className="px-4 pt-2 pb-1">
+        <p className="text-xs font-medium" style={{ color: "var(--stark-muted)" }}>
+          Recents
+        </p>
+      </div>
+
       <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
         {!conversations || conversations.length === 0 ? (
-          <p className="text-xs text-center py-6 px-3" style={{ color: "var(--text-muted)" }}>
-            No conversations yet. Start chatting!
+          <p className="text-xs text-center py-6 px-3" style={{ color: "var(--stark-muted)" }}>
+            No conversations yet
           </p>
         ) : (
           conversations.map((convo) => {
@@ -199,241 +227,225 @@ export default function StarkPage() {
               <div
                 key={convo._id}
                 onClick={() => loadConversation(convo._id)}
-                className="group flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
+                className="group flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-colors"
                 style={{
-                  background: isActive ? "#14B8A615" : "transparent",
-                  border: isActive ? "1px solid #14B8A630" : "1px solid transparent",
+                  background: isActive ? "var(--stark-active)" : "transparent",
+                  color: isActive ? "var(--stark-text)" : "var(--stark-muted)",
                 }}
-                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--surface-2)"; }}
-                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.background = "var(--stark-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.background = "transparent";
+                }}
               >
-                <MessageSquare
-                  size={13}
-                  className="flex-shrink-0"
-                  style={{ color: isActive ? "#14B8A6" : "var(--text-muted)" }}
-                />
-                <span
-                  className="flex-1 text-xs truncate"
-                  style={{ color: isActive ? "var(--text)" : "var(--text-muted)" }}
-                >
-                  {convo.title}
-                </span>
+                <span className="flex-1 text-sm truncate">{convo.title}</span>
                 <button
+                  type="button"
                   onClick={(e) => handleDelete(convo._id, e)}
                   disabled={deletingId === convo._id}
-                  className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ color: "#EF4444" }}
+                  className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ color: "var(--stark-muted)" }}
+                  aria-label="Delete conversation"
                 >
-                  {deletingId === convo._id
-                    ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                    : <Trash2 size={12} />
-                  }
+                  {deletingId === convo._id ? (
+                    <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
                 </button>
               </div>
             );
           })
         )}
       </div>
-
-      {/* Feature pills */}
-      <div className="px-3 pb-4 pt-2 border-t space-y-1" style={{ borderColor: "var(--border)" }}>
-        {FEATURES.map((f) => (
-          <div key={f.label} className="flex items-center gap-2 px-2 py-1">
-            <f.icon size={11} style={{ color: "#14B8A6" }} />
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>{f.label}</span>
-          </div>
-        ))}
-      </div>
-    </aside>
+    </>
   );
 
-  // ── Main chat area ────────────────────────────────────────────────────────
-
-  const activeTitle = conversations?.find((c) => c._id === activeConvoId)?.title;
-
   return (
-    <div className="flex" style={{ height: "calc(100vh - 56px)", overflow: "hidden" }}>
+    <div
+      className="stark-chat flex"
+      style={{
+        ...vars,
+        height: "calc(100vh - 56px)",
+        overflow: "hidden",
+        background: "var(--stark-bg)",
+        color: "var(--stark-text)",
+      } as React.CSSProperties}
+    >
+      {/* Desktop sidebar (animated collapse) */}
+      <aside
+        className="hidden md:flex flex-col flex-shrink-0 h-full overflow-hidden"
+        style={{
+          width: sidebarOpen ? "260px" : "0px",
+          background: "var(--stark-sidebar)",
+          borderRight: sidebarOpen ? "1px solid var(--stark-border)" : "1px solid transparent",
+          transition: "width 0.22s ease, border-color 0.22s ease",
+        }}
+      >
+        <div className="flex flex-col h-full" style={{ width: "260px" }}>
+          {SidebarContent}
+        </div>
+      </aside>
 
-      {/* ── Desktop sidebar ── */}
-      <div className="hidden md:flex flex-col flex-shrink-0" style={{ width: "240px" }}>
-        {Sidebar}
-      </div>
-
-      {/* ── Mobile sidebar overlay ── */}
-      {sidebarOpen && (
+      {/* Mobile sidebar overlay */}
+      {mobileSidebarOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div
             className="absolute inset-0"
             style={{ background: "rgba(0,0,0,0.5)" }}
-            onClick={() => setSidebarOpen(false)}
+            onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className="relative z-10 flex flex-col" style={{ width: "280px", height: "100%" }}>
-            {Sidebar}
-          </div>
+          <aside
+            className="relative z-10 flex flex-col h-full"
+            style={{
+              width: "280px",
+              background: "var(--stark-sidebar)",
+              borderRight: "1px solid var(--stark-border)",
+            }}
+          >
+            {SidebarContent}
+          </aside>
         </div>
       )}
 
-      {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--bg)" }}>
-
+      {/* Main chat */}
+      <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--stark-bg)" }}>
         {/* Top bar */}
         <div
-          className="flex-shrink-0 border-b px-4 py-3 flex items-center justify-between"
-          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+          className="flex-shrink-0 px-4 py-3 flex items-center gap-3"
+          style={{ borderBottom: "1px solid var(--stark-border)" }}
         >
-          <div className="flex items-center gap-3">
-            {/* Mobile menu toggle */}
+          {!sidebarOpen && (
             <button
+              type="button"
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+              className="hidden md:flex w-8 h-8 rounded-lg items-center justify-center transition-colors"
+              style={{ color: "var(--stark-muted)" }}
+              aria-label="Open sidebar"
             >
-              <Menu size={15} style={{ color: "var(--text-muted)" }} />
+              <PanelLeft size={16} />
             </button>
-
-            <div>
-              <p className="text-sm font-semibold truncate max-w-[200px] sm:max-w-none" style={{ color: "var(--text)" }}>
-                {activeTitle ?? "New Conversation"}
-              </p>
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="text-xs font-bold flex items-center gap-1"
-                  style={{ color: "#14B8A6", fontFamily: "var(--font-stark)", letterSpacing: "0.08em" }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#14B8A6" }} />
-                  LIVE
-                </span>
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>· AI assistant</span>
-              </div>
-            </div>
-          </div>
-
-          {/* New chat (desktop shortcut) */}
+          )}
           <button
-            onClick={startNewChat}
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-80"
-            style={{ background: "#14B8A615", color: "#14B8A6", border: "1px solid #14B8A630" }}
+            type="button"
+            onClick={() => setMobileSidebarOpen(true)}
+            className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ color: "var(--stark-muted)" }}
           >
-            <SquarePen size={13} /> New Chat
+            <Menu size={16} />
           </button>
+          <h1 className="text-sm font-medium truncate" style={{ color: "var(--stark-text)" }}>
+            {activeTitle ?? "New chat"}
+          </h1>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-5 max-w-3xl w-full mx-auto">
-          {messages.map((msg, i) =>
-            msg.role === "assistant" ? (
-              <div key={i} className="flex items-start gap-3">
-                <StarkAvatar />
-                <div
-                  className="rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]"
-                  style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-                >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text)" }}>
-                    {msg.content}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div key={i} className="flex items-start gap-3 justify-end">
-                <div
-                  className="rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%]"
-                  style={{ background: STARK_GRADIENT, color: "#fff" }}
-                >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                </div>
-              </div>
-            )
-          )}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+            {messages.map((msg, i) => (
+              <StarkMessage
+                key={i}
+                role={msg.role}
+                content={msg.content}
+                showCopy={msg.role === "assistant" && msg.content !== GREETING.content}
+              />
+            ))}
 
-          {loading && (
-            <div className="flex items-start gap-3">
-              <StarkAvatar />
-              <div
-                className="rounded-2xl rounded-tl-sm px-4 py-4 flex items-center gap-1.5"
-                style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-              >
-                {[0, 1, 2].map((d) => (
-                  <span
-                    key={d}
-                    className="w-2 h-2 rounded-full animate-bounce"
-                    style={{ background: "#14B8A6", animationDelay: `${d * 150}ms` }}
-                  />
+            {loading && (
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-block w-4 h-4 rounded-sm animate-pulse"
+                  style={{ background: "var(--stark-accent)" }}
+                />
+                <span className="text-sm" style={{ color: "var(--stark-muted)" }}>
+                  Stark is thinking…
+                </span>
+              </div>
+            )}
+
+            {isFreshChat && !loading && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => handleSend(s)}
+                    className="text-sm px-4 py-2 rounded-full transition-colors"
+                    style={{
+                      background: "var(--stark-surface)",
+                      color: "var(--stark-text)",
+                      border: "1px solid var(--stark-border)",
+                    }}
+                  >
+                    {s}
+                  </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Suggestion chips — only on a fresh chat */}
-          {messages.length === 1 && !loading && (
-            <div className="flex flex-wrap gap-2 pt-2">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleSend(s)}
-                  className="text-xs font-medium px-3 py-2 rounded-full transition-all hover:scale-105"
-                  style={{ background: "var(--surface-2)", color: "var(--text)", border: "1px solid var(--border)" }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
+            {error && (
+              <p className="text-sm" style={{ color: "#ef4444" }}>
+                {error}
+              </p>
+            )}
 
-          {error && (
-            <div className="flex items-start gap-3">
-              <StarkAvatar />
-              <div className="rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]" style={{ background: "#EF444415", border: "1px solid #EF444433" }}>
-                <p className="text-sm" style={{ color: "#EF4444" }}>{error}</p>
-              </div>
-            </div>
-          )}
-
-          <div ref={bottomRef} />
+            <div ref={bottomRef} />
+          </div>
         </div>
 
-        {/* ── Input bar (unchanged) ── */}
-        <div className="flex-shrink-0 px-4 sm:px-6 pb-4 pt-2" style={{ background: "var(--bg)" }}>
+        {/* Input */}
+        <div className="flex-shrink-0 px-4 sm:px-6 pb-5 pt-2">
           <div className="max-w-3xl mx-auto">
             <div
-              className="rounded-2xl overflow-hidden"
-              style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}
+              className="rounded-3xl overflow-hidden"
+              style={{
+                background: "var(--stark-surface)",
+                border: "1px solid var(--stark-border)",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
+              }}
             >
-              <div className="flex items-center px-4 pt-3 pb-1">
+              <div className="px-4 pt-3 pb-2.5">
                 <textarea
                   ref={textareaRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Hey there! Ask Stark anything..."
+                  placeholder="Write a message..."
                   rows={1}
-                  className="flex-1 resize-none bg-transparent outline-none text-sm"
-                  style={{ color: "var(--text)", lineHeight: "1.5", minHeight: "24px", maxHeight: "120px" }}
+                  className="w-full resize-none bg-transparent outline-none text-sm"
+                  style={{ color: "var(--stark-text)", lineHeight: "1.5", minHeight: "24px", maxHeight: "160px" }}
                 />
-              </div>
-              <div className="flex items-center justify-between px-3 pb-2.5">
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
-                  style={{ background: "var(--surface-2)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
-                >
-                  <span style={{ fontFamily: "var(--font-stark)", fontSize: "10px", color: "#14B8A6" }}>S</span>
-                  Stark·1
+                <div className="flex items-center justify-between pt-2">
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
+                    style={{
+                      background: "var(--stark-bg)",
+                      color: "var(--stark-muted)",
+                      border: "1px solid var(--stark-border)",
+                    }}
+                  >
+                    <span style={{ fontFamily: "var(--font-stark), sans-serif", fontWeight: 900, color: "#14B8A6" }}>S</span>
+                    Stark v1
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSend()}
+                    disabled={!input.trim() || loading}
+                    className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{
+                      background: input.trim() && !loading ? "#14B8A6" : "var(--stark-border)",
+                      color: input.trim() && !loading ? "#fff" : "var(--stark-muted)",
+                    }}
+                    aria-label="Send message"
+                  >
+                    <ArrowUp size={16} strokeWidth={2.5} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleSend()}
-                  disabled={!input.trim() || loading}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-105 disabled:cursor-not-allowed"
-                  style={{
-                    background: input.trim() && !loading ? STARK_GRADIENT : "var(--surface-2)",
-                    border: "1px solid var(--border)",
-                    opacity: input.trim() && !loading ? 1 : 0.6,
-                  }}
-                >
-                  <Send size={14} style={{ color: input.trim() && !loading ? "#fff" : "var(--text-muted)" }} />
-                </button>
               </div>
             </div>
-            <p className="text-center text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-              Stark can make mistakes. Double-check important info with Cassandra.
+            <p className="text-center text-xs mt-3" style={{ color: "var(--stark-muted)" }}>
+              Stark is AI and can make mistakes. Please double-check responses.
             </p>
           </div>
         </div>

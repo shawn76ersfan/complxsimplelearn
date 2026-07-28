@@ -19,11 +19,13 @@ import type * as emailMutations from "../emailMutations.js";
 import type * as embeddings from "../embeddings.js";
 import type * as feedback from "../feedback.js";
 import type * as init from "../init.js";
+import type * as knowledge from "../knowledge.js";
 import type * as lessons from "../lessons.js";
 import type * as quotes from "../quotes.js";
 import type * as seed from "../seed.js";
 import type * as tracks from "../tracks.js";
 import type * as users from "../users.js";
+import type * as videos from "../videos.js";
 
 import type {
   ApiFromModules,
@@ -43,11 +45,13 @@ declare const fullApi: ApiFromModules<{
   embeddings: typeof embeddings;
   feedback: typeof feedback;
   init: typeof init;
+  knowledge: typeof knowledge;
   lessons: typeof lessons;
   quotes: typeof quotes;
   seed: typeof seed;
   tracks: typeof tracks;
   users: typeof users;
+  videos: typeof videos;
 }>;
 
 /**
@@ -76,4 +80,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  r2: import("@convex-dev/r2/_generated/component.js").ComponentApi<"r2">;
+};

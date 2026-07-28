@@ -6,7 +6,7 @@ import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { BookOpen, LayoutDashboard, GraduationCap, Menu, X, Bot } from "lucide-react";
+import { BookOpen, LayoutDashboard, GraduationCap, Menu, X, Bot, Video } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ export function Navbar() {
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/learn",     label: "Learn",     icon: BookOpen },
+    { href: "/videos",    label: "Videos",    icon: Video },
     ...(isTeacher ? [{ href: "/teacher/dashboard", label: "Teacher Hub", icon: GraduationCap }] : []),
     { href: "/stark",     label: "Stark",     icon: Bot, stark: true },
   ];

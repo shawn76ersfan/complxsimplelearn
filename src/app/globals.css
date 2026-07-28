@@ -71,6 +71,13 @@ body {
   outline-offset: 2px;
 }
 
+/* Stark's chat input should not show the blue focus ring */
+.stark-chat textarea:focus,
+.stark-chat textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* ── Testimonial marquee ── */
 @keyframes marquee {
   0%   { transform: translateX(0); }
@@ -109,4 +116,33 @@ body {
 
 .dark .rain-drop {
   background: linear-gradient(180deg, transparent 0%, rgba(96,165,250,0.5) 100%);
+}
+
+/* ── Stark logo (animated shimmer) ── */
+@keyframes starkShimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.stark-logo-text {
+  font-family: var(--font-stark), sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  background: linear-gradient(90deg, #14B8A6, #0d4f4a, #2dd4bf, #14B8A6);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: starkShimmer 3.5s linear infinite;
+}
+
+.stark-logo-dot {
+  box-shadow: 0 0 8px rgba(20, 184, 166, 0.6);
+  animation: starkPulse 2s ease-in-out infinite;
+}
+
+@keyframes starkPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.8); }
 }

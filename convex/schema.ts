@@ -148,4 +148,29 @@ export default defineSchema({
     content: v.string(),
     createdAt: v.number(),
   }).index("by_conversation", ["conversationId"]),
+
+  // Teacher-editable knowledge that gets embedded into Stark's RAG index
+  knowledgeDocs: defineTable({
+    title: v.string(),
+    content: v.string(),
+    category: v.optional(v.string()),
+    updatedBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_updated", ["updatedAt"]),
+
+  // Recorded class videos (e.g. Zoom recordings) teachers upload for students.
+  // Files live in Cloudflare R2 (via @convex-dev/r2); we store the object key.
+  videos: defineTable({
+    title: v.string(),
+    recordedDate: v.string(),          // "YYYY-MM-DD" — the date the class happened
+    description: v.optional(v.string()),
+    key: v.string(),                   // R2 object key returned by the upload hook
+    contentType: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
+    uploadedBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_recorded_date", ["recordedDate"])
+    .index("by_created_at", ["createdAt"]),
 });
