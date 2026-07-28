@@ -5,10 +5,12 @@ Built with Next.js 16, Convex, Clerk, Tailwind CSS, and Resend.
 
 ## Features
 
-- **4 Learning Tracks**: Hardware, AI, Cybersecurity, HTML
-- **Interactive Lessons**: Content, quizzes, and a drag-and-drop PC parts game
-- **Progress Tracking**: % completion per track, scores per lesson
-- **Teacher Dashboard**: Student scores, class calendar, email sending
+- **Learning Tracks**: Hardware, AI, Cybersecurity, HTML, Linux (and more via seed)
+- **Interactive Lessons**: Content, quizzes, games, and mandatory activities
+- **Progress Tracking**: % completion per track, scores, XP, and streaks
+- **Class Videos**: Teachers upload long recordings (Cloudflare R2); students watch on `/videos`
+- **Stark**: Course-aware AI chat with RAG over lessons and teacher knowledge docs
+- **Teacher Dashboard**: Scores, students, homework, calendar, email, quote of the week, knowledge base
 - **Dark / Light Mode**: System preference + manual toggle
 - **Responsive**: Mobile, tablet, and desktop
 
@@ -42,6 +44,7 @@ Copy the `NEXT_PUBLIC_CONVEX_URL` it prints into `.env.local`.
    - `TEACHER_EMAIL` = Cassandra's exact sign-up email
    - `RESEND_API_KEY` = your Resend key
    - `FROM_EMAIL` = your verified sender email
+   - **Class videos (R2):** `R2_BUCKET`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_TOKEN` — see `.env.example` for setup notes (Cloudflare R2 bucket + CORS)
 
 ### 4. Set up Resend (Email)
 
@@ -65,8 +68,10 @@ This creates all 4 tracks and their lessons.
 ### 7. Start the app
 
 ```bash
-npm run dev
+npm run dev:all
 ```
+
+Or run `npx convex dev` and `npm run dev` in separate terminals.
 
 Open [http://localhost:3000](http://localhost:3000).
 
