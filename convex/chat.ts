@@ -1,5 +1,5 @@
-import { action, internalQuery } from "./_generated/server";
-import type { ActionCtx } from "./_generated/server";
+import { action, internalMutation, internalQuery } from "./_generated/server";
+import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
@@ -386,47 +386,89 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+async function loadAssessmentPrompts(
+  ctx: QueryCtx | MutationCtx,
+): Promise<string[]> {
+  const quizQuestions = await ctx.db.query("quizQuestions").collect();
+  const lessons = await ctx.db.query("lessons").collect();
+  const prompts = new Set(quizQuestions.map((question) => question.question));
+
+  for (const lesson of lessons) {
+    try {
+      const parsed: unknown = JSON.parse(lesson.content);
+      if (!isRecord(parsed) || !Array.isArray(parsed.blocks)) continue;
+
+      for (const value of parsed.blocks) {
+        if (!isRecord(value) || typeof value.type !== "string") continue;
+
+        if (
+          (value.type === "quiz" || value.type === "fillblank") &&
+          typeof (value.type === "quiz" ? value.question : value.prompt) === "string"
+        ) {
+          const prompt = value.type === "quiz" ? value.question : value.prompt;
+          if (typeof prompt === "string") prompts.add(prompt);
+        }
+
+        if (
+          (value.type === "crossword" || value.type === "match") &&
+          Array.isArray(value.pairs)
+        ) {
+          for (const pair of value.pairs) {
+            if (isRecord(pair) && typeof pair.definition === "string") {
+              prompts.add(pair.definition);
+            }
+          }
+        }
+      }
+    } catch {
+      // Older plain-text lessons have no structured assessments to inspect.
+    }
+  }
+
+  return [...prompts];
+}
+
 export const getAssessmentPrompts = internalQuery({
   args: {},
   returns: v.array(v.string()),
   handler: async (ctx) => {
-    const quizQuestions = await ctx.db.query("quizQuestions").collect();
-    const lessons = await ctx.db.query("lessons").collect();
-    const prompts = new Set(quizQuestions.map((question) => question.question));
+    return await loadAssessmentPrompts(ctx);
+  },
+});
 
-    for (const lesson of lessons) {
-      try {
-        const parsed: unknown = JSON.parse(lesson.content);
-        if (!isRecord(parsed) || !Array.isArray(parsed.blocks)) continue;
+export const redactHistoricalAssessmentAnswers = internalMutation({
+  args: {},
+  returns: v.object({ redacted: v.number() }),
+  handler: async (ctx) => {
+    const assessmentPrompts = await loadAssessmentPrompts(ctx);
+    const messages = await ctx.db.query("starkMessages").order("asc").collect();
+    const precedingUserText = new Map<string, string>();
+    let redacted = 0;
 
-        for (const value of parsed.blocks) {
-          if (!isRecord(value) || typeof value.type !== "string") continue;
+    for (const message of messages) {
+      const conversationKey = message.conversationId.toString();
+      if (message.role === "user") {
+        precedingUserText.set(conversationKey, message.content);
+        continue;
+      }
 
-          if (
-            (value.type === "quiz" || value.type === "fillblank") &&
-            typeof (value.type === "quiz" ? value.question : value.prompt) === "string"
-          ) {
-            const prompt = value.type === "quiz" ? value.question : value.prompt;
-            if (typeof prompt === "string") prompts.add(prompt);
-          }
+      const userText = precedingUserText.get(conversationKey);
+      precedingUserText.delete(conversationKey);
+      if (
+        !userText ||
+        (!isAssessmentAnswerRequest(userText) &&
+          !containsKnownAssessmentPrompt(userText, assessmentPrompts))
+      ) {
+        continue;
+      }
 
-          if (
-            (value.type === "crossword" || value.type === "match") &&
-            Array.isArray(value.pairs)
-          ) {
-            for (const pair of value.pairs) {
-              if (isRecord(pair) && typeof pair.definition === "string") {
-                prompts.add(pair.definition);
-              }
-            }
-          }
-        }
-      } catch {
-        // Older plain-text lessons have no structured assessments to inspect.
+      if (message.content !== ASSESSMENT_REFUSAL_MESSAGE) {
+        await ctx.db.patch(message._id, { content: ASSESSMENT_REFUSAL_MESSAGE });
+        redacted += 1;
       }
     }
 
-    return [...prompts];
+    return { redacted };
   },
 });
 
