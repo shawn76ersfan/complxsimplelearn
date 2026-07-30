@@ -1,8 +1,32 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { Cpu, Brain, Shield, Code, Terminal, Zap, Trophy, Users, Download, Quote } from "lucide-react";
+import {
+  Award,
+  BookOpen,
+  Boxes,
+  BriefcaseBusiness,
+  Check,
+  Cloud,
+  Container,
+  Download,
+  Gauge,
+  GraduationCap,
+  Layers,
+  MessageCircle,
+  Network,
+  Quote,
+  Rocket,
+  Server,
+  Terminal,
+  Trophy,
+  Users,
+  Video,
+  Workflow,
+  Wrench,
+  Zap,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { SignInBtn, SignUpBtn, HeroButtons } from "@/components/layout/AuthButtons";
+import { SignInBtn, SignUpBtn, EnrollmentButtons } from "@/components/layout/AuthButtons";
 import { RainAnimation } from "@/components/layout/RainAnimation";
 
 const TESTIMONIALS = [
@@ -28,16 +52,129 @@ const TESTIMONIALS = [
   },
 ];
 
+const TOOLS = [
+  "AWS",
+  "Azure",
+  "Kubernetes",
+  "Docker",
+  "Terraform",
+  "Jenkins",
+  "GitHub",
+  "Linux",
+  "Ansible",
+  "Prometheus",
+  "Grafana",
+];
+
+const BENEFITS = [
+  { icon: Terminal, title: "Hands-On Labs", desc: "Practice in real cloud environments." },
+  { icon: BriefcaseBusiness, title: "Real Projects", desc: "Build production-grade infrastructure for your portfolio." },
+  { icon: Trophy, title: "Career Support", desc: "Get resume optimization and interview preparation." },
+  { icon: Users, title: "Live Mentorship", desc: "Learn directly from an experienced instructor." },
+  { icon: Video, title: "Recorded Sessions", desc: "Review every class inside the learning platform." },
+  { icon: MessageCircle, title: "Community Support", desc: "Learn alongside an active student community." },
+  { icon: BookOpen, title: "Beginner Friendly", desc: "Start with the fundamentals—no previous experience required." },
+  { icon: Award, title: "Certification Voucher", desc: "AWS Solutions Architect Associate exam voucher included." },
+];
+
+const CURRICULUM = [
+  {
+    number: "01",
+    title: "Linux Administration",
+    topics: ["Linux Fundamentals", "Command Line Interface", "File Permissions", "Users and Groups", "Networking", "Process Management", "Package Management", "Bash Scripting"],
+  },
+  {
+    number: "02",
+    title: "AWS Cloud",
+    topics: ["IAM", "EC2", "S3", "VPC", "Route Tables", "Security Groups", "Load Balancers", "Auto Scaling", "Route 53", "RDS", "CloudWatch", "EFS", "Lambda", "SNS", "SQS", "CloudFormation"],
+  },
+  {
+    number: "03",
+    title: "Microsoft Azure",
+    topics: ["Virtual Machines", "Storage", "Networking", "Virtual Networks", "Azure Active Directory", "Monitoring", "Security"],
+  },
+  {
+    number: "04",
+    title: "Version Control",
+    topics: ["Git", "GitHub", "Branching", "Pull Requests"],
+  },
+  {
+    number: "05",
+    title: "Containerization",
+    topics: ["Docker Fundamentals", "Docker Images", "Containers", "Docker Compose"],
+  },
+  {
+    number: "06",
+    title: "Kubernetes",
+    topics: ["Pods", "Deployments", "Services", "ConfigMaps", "Secrets", "Persistent Volumes", "Scaling Applications"],
+  },
+  {
+    number: "07",
+    title: "Infrastructure as Code",
+    topics: ["Terraform Basics", "Variables", "Modules", "Provisioning AWS Infrastructure"],
+  },
+  {
+    number: "08",
+    title: "Configuration Management",
+    topics: ["Ansible", "Playbooks", "Inventory", "Automation"],
+  },
+  {
+    number: "09",
+    title: "CI/CD",
+    topics: ["Jenkins", "GitHub Actions", "Pipelines", "Deployment Automation"],
+  },
+  {
+    number: "10",
+    title: "Monitoring",
+    topics: ["Prometheus", "Grafana", "Alerting"],
+  },
+];
+
+const PROJECTS = [
+  { icon: Cloud, tag: "AWS · HA", title: "Deploy Highly Available Web Applications on AWS" },
+  { icon: Layers, tag: "IaC", title: "Build Infrastructure with Terraform" },
+  { icon: Workflow, tag: "CI/CD", title: "Create CI/CD Pipelines Using Jenkins" },
+  { icon: Container, tag: "Containers", title: "Containerize Applications with Docker" },
+  { icon: Boxes, tag: "K8s", title: "Deploy Applications on Kubernetes" },
+  { icon: Gauge, tag: "Monitoring", title: "Configure Monitoring with Prometheus and Grafana" },
+  { icon: Wrench, tag: "Automation", title: "Implement Infrastructure Automation with Ansible" },
+];
+
+const PRICING_FEATURES = [
+  "Live classes",
+  "Recorded sessions",
+  "Hands-on labs",
+  "Real-world projects",
+  "Live mentorship",
+  "Community support",
+  "Resume optimization",
+  "Interview preparation",
+  "Certificate of completion",
+  "AWS certification preparation",
+  "Free AWS Solutions Architect Associate voucher",
+  "Access to Stark AI learning support",
+];
+
+const FAQS = [
+  { question: "Do I need previous experience?", answer: "No. The program starts with core Linux and cloud fundamentals before progressing into production tools." },
+  { question: "Is this beginner-friendly?", answer: "Yes. The roadmap is structured to take beginners from foundational skills through complete DevOps projects." },
+  { question: "Are recordings available?", answer: "Yes. Enrolled students can revisit recorded sessions inside the ComplxSimple platform." },
+  { question: "Will I receive a certificate?", answer: "Students who complete the program requirements receive a certificate of completion." },
+  { question: "Will I work on real projects?", answer: "Yes. You will build portfolio projects across AWS, Terraform, CI/CD, Docker, Kubernetes, monitoring, and automation." },
+  { question: "Will I get support for AWS certification?", answer: "Yes. The program includes SAA-C03 preparation, practical labs, and an AWS Solutions Architect Associate exam voucher." },
+  { question: "How long is the program?", answer: "The complete schedule will be shared when the next cohort dates are announced." },
+];
+
 export default async function LandingPage() {
   const { userId } = await auth();
   if (userId) redirect("/dashboard");
 
   const tracks = [
-    { icon: Cpu,      label: "Hardware Fundamentals", color: "#F97316", bg: "#F9731610" },
-    { icon: Brain,    label: "AI Fundamentals",       color: "#2563EB", bg: "#2563EB10" },
-    { icon: Shield,   label: "Cybersecurity Basics",  color: "#F97316", bg: "#F9731610" },
-    { icon: Code,     label: "HTML Fundamentals",     color: "#06B6D4", bg: "#06B6D410" },
-    { icon: Terminal, label: "Linux Mastery",         color: "#F59E0B", bg: "#F59E0B10" },
+    { icon: Terminal,  label: "Linux Administration", color: "#F59E0B", bg: "#F59E0B10" },
+    { icon: Cloud,     label: "AWS Cloud",            color: "#FF9900", bg: "#FF990010" },
+    { icon: Network,   label: "Microsoft Azure",      color: "#0078D4", bg: "#0078D410" },
+    { icon: Container, label: "Docker",               color: "#2496ED", bg: "#2496ED10" },
+    { icon: Boxes,     label: "Kubernetes",           color: "#326CE5", bg: "#326CE510" },
   ];
 
   const features = [
@@ -90,27 +227,56 @@ export default async function LandingPage() {
             style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
           >
             <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }} />
-            Built for Cassandra Carter&apos;s Tech students
+            Next cohort date to be announced &mdash; Limited seats
           </div>
           <h1
             className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-6 leading-tight"
             style={{ color: "var(--text)" }}
           >
-            Make Tech{" "}
-            <span className="gradient-text">Simple</span>
-            <br />& Fun to Learn
+            Become a Job-Ready
+            <br />
+            <span className="gradient-text">DevOps &amp; Cloud Engineer</span>
           </h1>
-          <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--text-muted)" }}>
-            Interactive lessons in Hardware, AI, Cybersecurity, HTML, and Linux. Play games, take quizzes, track your progress — and actually understand Tech.
+          <p className="text-xl max-w-3xl mx-auto mb-7" style={{ color: "var(--text-muted)" }}>
+            Master Linux, AWS, Azure, Docker, Kubernetes, Terraform, Jenkins, GitHub Actions, Ansible, and Infrastructure as Code through live training, hands-on labs, and real-world projects.
           </p>
-          <HeroButtons />
+          <div className="flex flex-wrap justify-center gap-2 mb-10">
+            {["Beginner Friendly", "Live Instructor-Led Classes", "Hands-On Projects", "Career Support", "Free AWS Certification Voucher"].map((item) => (
+              <span
+                key={item}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+          <EnrollmentButtons />
+        </div>
+      </section>
+
+      {/* Tools */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+        <p className="text-center text-xs font-bold uppercase tracking-[0.22em] mb-6" style={{ color: "var(--text-muted)" }}>
+          Tools you&apos;ll master
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          {TOOLS.map((tool) => (
+            <div
+              key={tool}
+              className="px-5 py-3 rounded-2xl text-sm font-bold transition-transform hover:-translate-y-1"
+              style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", boxShadow: "0 8px 24px rgba(15,23,42,0.05)" }}
+            >
+              {tool}
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Tracks */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <h2 className="text-3xl font-bold text-center mb-3" style={{ color: "var(--text)" }}>Five Tracks to Master</h2>
-        <p className="text-center mb-12 text-sm" style={{ color: "var(--text-muted)" }}>More Tech topics coming soon</p>
+        <h2 className="text-3xl font-bold text-center mb-3" style={{ color: "var(--text)" }}>Core Skills You&apos;ll Build</h2>
+        <p className="text-center mb-12 text-sm" style={{ color: "var(--text-muted)" }}>Start with Linux, then move into cloud platforms, containers, automation, and operations.</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
           {tracks.map((track) => (
             <div
@@ -175,6 +341,128 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* Why choose the program */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#2563EB" }}>Why choose us</p>
+          <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>
+            Everything you need to launch your cloud career
+          </h2>
+          <p style={{ color: "var(--text-muted)" }}>A premium learning experience built around practice, mentorship, and job-ready results.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {BENEFITS.map((benefit, index) => (
+            <div key={benefit.title} className="card p-6">
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+                style={{ background: index % 2 === 0 ? "#2563EB14" : "#F9731614" }}
+              >
+                <benefit.icon size={20} style={{ color: index % 2 === 0 ? "#2563EB" : "#F97316" }} />
+              </div>
+              <h3 className="font-bold mb-2" style={{ color: "var(--text)" }}>{benefit.title}</h3>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>{benefit.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Curriculum */}
+      <section className="relative z-10 pb-24">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-12">
+            <div className="max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#F97316" }}>Program curriculum</p>
+              <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>10 modules. Zero to job-ready.</h2>
+              <p style={{ color: "var(--text-muted)" }}>A structured roadmap covering the essential DevOps and cloud engineering skills employers expect.</p>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+              <Server size={20} style={{ color: "#2563EB" }} />
+              <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>Foundation → Cloud → Automation</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {CURRICULUM.map((module) => (
+              <div key={module.number} className="card p-6 sm:p-7">
+                <div className="flex items-start gap-4">
+                  <span
+                    className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-xs font-black"
+                    style={{ background: "linear-gradient(135deg, #2563EB, #0EA5E9)", color: "white" }}
+                  >
+                    {module.number}
+                  </span>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1" style={{ color: "var(--text-muted)" }}>Module {module.number}</p>
+                    <h3 className="text-lg font-bold mb-4" style={{ color: "var(--text)" }}>{module.title}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {module.topics.map((topic) => (
+                        <span
+                          key={topic}
+                          className="px-2.5 py-1 rounded-lg text-xs"
+                          style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
+                        >
+                          {topic}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Projects */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#2563EB" }}>Real-world projects</p>
+          <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>Build a portfolio recruiters take seriously</h2>
+          <p style={{ color: "var(--text-muted)" }}>Complete production-style projects across the full DevOps lifecycle.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {PROJECTS.map((project) => (
+            <div key={project.title} className="card p-6 group">
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "#2563EB14" }}>
+                  <project.icon size={20} style={{ color: "#2563EB" }} />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full" style={{ background: "#F9731612", color: "#F97316" }}>
+                  {project.tag}
+                </span>
+              </div>
+              <h3 className="font-bold leading-snug" style={{ color: "var(--text)" }}>{project.title}</h3>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Certification */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+        <div
+          className="rounded-3xl p-8 sm:p-12 relative overflow-hidden"
+          style={{ background: "linear-gradient(135deg, #172554, #1e3a8a 55%, #0c4a6e)", border: "1px solid rgba(96,165,250,0.35)" }}
+        >
+          <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full" style={{ background: "rgba(56,189,248,0.16)", filter: "blur(50px)" }} />
+          <div className="relative grid md:grid-cols-[auto_1fr] gap-7 items-center">
+            <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)" }}>
+              <GraduationCap size={36} style={{ color: "#7dd3fc" }} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] mb-2" style={{ color: "#7dd3fc" }}>Certification track</p>
+              <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">AWS Certified Solutions Architect Associate (SAA-C03)</h2>
+              <p className="leading-relaxed mb-5" style={{ color: "rgba(255,255,255,0.7)" }}>
+                Get structured exam preparation, practical labs, and support designed to help you test with confidence.
+              </p>
+              <div className="inline-flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)" }}>
+                <Award size={20} style={{ color: "#fbbf24" }} />
+                <span className="text-sm font-bold text-white">Free AWS Solutions Architect Associate exam voucher included</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Stark teaser */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
         <div
@@ -228,16 +516,16 @@ export default async function LandingPage() {
                     borderRadius: "99px",
                   }}
                 >
-                  COMING SOON
+                  INCLUDED WITH ENROLLMENT
                 </span>
               </div>
 
               <p className="text-base leading-relaxed mb-5" style={{ color: "rgba(255,255,255,0.6)", maxWidth: "580px" }}>
-                An AI assistant trained specifically on this course — ready to answer your Tech questions anytime, break down concepts, and guide your learning. Built with intentional diversity: Stark is trained on truthful, accurate data about Black and Brown people to actively reduce AI bias from day one.
+                Join the platform and get access to Stark, your course-aware AI learning assistant. Ask questions about lessons, break down Linux and cloud concepts, review DevOps tools, and get guidance whenever you need it.
               </p>
 
               <div className="flex flex-wrap gap-2 mb-5">
-                {["Course-specific knowledge", "24/7 Tech Q&A", "Bias-aware AI", "Career guidance", "Explain any concept"].map((tag) => (
+                {["Course-specific knowledge", "Linux & Cloud Q&A", "DevOps explanations", "Career guidance", "Available to enrolled students"].map((tag) => (
                   <span
                     key={tag}
                     className="text-xs font-medium px-3 py-1.5 rounded-full"
@@ -248,12 +536,12 @@ export default async function LandingPage() {
                 ))}
               </div>
 
-              <p
-                className="text-sm font-semibold"
-                style={{ fontFamily: "var(--font-orbitron)", color: "#14B8A6", letterSpacing: "0.04em", fontSize: "11px" }}
+              <SignUpBtn
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
+                style={{ background: "#14B8A6", color: "#fff" }}
               >
-                SIGN UP NOW TO BE NOTIFIED AT LAUNCH →
-              </p>
+                Join ComplxSimple to access Stark
+              </SignUpBtn>
             </div>
           </div>
         </div>
@@ -293,6 +581,97 @@ export default async function LandingPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="relative z-10 max-w-6xl mx-auto px-6 pb-24">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#F97316" }}>Pricing</p>
+          <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>Premium DevOps &amp; Cloud Engineering Bootcamp</h2>
+          <p style={{ color: "var(--text-muted)" }}>One investment. A career-changing outcome.</p>
+        </div>
+
+        <div className="card overflow-hidden">
+          <div className="grid lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="p-8 sm:p-10" style={{ background: "linear-gradient(145deg, #111827, #172554)", color: "white" }}>
+              <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: "#F9731620", border: "1px solid #F9731644", color: "#FDBA74" }}>
+                Limited seats available
+              </span>
+              <h3 className="text-2xl font-black mb-3">Complete Bootcamp</h3>
+              <p className="text-sm leading-relaxed mb-8" style={{ color: "rgba(255,255,255,0.65)" }}>
+                Everything included—live training, labs, projects, mentorship, career support, Stark access, and certification preparation.
+              </p>
+              <div className="flex items-end gap-2 mb-2">
+                <span className="text-5xl font-black">$1,699</span>
+                <span className="text-sm mb-1" style={{ color: "rgba(255,255,255,0.55)" }}>one-time</span>
+              </div>
+              <p className="text-xs mb-8" style={{ color: "rgba(255,255,255,0.55)" }}>Installment payment available—contact the administrator for details.</p>
+              <SignUpBtn
+                className="w-full py-3.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
+                style={{ background: "linear-gradient(135deg, #2563EB, #F97316)", color: "white" }}
+              >
+                Enroll Now
+              </SignUpBtn>
+              <p className="text-center text-xs mt-4" style={{ color: "rgba(255,255,255,0.5)" }}>Next cohort date to be announced</p>
+            </div>
+
+            <div className="p-8 sm:p-10">
+              <div className="flex items-center gap-3 mb-7">
+                <Network size={22} style={{ color: "#2563EB" }} />
+                <h3 className="text-lg font-bold" style={{ color: "var(--text)" }}>Everything included</h3>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-x-7 gap-y-4">
+                {PRICING_FEATURES.map((feature) => (
+                  <div key={feature} className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "#16A34A16" }}>
+                      <Check size={12} strokeWidth={3} style={{ color: "#16A34A" }} />
+                    </span>
+                    <span className="text-sm" style={{ color: "var(--text-muted)" }}>{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="relative z-10 max-w-4xl mx-auto px-6 pb-24">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl sm:text-4xl font-black mb-3" style={{ color: "var(--text)" }}>Frequently asked questions</h2>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>The essentials before you enroll.</p>
+        </div>
+        <div className="space-y-3">
+          {FAQS.map((faq) => (
+            <details key={faq.question} className="card group p-5">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-4 font-semibold" style={{ color: "var(--text)" }}>
+                {faq.question}
+                <span className="text-xl transition-transform group-open:rotate-45" style={{ color: "#2563EB" }}>+</span>
+              </summary>
+              <p className="text-sm leading-relaxed pt-4 pr-8" style={{ color: "var(--text-muted)" }}>{faq.answer}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+        <div
+          className="rounded-3xl p-10 sm:p-14 text-center relative overflow-hidden"
+          style={{ background: "linear-gradient(135deg, #EFF6FF, #FFF7ED)", border: "1px solid var(--border)" }}
+        >
+          <div className="absolute -top-16 left-1/4 w-64 h-64 rounded-full" style={{ background: "rgba(37,99,235,0.10)", filter: "blur(50px)" }} />
+          <div className="relative">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
+              <Rocket size={25} color="white" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "#111827" }}>Start your cloud engineering career</h2>
+            <p className="max-w-2xl mx-auto mb-8" style={{ color: "#4B5563" }}>
+              Master AWS, Azure, Docker, Kubernetes, Terraform, CI/CD, and DevOps through practical projects and expert mentorship.
+            </p>
+            <EnrollmentButtons />
           </div>
         </div>
       </section>

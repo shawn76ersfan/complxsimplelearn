@@ -6,8 +6,9 @@ export const listByTrack = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("lessons")
-      .withIndex("by_track", (q) => q.eq("trackId", args.trackId))
-      .filter((q) => q.eq(q.field("published"), true))
+      .withIndex("by_track_published", (q) =>
+        q.eq("trackId", args.trackId).eq("published", true)
+      )
       .collect();
   },
 });

@@ -29,7 +29,9 @@ export default defineSchema({
     icon: v.string(),
     order: v.number(),
     published: v.boolean(),
-  }).index("by_slug", ["slug"]),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_published", ["published"]),
 
   lessons: defineTable({
     trackId: v.id("tracks"),
@@ -38,7 +40,10 @@ export default defineSchema({
     type: v.union(v.literal("content"), v.literal("quiz"), v.literal("game"), v.literal("mandatory")),
     order: v.number(),
     published: v.boolean(),
-  }).index("by_track", ["trackId"]),
+  })
+    .index("by_track", ["trackId"])
+    .index("by_track_published", ["trackId", "published"])
+    .index("by_published", ["published"]),
 
   quizQuestions: defineTable({
     lessonId: v.id("lessons"),
@@ -53,7 +58,7 @@ export default defineSchema({
   lessonEmbeddings: defineTable({
     lessonId: v.optional(v.id("lessons")),
     trackId: v.optional(v.id("tracks")),
-    source: v.string(),       // "lesson" | "track" | "faq"
+    source: v.string(),       // "lesson" | "track" | "assignment" | "faq" | "knowledge"
     title: v.string(),        // human-readable label for the chunk
     chunkText: v.string(),    // the text that was embedded
     embedding: v.array(v.float64()),
@@ -129,6 +134,7 @@ export default defineSchema({
     assignedToAll: v.boolean(),
   })
     .index("by_created_by", ["createdBy"])
+    .index("by_title", ["title"])
     .index("by_due_date", ["dueDate"]),
 
   // Stark chatbot: saved conversations

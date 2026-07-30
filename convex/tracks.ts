@@ -6,7 +6,7 @@ export const list = query({
   handler: async (ctx) => {
     return await ctx.db
       .query("tracks")
-      .filter((q) => q.eq(q.field("published"), true))
+      .withIndex("by_published", (q) => q.eq("published", true))
       .collect();
   },
 });
@@ -14,9 +14,10 @@ export const list = query({
 export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const track = await ctx.db
       .query("tracks")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique();
+    return track?.published ? track : null;
   },
 });

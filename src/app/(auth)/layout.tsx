@@ -59,7 +59,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const addLinuxTrack = useMutation(api.init.addLinuxTrack);
   const addHardwareCrossword = useMutation(api.init.addHardwareCrossword);
   const addAICrossword = useMutation(api.init.addAICrossword);
-  const addLinuxCrossword = useMutation(api.init.addLinuxCrossword);
   const reorderTracksLinuxFirst = useMutation(api.init.reorderTracksLinuxFirst);
   const patchCrosswordsToMandatory = useMutation(api.init.patchCrosswordsToMandatory);
   const profile = useQuery(api.users.getMyProfile);
@@ -77,7 +76,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     void addLinuxTrack();
     void addHardwareCrossword();
     void addAICrossword();
-    void addLinuxCrossword();
     void reorderTracksLinuxFirst();
     void patchCrosswordsToMandatory();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -10,6 +10,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const { user, isLoaded } = useUser();
   const storeUser = useMutation(api.users.store);
   const ensureSeeded = useMutation(api.init.ensureSeeded);
+  const syncDevOpsCurriculum = useMutation(api.curriculum.syncDevOpsCurriculum);
   const profile = useQuery(api.users.getMyProfile);
 
   useEffect(() => {
@@ -23,6 +24,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       ensureSeeded();
     }
   }, [isLoaded, user, storeUser, ensureSeeded]);
+
+  useEffect(() => {
+    if (profile?.role !== "teacher") return;
+    void syncDevOpsCurriculum();
+  }, [profile?.role, syncDevOpsCurriculum]);
 
   if (profile === undefined) {
     return (

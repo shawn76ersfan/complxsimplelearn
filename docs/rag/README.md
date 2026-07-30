@@ -15,7 +15,7 @@ TypeScript examples, see
 ```mermaid
 flowchart TB
   subgraph indexTime [Index time — build the search library]
-    Content[Tracks, lessons, quizzes, FAQ, teacher knowledge]
+    Content[Tracks, lessons, quizzes, homework, FAQ, teacher knowledge]
     Chunk[Split into text chunks]
     JinaDoc[Jina AI — embed as passages]
     DB[(lessonEmbeddings table + vector index)]
@@ -61,7 +61,7 @@ Chunks live in `lessonEmbeddings` (see [`convex/schema.ts`](../../convex/schema.
 lessonEmbeddings: defineTable({
   lessonId: v.optional(v.id("lessons")),
   trackId: v.optional(v.id("tracks")),
-  source: v.string(),       // "track" | "lesson" | "faq" | "knowledge"
+  source: v.string(),       // "track" | "lesson" | "assignment" | "faq" | "knowledge"
   title: v.string(),
   chunkText: v.string(),
   embedding: v.array(v.float64()),
@@ -80,17 +80,26 @@ Teacher-editable text is stored separately in `knowledgeDocs` and **copied into 
 
 ### 1. Gather all text to embed
 
-An internal query loads tracks, lessons, quiz questions, and knowledge docs:
+An internal query loads published tracks and lessons, quiz questions, homework,
+and knowledge docs. Unpublished material such as the retired HTML track is
+excluded from Stark's index:
 
 ```typescript
 export const getAllContent = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const tracks = await ctx.db.query("tracks").collect();
-    const lessons = await ctx.db.query("lessons").collect();
+    const tracks = await ctx.db
+      .query("tracks")
+      .withIndex("by_published", (q) => q.eq("published", true))
+      .collect();
+    const lessons = await ctx.db
+      .query("lessons")
+      .withIndex("by_published", (q) => q.eq("published", true))
+      .collect();
     const questions = await ctx.db.query("quizQuestions").collect();
+    const assignments = await ctx.db.query("assignments").collect();
     const knowledge = await ctx.db.query("knowledgeDocs").collect();
-    return { tracks, lessons, questions, knowledge };
+    return { tracks, lessons, questions, assignments, knowledge };
   },
 });
 ```
@@ -124,6 +133,7 @@ Each rebuild adds chunks from:
 
 - **track** — name, slug, description  
 - **lesson** — track + title + flattened content + linked quiz Q&A  
+- **assignment** — homework title, track, description, and due date
 - **faq** — static “how the site works” copy (homework, crosswords, Cassandra, etc.)  
 - **knowledge** — Cassandra’s docs from Teacher Hub → Stark Knowledge  
 
@@ -282,7 +292,10 @@ Without `JINA_API_KEY`, indexing and RAG search will error. Without both chat ke
 1. **First time / after big content changes:** Teacher Hub → Stark Knowledge → **Sync Stark now** (or run `embeddings.generateAllEmbeddings` from the Convex dashboard).
 2. **After Cassandra edits knowledge:** Re-index runs automatically within a few seconds.
 3. **After seeding new lessons:** Run a full sync so new lesson text is embedded.
-4. **Students:** Open `/stark` and ask course questions; retrieved chunks drive grounded answers.
+4. **After the DevOps curriculum sync:** A rebuild is scheduled automatically,
+   including the new Linux, AWS, Azure, Git, Docker, Kubernetes, Terraform,
+   Ansible, CI/CD, monitoring, crossword, quiz, and homework content.
+5. **Students:** Open `/stark` and ask course or homework questions; retrieved chunks drive grounded answers.
 
 ---
 
@@ -293,6 +306,7 @@ Without `JINA_API_KEY`, indexing and RAG search will error. Without both chat ke
 | [`convex/schema.ts`](../../convex/schema.ts) | `lessonEmbeddings` + vector index; `knowledgeDocs` |
 | [`convex/embeddings.ts`](../../convex/embeddings.ts) | Chunking, Jina batch embed, rebuild index |
 | [`convex/knowledge.ts`](../../convex/knowledge.ts) | Teacher CRUD + schedule rebuild |
+| [`convex/curriculum.ts`](../../convex/curriculum.ts) | Idempotent DevOps/cloud coursework, crossword, homework, and RAG sync |
 | [`convex/chat.ts`](../../convex/chat.ts) | Query embed, vector search, LLM, safety |
 | [`convex/conversations.ts`](../../convex/conversations.ts) | Persist Stark chats |
 | [`src/app/(auth)/stark/page.tsx`](../../src/app/(auth)/stark/page.tsx) | Chat UI |

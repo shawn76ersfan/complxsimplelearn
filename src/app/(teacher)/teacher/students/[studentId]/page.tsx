@@ -7,15 +7,28 @@ import { Id } from "../../../../../../convex/_generated/dataModel";
 import Link from "next/link";
 import {
   ArrowLeft, BookOpen, CheckCircle, Clock, Flame,
-  Star, Trophy, Cpu, Brain, Shield, Code, TrendingUp,
+  Star, Trophy, Cpu, Brain, Shield, TrendingUp,
   Terminal, Send, MessageSquare, AlertTriangle, UserX,
-  UserCheck, Bell, AlertCircle, RotateCcw,
+  UserCheck, Bell, AlertCircle, RotateCcw, Cloud, Container,
+  Boxes, GitBranch, Layers, Wrench, Workflow, Gauge,
 } from "lucide-react";
 import { cn, percentageColor, percentageBg, getInitials, formatDate } from "@/lib/utils";
 import { QuizDetailAccordion } from "@/components/teacher/QuizDetailAccordion";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
-  hardware: Cpu, ai: Brain, cybersecurity: Shield, html: Code, linux: Terminal,
+  hardware: Cpu,
+  ai: Brain,
+  cybersecurity: Shield,
+  linux: Terminal,
+  aws: Cloud,
+  azure: Cloud,
+  "version-control": GitBranch,
+  docker: Container,
+  kubernetes: Boxes,
+  terraform: Layers,
+  ansible: Wrench,
+  cicd: Workflow,
+  monitoring: Gauge,
 };
 
 function ScoreRing({ pct, color }: { pct: number; color: string }) {

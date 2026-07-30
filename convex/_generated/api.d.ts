@@ -14,6 +14,7 @@ import type * as attempts from "../attempts.js";
 import type * as calendar from "../calendar.js";
 import type * as chat from "../chat.js";
 import type * as conversations from "../conversations.js";
+import type * as curriculum from "../curriculum.js";
 import type * as email from "../email.js";
 import type * as emailMutations from "../emailMutations.js";
 import type * as embeddings from "../embeddings.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   calendar: typeof calendar;
   chat: typeof chat;
   conversations: typeof conversations;
+  curriculum: typeof curriculum;
   email: typeof email;
   emailMutations: typeof emailMutations;
   embeddings: typeof embeddings;

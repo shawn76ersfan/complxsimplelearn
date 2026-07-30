@@ -4,13 +4,24 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { Cpu, Brain, Shield, Code, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, MessageSquare, AlertTriangle, Calendar } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Calendar, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge } from "lucide-react";
 import { FeedbackInbox } from "@/components/teacher/FeedbackInbox";
 import { StudentHomework } from "@/components/learn/StudentHomework";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
-  hardware: Cpu, ai: Brain, cybersecurity: Shield, html: Code, linux: Terminal,
+  hardware: Cpu,
+  ai: Brain,
+  cybersecurity: Shield,
+  linux: Terminal,
+  aws: Cloud,
+  azure: Cloud,
+  "version-control": GitBranch,
+  docker: Container,
+  kubernetes: Boxes,
+  terraform: Layers,
+  ansible: Wrench,
+  cicd: Workflow,
+  monitoring: Gauge,
 };
 
 function TrackCard({ track }: { track: { _id: string; name: string; slug: string; description: string; color: string; icon: string } }) {
@@ -99,7 +110,6 @@ export default function StudentDashboard() {
   const profile = useQuery(api.users.getMyProfile);
   const unreadFeedback = useQuery(api.feedback.getUnreadCount);
   const activeWarnings = useQuery(api.feedback.getActiveWarnings);
-  const markRead = useMutation(api.feedback.markRead);
   const acknowledgeWarning = useMutation(api.feedback.acknowledgeWarning);
 
   const totalScore = myAttempts?.reduce((s, a) => s + a.score, 0) ?? 0;
@@ -213,7 +223,7 @@ export default function StudentDashboard() {
         <StudentHomework />
       </div>
 
-      {/* Stark — Coming Soon */}
+      {/* Stark */}
       <div
         className="card p-6 mb-8 relative overflow-hidden"
         style={{ background: "linear-gradient(135deg, #020d0d, #071a17, #030f0f)", border: "1px solid rgba(20,184,166,0.25)" }}
@@ -261,13 +271,13 @@ export default function StudentDashboard() {
                   borderRadius: "99px",
                 }}
               >
-                COMING SOON
+                AVAILABLE NOW
               </span>
             </div>
             <p className="text-sm leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.55)" }}>
-              An AI assistant trained on everything related to this course — ready to answer your Tech questions 24/7. Built with intentional diversity, trained on truthful data about Black and Brown people to reduce AI bias from the ground up.
+              Stark is included with your platform access. Ask course questions, review Linux and cloud concepts, break down DevOps tools, and get learning guidance whenever you need it.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-4">
               {["Course FAQs", "Tech Concepts", "Career Advice", "Bias-Aware AI"].map((tag) => (
                 <span
                   key={tag}
@@ -278,6 +288,13 @@ export default function StudentDashboard() {
                 </span>
               ))}
             </div>
+            <Link
+              href="/stark"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+              style={{ background: "#14B8A6", color: "#fff" }}
+            >
+              Open Stark <ArrowRight size={13} />
+            </Link>
           </div>
         </div>
       </div>

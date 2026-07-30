@@ -3,15 +3,22 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import Link from "next/link";
-import { Cpu, Brain, Shield, Code, Terminal, ArrowRight, BookOpen, Tv, ExternalLink } from "lucide-react";
-import { cn, percentageBg } from "@/lib/utils";
+import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Tv, ExternalLink, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge } from "lucide-react";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
   hardware:     Cpu,
   ai:           Brain,
   cybersecurity: Shield,
-  html:         Code,
   linux:        Terminal,
+  aws:          Cloud,
+  azure:        Cloud,
+  "version-control": GitBranch,
+  docker:       Container,
+  kubernetes:   Boxes,
+  terraform:    Layers,
+  ansible:      Wrench,
+  cicd:         Workflow,
+  monitoring:   Gauge,
 };
 
 export default function LearnPage() {

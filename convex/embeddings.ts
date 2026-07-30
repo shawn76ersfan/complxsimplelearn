@@ -89,11 +89,18 @@ async function embedBatch(inputs: string[]): Promise<number[][]> {
 export const getAllContent = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const tracks = await ctx.db.query("tracks").collect();
-    const lessons = await ctx.db.query("lessons").collect();
+    const tracks = await ctx.db
+      .query("tracks")
+      .withIndex("by_published", (q) => q.eq("published", true))
+      .collect();
+    const lessons = await ctx.db
+      .query("lessons")
+      .withIndex("by_published", (q) => q.eq("published", true))
+      .collect();
     const questions = await ctx.db.query("quizQuestions").collect();
     const knowledge = await ctx.db.query("knowledgeDocs").collect();
-    return { tracks, lessons, questions, knowledge };
+    const assignments = await ctx.db.query("assignments").collect();
+    return { tracks, lessons, questions, knowledge, assignments };
   },
 });
 
@@ -148,7 +155,7 @@ export const insertEmbedding = internalMutation({
 // ── Shared rebuild logic ────────────────────────────────────────────────────
 
 async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
-  const { tracks, lessons, questions, knowledge } = await ctx.runQuery(
+  const { tracks, lessons, questions, knowledge, assignments } = await ctx.runQuery(
     internal.embeddings.getAllContent,
     {}
   );
@@ -208,11 +215,11 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
     const FAQ: Array<{ title: string; text: string }> = [
       {
         title: "About ComplxSimple",
-        text: "ComplxSimple is an interactive tech learning platform created by Cassandra Carter. It teaches Hardware, AI, Cybersecurity, HTML, and Linux through lessons, quizzes, games, and crosswords.",
+        text: "ComplxSimple is an interactive DevOps and cloud engineering learning platform created by Cassandra Carter. Its core program covers Linux Administration, AWS, Microsoft Azure, Git and GitHub, Docker, Kubernetes, Terraform, Ansible, CI/CD with Jenkins and GitHub Actions, and monitoring with Prometheus and Grafana. Hardware, AI, and cybersecurity remain available as supplementary foundations. HTML is not part of the current program.",
       },
       {
         title: "How learning works",
-        text: "Students pick a track on the Learn page, then complete lessons in order. Lessons can be reading content, quizzes, interactive games, or Mandatory Work crosswords. Each completed lesson earns XP and counts toward track progress.",
+        text: "Students follow a structured DevOps and cloud roadmap on the Learn page, complete lessons in order, take quizzes, finish Mandatory Work crosswords, submit homework, and build production-style portfolio projects. Each completed lesson earns XP and counts toward track progress.",
       },
       {
         title: "Mandatory Work / Crosswords",
@@ -220,7 +227,7 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
       },
       {
         title: "Homework and assignments",
-        text: "Teachers assign homework with due dates on the Teacher Hub. Students see their homework status (pending, complete, or late) on the Homework page. Homework is tied to a track and counts as complete when the student completes work in that track before the due date.",
+        text: "Teachers assign DevOps and cloud homework with due dates on the Teacher Hub. Students see homework status (pending, complete, or late) on the Homework page. Assignments include Linux administration reports, Bash automation, cloud architecture designs, GitHub pull requests, Docker builds, Kubernetes deployments, Terraform infrastructure, Ansible playbooks, CI/CD pipelines, and Prometheus/Grafana dashboards.",
       },
       {
         title: "Teacher feedback",
@@ -237,6 +244,26 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
     ];
     for (const f of FAQ) {
       chunks.push({ source: "faq", title: f.title, chunkText: `${f.title}. ${f.text}` });
+    }
+
+    // Homework is searchable so Stark can explain current assignments.
+    for (const assignment of assignments) {
+      const track = assignment.trackId
+        ? tracks.find((item) => item._id === assignment.trackId)
+        : undefined;
+      chunks.push({
+        trackId: assignment.trackId,
+        source: "assignment",
+        title: assignment.title,
+        chunkText: [
+          `Homework: ${assignment.title}`,
+          track ? `Track: ${track.name}` : "",
+          assignment.description ?? "",
+          `Due: ${new Date(assignment.dueDate).toISOString()}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
     }
 
     // Teacher-authored knowledge docs (chunked if long)

@@ -125,11 +125,24 @@ export const reorderTracksLinuxFirst = mutation({
   handler: async (ctx) => {
     const tracks = await ctx.db.query("tracks").collect();
     const slugOrder: Record<string, number> = {
-      linux: 1, hardware: 2, ai: 3, cybersecurity: 4, html: 5,
+      linux: 1,
+      aws: 2,
+      azure: 3,
+      "version-control": 4,
+      docker: 5,
+      kubernetes: 6,
+      terraform: 7,
+      ansible: 8,
+      cicd: 9,
+      monitoring: 10,
+      hardware: 11,
+      ai: 12,
+      cybersecurity: 13,
+      html: 99,
     };
     await Promise.all(
       tracks.map((t) => {
-        const newOrder = slugOrder[t.slug] ?? t.order + 10;
+        const newOrder = slugOrder[t.slug] ?? t.order;
         if (t.order !== newOrder) return ctx.db.patch(t._id, { order: newOrder });
       })
     );

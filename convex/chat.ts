@@ -262,7 +262,7 @@ async function generateTitle(userText: string): Promise<string> {
       {
         role: "system",
         content:
-          "You create short chat titles for ComplxSimple, a tech education platform. Students ask about course learning TRACKS (Hardware, AI, Cybersecurity, HTML, Linux), lessons, quizzes, crosswords, and homework. IMPORTANT: 'tracks' always means course learning tracks — never music. Summarize the user's message as a concise 3-6 word title about the tech/course topic. Return ONLY the title text — no quotes, no punctuation at the end, no explanation.",
+          "You create short chat titles for ComplxSimple, a DevOps and cloud engineering education platform. Students ask about learning tracks such as Linux, AWS, Azure, Git, Docker, Kubernetes, Terraform, Ansible, CI/CD, and monitoring, plus lessons, quizzes, crosswords, projects, and homework. IMPORTANT: 'tracks' always means course learning tracks — never music. Summarize the user's message as a concise 3-6 word title about the tech/course topic. Return ONLY the title text — no quotes, no punctuation at the end, no explanation.",
       },
       { role: "user", content: userText },
     ],

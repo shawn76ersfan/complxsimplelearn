@@ -12,14 +12,14 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 const GREETING: ChatMessage = {
   role: "assistant",
   content:
-    "Hey! I'm Stark — your AI learning assistant for ComplxSimple. Ask me anything about your lessons, the crosswords, homework, or any tech concept in Hardware, AI, Cybersecurity, HTML, or Linux. What can I help you with?",
+    "Hey! I'm Stark — your AI learning assistant for ComplxSimple. Ask me about your lessons, crosswords, homework, Linux, AWS, Azure, Git, Docker, Kubernetes, Terraform, Ansible, CI/CD, Prometheus, Grafana, or any other tech concept. What can I help you with?",
 };
 
 const SUGGESTIONS = [
-  "What tracks can I learn?",
-  "How do the crosswords work?",
-  "Explain what a CPU does",
-  "What is the CIA triad?",
+  "What is the DevOps learning roadmap?",
+  "Explain AWS VPCs in simple terms",
+  "What is the difference between Docker and Kubernetes?",
+  "Help me understand my current homework",
 ];
 
 const STARK_VARS = {
@@ -87,6 +87,7 @@ export default function StarkPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Convex query results hydrate the selected conversation. */
   useEffect(() => {
     if (!dbMessages) return;
     if (dbMessages.length === 0) {
@@ -95,6 +96,7 @@ export default function StarkPage() {
       setMessages(dbMessages.map((m) => ({ role: m.role, content: m.content })));
     }
   }, [dbMessages]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

@@ -5,11 +5,12 @@ Built with Next.js 16, Convex, Clerk, Tailwind CSS, and Resend.
 
 ## Features
 
-- **Learning Tracks**: Hardware, AI, Cybersecurity, HTML, Linux (and more via seed)
+- **DevOps & Cloud Tracks**: Linux, AWS, Azure, Git/GitHub, Docker, Kubernetes, Terraform, Ansible, CI/CD, and Monitoring
+- **Supplementary Foundations**: Hardware, AI, and Cybersecurity
 - **Interactive Lessons**: Content, quizzes, games, and mandatory activities
 - **Progress Tracking**: % completion per track, scores, XP, and streaks
 - **Class Videos**: Teachers upload long recordings (Cloudflare R2); students watch on `/videos`
-- **Stark**: Course-aware AI chat with RAG over lessons and teacher knowledge docs
+- **Stark**: Course-aware AI chat with RAG over lessons, homework, quizzes, and teacher knowledge docs
 - **Teacher Dashboard**: Scores, students, homework, calendar, email, quote of the week, knowledge base
 - **Dark / Light Mode**: System preference + manual toggle
 - **Responsive**: Mobile, tablet, and desktop
@@ -68,7 +69,9 @@ cp .env.example .env.local
 After `npx convex dev` is running, in the Convex dashboard:
 - Go to **Functions** → `seed.seedAll` → **Run**
 
-This creates all 4 tracks and their lessons.
+This creates the foundation content. Opening the Teacher Hub as the configured
+teacher idempotently adds the DevOps/cloud curriculum, homework, crosswords,
+and refreshes Stark's RAG index.
 
 ### 7. Start the app
 
