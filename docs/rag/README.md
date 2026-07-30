@@ -4,6 +4,10 @@ This document explains the **Retrieval-Augmented Generation (RAG)** system that 
 
 In plain English: we **store searchable copies of course content as numbers (embeddings)**, and when a student asks a question we **find the most relevant pieces**, paste them into the prompt, and let the LLM answer using that context.
 
+For a standalone, public-safe architecture case study with production-derived
+TypeScript examples, see
+[`stark-rag-architecture`](https://github.com/shawn76ersfan/stark-rag-architecture).
+
 ---
 
 ## The big picture
@@ -22,7 +26,7 @@ flowchart TB
     Question[Student question]
     JinaQ[Jina AI — embed as query]
     Search[Vector search top 6 chunks]
-    LLM[Groq Llama 4 Scout or OpenAI fallback]
+    LLM[Groq Llama 3.3 70B or OpenAI fallback]
     Answer[Stark reply]
     Question --> JinaQ --> Search --> LLM --> Answer
     DB --> Search
@@ -40,7 +44,7 @@ flowchart TB
 |--------|-------------|-----|
 | Where vectors live | Convex table `lessonEmbeddings` + `vectorIndex("by_embedding")` | Same database as the app; reactive, no separate vector DB to run |
 | Embedding model | [Jina `jina-embeddings-v3`](https://jina.ai/), 1024 dimensions | Good quality; separate tasks for **documents** vs **questions** |
-| Chat model | Groq **Llama 4 Scout** first, **GPT-4o-mini** fallback | Fast/free tier friendly; still works if Groq is down |
+| Chat model | Groq **Llama 3.3 70B** first, **GPT-4o-mini** fallback | Fast/free tier friendly; a configured secondary provider is available if Groq fails |
 | Chunking | ~1200 characters, split on paragraph breaks | Keeps each search result focused; long teacher docs split into parts |
 | Retrieval | Top **6** chunks per question | Enough context without blowing up the prompt |
 | Teacher knowledge | `knowledgeDocs` table + auto re-index on save | Cassandra can teach Stark policies, schedules, etc. without code changes |
@@ -231,7 +235,9 @@ let reply = await chatComplete(llmMessages);
 reply = sanitizeReply(userText, reply);
 ```
 
-`chatComplete` tries **Groq** first, then **OpenAI** if Groq fails or is missing.
+`chatComplete` tries **Groq** first, then **OpenAI** if Groq fails or is
+missing. The fallback can also fail if its key, quota, or service is
+unavailable.
 
 ### Step 6 — Save conversation
 

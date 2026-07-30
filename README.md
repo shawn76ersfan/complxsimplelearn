@@ -14,6 +14,11 @@ Built with Next.js 16, Convex, Clerk, Tailwind CSS, and Resend.
 - **Dark / Light Mode**: System preference + manual toggle
 - **Responsive**: Mobile, tablet, and desktop
 
+## Architecture documentation
+
+- [Stark RAG implementation guide](docs/rag/README.md)
+- [Public Stark RAG architecture case study](https://github.com/shawn76ersfan/stark-rag-architecture)
+
 ---
 
 ## Quick Setup
