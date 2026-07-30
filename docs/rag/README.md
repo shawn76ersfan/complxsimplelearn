@@ -6,7 +6,7 @@ In plain English: we **store searchable copies of course content as numbers (emb
 
 For a standalone, public-safe architecture case study with production-derived
 TypeScript examples, see
-[`stark-rag-architecture`](https://github.com/shawn76ersfan/stark-rag-architecture).
+[`stark-rag-docs`](https://github.com/shawn76ersfan/stark-rag-docs).
 
 ---
 
