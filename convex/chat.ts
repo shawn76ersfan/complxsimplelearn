@@ -9,9 +9,8 @@ const EMBEDDING_URL = "https://api.jina.ai/v1/embeddings";
 const EMBEDDING_DIMENSIONS = 1024;
 
 // Primary: Groq (free, fast). Fallback automatically to OpenAI if Groq fails.
-// Llama 4 Scout — knowledge cutoff Aug 2024 (vs Dec 2023 on llama-3.3-70b-versatile).
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_CHAT_MODEL = "gpt-4o-mini";
 
@@ -234,8 +233,11 @@ async function chatComplete(
         const json = await res.json();
         const content = json.choices?.[0]?.message?.content;
         if (content) return content;
+      } else {
+        console.warn(`Groq chat completion failed (${res.status}): ${await res.text()}`);
       }
-    } catch {
+    } catch (error) {
+      console.warn("Groq chat completion request failed:", error);
       // fall through to OpenAI
     }
   }
