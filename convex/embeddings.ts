@@ -28,22 +28,18 @@ function lessonContentToText(content: string): string {
           if (b.front || b.back) parts.push(`${b.front}: ${b.back}`);
           break;
         case "fillblank":
-          if (b.prompt) parts.push(`Fill in the blank: ${b.prompt}`);
+          // Fill-in-the-blank prompts are assessments and stay out of RAG.
           break;
         case "quiz":
-          if (b.question) {
-            const opts = Array.isArray(b.options) ? b.options.join(", ") : "";
-            const answer = Array.isArray(b.options) ? b.options[b.correctIndex] : "";
-            parts.push(`Quiz: ${b.question} Options: ${opts}. Correct answer: ${answer}.${b.explanation ? " " + b.explanation : ""}`);
-          }
+          // Assessment questions, choices, answers, and explanations are
+          // deliberately excluded from Stark's retrieval context.
+          break;
+        case "crossword":
+          // Crossword terms are answers, so none of the crossword block enters
+          // the RAG index. Stark can explain the lesson concepts instead.
           break;
         case "match":
-        case "crossword":
-          if (Array.isArray(b.pairs)) {
-            parts.push(
-              b.pairs.map((p: { term: string; definition: string }) => `${p.term} = ${p.definition}`).join("; ")
-            );
-          }
+          // Matching pairs contain the complete answer key.
           break;
         case "playground":
           if (b.code) parts.push(`Code example (${b.language}):\n${b.code}`);
@@ -97,10 +93,9 @@ export const getAllContent = internalQuery({
       .query("lessons")
       .withIndex("by_published", (q) => q.eq("published", true))
       .collect();
-    const questions = await ctx.db.query("quizQuestions").collect();
     const knowledge = await ctx.db.query("knowledgeDocs").collect();
     const assignments = await ctx.db.query("assignments").collect();
-    return { tracks, lessons, questions, knowledge, assignments };
+    return { tracks, lessons, knowledge, assignments };
   },
 });
 
@@ -155,7 +150,7 @@ export const insertEmbedding = internalMutation({
 // ── Shared rebuild logic ────────────────────────────────────────────────────
 
 async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
-  const { tracks, lessons, questions, knowledge, assignments } = await ctx.runQuery(
+  const { tracks, lessons, knowledge, assignments } = await ctx.runQuery(
     internal.embeddings.getAllContent,
     {}
   );
@@ -180,16 +175,9 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
       });
     }
 
-    // Lesson-level chunks (with their quiz questions appended)
+    // Lesson-level chunks. Assessment questions and answers never enter RAG.
     for (const l of lessons) {
       const track = tracks.find((t) => t._id === l.trackId);
-      const lessonQuestions = questions.filter((q) => q.lessonId === l._id);
-      const qText = lessonQuestions
-        .map((q) => {
-          const answer = q.options[q.correctIndex];
-          return `Q: ${q.question} A: ${answer}.${q.explanation ? " " + q.explanation : ""}`;
-        })
-        .join("\n");
 
       const body = lessonContentToText(l.content);
       const chunkText = [
@@ -197,7 +185,6 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
         `Lesson: ${l.title}`,
         `Type: ${l.type === "mandatory" ? "Mandatory Work (graded crossword)" : l.type}`,
         body,
-        qText,
       ]
         .filter(Boolean)
         .join("\n");
