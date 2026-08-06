@@ -5,6 +5,7 @@ import {
   BookOpen,
   Boxes,
   BriefcaseBusiness,
+  CalendarDays,
   Check,
   Cloud,
   Container,
@@ -28,6 +29,7 @@ import {
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { SignInBtn, SignUpBtn, EnrollmentButtons } from "@/components/layout/AuthButtons";
 import { RainAnimation } from "@/components/layout/RainAnimation";
+import { InfoSessionsSection } from "@/components/marketing/InfoSessionsSection";
 
 const TESTIMONIALS = [
   {
@@ -163,6 +165,16 @@ const FAQS = [
   { question: "Will I work on real projects?", answer: "Yes. You will build portfolio projects across AWS, Terraform, CI/CD, Docker, Kubernetes, monitoring, and automation." },
   { question: "Will I get support for AWS certification?", answer: "Yes. The program includes SAA-C03 preparation, practical labs, and an AWS Solutions Architect Associate exam voucher." },
   { question: "How long is the program?", answer: "The complete schedule will be shared when the next cohort dates are announced." },
+  {
+    question: "What is the difference between the bootcamp and the instructor course?",
+    answer:
+      "The DevOps & Cloud Engineering Bootcamp is the full career program (labs, projects, mentorship, certification prep, and platform access). The instructor course is a separate program with its own tuition—see pricing on this page.",
+  },
+  {
+    question: "How much does the bootcamp cost?",
+    answer:
+      "Bootcamp tuition depends on the cohort. Schedule a free consultation for current pricing, installment options, and seat availability.",
+  },
 ];
 
 export default async function LandingPage() {
@@ -202,6 +214,14 @@ export default async function LandingPage() {
           <span className="gradient-text">ComplxSimple</span>
         </div>
         <div className="flex items-center gap-3">
+          <a
+            href="#info-sessions"
+            className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-2 text-sm font-semibold hover:opacity-70 transition-opacity"
+            style={{ color: "var(--text)" }}
+          >
+            <CalendarDays size={15} />
+            <span className="hidden lg:inline">Info Sessions</span>
+          </a>
           <ThemeToggle />
           <SignInBtn
             className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-80"
@@ -254,6 +274,8 @@ export default async function LandingPage() {
           <EnrollmentButtons />
         </div>
       </section>
+
+      <InfoSessionsSection />
 
       {/* Tools */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
@@ -589,30 +611,31 @@ export default async function LandingPage() {
       <section id="pricing" className="relative z-10 max-w-6xl mx-auto px-6 pb-24">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#F97316" }}>Pricing</p>
-          <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>Premium DevOps &amp; Cloud Engineering Bootcamp</h2>
-          <p style={{ color: "var(--text-muted)" }}>One investment. A career-changing outcome.</p>
+          <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>Programs &amp; tuition</h2>
+          <p style={{ color: "var(--text-muted)" }}>
+            The DevOps bootcamp and the instructor course are separate programs with different pricing.
+          </p>
         </div>
 
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden mb-6">
           <div className="grid lg:grid-cols-[0.85fr_1.15fr]">
             <div className="p-8 sm:p-10" style={{ background: "linear-gradient(145deg, #111827, #172554)", color: "white" }}>
-              <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: "#F9731620", border: "1px solid #F9731644", color: "#FDBA74" }}>
-                Limited seats available
+              <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: "#2563EB25", border: "1px solid #2563EB55", color: "#93C5FD" }}>
+                DevOps bootcamp
               </span>
               <h3 className="text-2xl font-black mb-3">Complete Bootcamp</h3>
               <p className="text-sm leading-relaxed mb-8" style={{ color: "rgba(255,255,255,0.65)" }}>
                 Everything included—live training, labs, projects, mentorship, career support, Stark access, and certification preparation.
               </p>
-              <div className="flex items-end gap-2 mb-2">
-                <span className="text-5xl font-black">$1,699</span>
-                <span className="text-sm mb-1" style={{ color: "rgba(255,255,255,0.55)" }}>one-time</span>
-              </div>
-              <p className="text-xs mb-8" style={{ color: "rgba(255,255,255,0.55)" }}>Installment payment available—contact the administrator for details.</p>
+              <p className="text-lg font-bold mb-2">Tuition by cohort</p>
+              <p className="text-sm leading-relaxed mb-8" style={{ color: "rgba(255,255,255,0.65)" }}>
+                Bootcamp pricing is not the same as the instructor course below. Schedule a free consultation for current tuition, installment plans, and seat availability.
+              </p>
               <SignUpBtn
                 className="w-full py-3.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
                 style={{ background: "linear-gradient(135deg, #2563EB, #F97316)", color: "white" }}
               >
-                Enroll Now
+                Enroll / get bootcamp pricing
               </SignUpBtn>
               <p className="text-center text-xs mt-4" style={{ color: "rgba(255,255,255,0.5)" }}>Next cohort date to be announced</p>
             </div>
@@ -620,7 +643,7 @@ export default async function LandingPage() {
             <div className="p-8 sm:p-10">
               <div className="flex items-center gap-3 mb-7">
                 <Network size={22} style={{ color: "#2563EB" }} />
-                <h3 className="text-lg font-bold" style={{ color: "var(--text)" }}>Everything included</h3>
+                <h3 className="text-lg font-bold" style={{ color: "var(--text)" }}>Everything included in the bootcamp</h3>
               </div>
               <div className="grid sm:grid-cols-2 gap-x-7 gap-y-4">
                 {PRICING_FEATURES.map((feature) => (
@@ -633,6 +656,31 @@ export default async function LandingPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="card p-8 sm:p-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <div className="max-w-xl">
+            <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold mb-4" style={{ background: "#F9731620", border: "1px solid #F9731644", color: "#F97316" }}>
+              Separate program
+            </span>
+            <h3 className="text-xl font-black mb-2" style={{ color: "var(--text)" }}>Instructor course</h3>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
+              This is not the DevOps bootcamp. It is Cassandra&apos;s instructor-focused program with its own curriculum and enrollment.
+            </p>
+          </div>
+          <div className="text-left sm:text-right flex-shrink-0">
+            <div className="flex items-end gap-2 sm:justify-end mb-1">
+              <span className="text-4xl font-black" style={{ color: "var(--text)" }}>$1,600+</span>
+              <span className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>one-time</span>
+            </div>
+            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Installment payment available—contact the administrator for details.</p>
+            <SignUpBtn
+              className="px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+            >
+              Inquire about instructor course
+            </SignUpBtn>
           </div>
         </div>
       </section>

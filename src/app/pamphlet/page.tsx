@@ -197,11 +197,23 @@ export default function PamphletPage() {
           </div>
         </section>
 
-        {/* Sign Up CTA */}
-        <section className="text-center py-8 rounded-xl" style={{ background: "#2563EB15", border: "2px solid #2563EB33" }}>
-          <h2 className="text-2xl font-black mb-2" style={{ color: "#111" }}>Ready to Start Your Cloud Career?</h2>
-          <p className="mb-2" style={{ color: "#555" }}>Complete bootcamp: live training, labs, projects, mentorship, career support, and certification preparation.</p>
-          <p className="text-3xl font-black" style={{ color: "#2563EB" }}>$1,699</p>
+        {/* Programs & pricing */}
+        <section className="text-center py-8 px-6 rounded-xl mb-6" style={{ background: "#2563EB15", border: "2px solid #2563EB33" }}>
+          <h2 className="text-2xl font-black mb-2" style={{ color: "#111" }}>DevOps &amp; Cloud Engineering Bootcamp</h2>
+          <p className="mb-4 max-w-lg mx-auto" style={{ color: "#555" }}>
+            Live training, labs, projects, mentorship, career support, Stark AI, and certification preparation on ComplxSimple.
+          </p>
+          <p className="text-sm font-semibold" style={{ color: "#111" }}>Bootcamp tuition varies by cohort.</p>
+          <p className="text-sm mt-1" style={{ color: "#888" }}>Contact the administrator for current bootcamp pricing and installment options.</p>
+        </section>
+
+        <section className="text-center py-8 px-6 rounded-xl" style={{ background: "#FFF7ED", border: "2px solid #F9731633" }}>
+          <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#F97316" }}>Separate program</p>
+          <h2 className="text-xl font-black mb-2" style={{ color: "#111" }}>Instructor course</h2>
+          <p className="text-sm mb-3 max-w-md mx-auto" style={{ color: "#555" }}>
+            Not the DevOps bootcamp—a dedicated instructor program with its own enrollment.
+          </p>
+          <p className="text-3xl font-black" style={{ color: "#2563EB" }}>$1,600+</p>
           <p className="text-sm mt-2" style={{ color: "#888" }}>Installment payment available. Next cohort date to be announced.</p>
         </section>
 

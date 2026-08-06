@@ -55,13 +55,13 @@ export function EnrollmentButtons() {
       >
         Enroll Now <ArrowRight size={20} />
       </button>
-      <button
-        onClick={() => openSignUp()}
+      <a
+        href="#info-sessions"
         className="px-8 py-4 rounded-2xl text-lg font-medium transition-all hover:scale-105 active:scale-95"
         style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
       >
-        Schedule a Free Consultation
-      </button>
+        View Info Sessions
+      </a>
     </div>
   );
 }
