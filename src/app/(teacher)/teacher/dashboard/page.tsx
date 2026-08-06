@@ -7,7 +7,8 @@ import { EmailComposer } from "@/components/teacher/EmailComposer";
 import { HomeworkTab } from "@/components/teacher/HomeworkTab";
 import { KnowledgeManager } from "@/components/teacher/KnowledgeManager";
 import { VideoManager } from "@/components/teacher/VideoManager";
-import { BarChart3, Calendar, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video } from "lucide-react";
+import { InfoSessionManager } from "@/components/teacher/InfoSessionManager";
+import { BarChart3, Calendar, CalendarClock, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
@@ -18,6 +19,7 @@ const TABS = [
   { id: "students", label: "Students",       icon: Users       },
   { id: "homework", label: "Homework",       icon: BookMarked  },
   { id: "calendar", label: "Calendar",       icon: Calendar    },
+  { id: "info-sessions", label: "Info Sessions", icon: CalendarClock },
   { id: "videos",   label: "Videos",         icon: Video       },
   { id: "email",    label: "Email Students", icon: Mail        },
   { id: "quote",    label: "Quote",          icon: Quote       },
@@ -268,6 +270,18 @@ export default function TeacherDashboard() {
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>Add events, quiz dates, and announcements for students to see</p>
           </div>
           <div className="card p-6"><CalendarWidget isTeacher={true} /></div>
+        </div>
+      )}
+
+      {activeTab === "info-sessions" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Info Sessions</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Publish signup dates and automatically remind registrants 30 minutes before each session.
+            </p>
+          </div>
+          <InfoSessionManager />
         </div>
       )}
 

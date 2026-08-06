@@ -19,6 +19,7 @@ import type * as email from "../email.js";
 import type * as emailMutations from "../emailMutations.js";
 import type * as embeddings from "../embeddings.js";
 import type * as feedback from "../feedback.js";
+import type * as infoSessions from "../infoSessions.js";
 import type * as init from "../init.js";
 import type * as knowledge from "../knowledge.js";
 import type * as lessons from "../lessons.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   emailMutations: typeof emailMutations;
   embeddings: typeof embeddings;
   feedback: typeof feedback;
+  infoSessions: typeof infoSessions;
   init: typeof init;
   knowledge: typeof knowledge;
   lessons: typeof lessons;

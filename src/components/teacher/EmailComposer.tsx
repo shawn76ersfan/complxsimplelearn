@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
-import { Send, Users, X, Check, Mail } from "lucide-react";
+import { Send, Users, Check, Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 
@@ -18,12 +18,14 @@ interface Student {
 export function EmailComposer() {
   const students = useQuery(api.users.listStudents) as Student[] | undefined;
   const sendEmail = useAction(api.email.sendEmail);
+  const sendTestEmail = useAction(api.email.sendTestEmail);
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendToAll, setSendToAll] = useState(true);
   const [sending, setSending] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
   const [sent, setSent] = useState(false);
 
   function toggleStudent(id: string) {
@@ -59,9 +61,23 @@ export function EmailComposer() {
       setSelectedIds(new Set());
       setTimeout(() => setSent(false), 3000);
     } catch (e) {
-      toast.error("Failed to send email. Check your Resend config.");
+      const message = e instanceof Error ? e.message : "Failed to send email.";
+      toast.error(message);
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleSendTest() {
+    setSendingTest(true);
+    try {
+      const result = await sendTestEmail({});
+      toast.success(`Test sent to ${result.email} through ${result.provider}.`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to send test email.";
+      toast.error(message);
+    } finally {
+      setSendingTest(false);
     }
   }
 
@@ -177,6 +193,18 @@ export function EmailComposer() {
             <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Sending...</>
           ) : (
             <><Send size={16} /> Send to {recipientCount} {recipientCount === 1 ? "Student" : "Students"}</>
+          )}
+        </button>
+        <button
+          onClick={handleSendTest}
+          disabled={sendingTest}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+        >
+          {sendingTest ? (
+            <><div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" /> Sending test...</>
+          ) : (
+            <><Mail size={15} /> Send test to my account</>
           )}
         </button>
       </div>

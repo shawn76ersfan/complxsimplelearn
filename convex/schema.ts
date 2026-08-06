@@ -91,6 +91,35 @@ export default defineSchema({
     createdBy: v.id("users"),
   }).index("by_date", ["date"]),
 
+  infoSessions: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    startsAt: v.number(),
+    timezone: v.string(),
+    meetingUrl: v.optional(v.string()),
+    published: v.boolean(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_start", ["startsAt"])
+    .index("by_published_start", ["published", "startsAt"]),
+
+  infoSessionRegistrations: defineTable({
+    sessionId: v.id("infoSessions"),
+    name: v.string(),
+    email: v.string(),
+    normalizedEmail: v.string(),
+    status: v.union(v.literal("active"), v.literal("cancelled")),
+    consentedAt: v.number(),
+    registeredAt: v.number(),
+    reminderScheduledAt: v.optional(v.number()),
+    confirmationSentAt: v.optional(v.number()),
+    reminderSentAt: v.optional(v.number()),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_email", ["sessionId", "normalizedEmail"]),
+
   emailLogs: defineTable({
     subject: v.string(),
     body: v.string(),

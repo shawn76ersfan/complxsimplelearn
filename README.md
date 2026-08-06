@@ -48,14 +48,28 @@ Copy the `NEXT_PUBLIC_CONVEX_URL` it prints into `.env.local`.
 5. In your **Convex dashboard** → Settings → Environment Variables, add:
    - `CLERK_JWT_ISSUER_DOMAIN` = the Issuer URL from step 4
    - `TEACHER_EMAIL` = Cassandra's exact sign-up email
-   - `RESEND_API_KEY` = your Resend key
-   - `FROM_EMAIL` = your verified sender email
+   - **Email (pick one):**
+     - **Gmail:** `EMAIL_PROVIDER=gmail`, `GMAIL_USER`, `GMAIL_APP_PASSWORD` (Google [App Password](https://myaccount.google.com/apppasswords))
+     - **Resend:** `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `FROM_EMAIL` on a verified domain
    - **Class videos (R2):** `R2_BUCKET`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_TOKEN` — see `.env.example` for setup notes (Cloudflare R2 bucket + CORS)
 
-### 4. Set up Resend (Email)
+### 4. Set up email (Teacher Hub)
 
-1. Go to [resend.com](https://resend.com) → Create API key
-2. Add to `.env.local` and to Convex dashboard environment variables
+**Gmail (typical for Cassandra’s Gmail inbox)**
+
+1. [Google Account → Security](https://myaccount.google.com/security) → enable **2-Step Verification**
+2. **App passwords** → create one for **Mail**
+3. On **Convex** (dev and `--prod`):
+
+```bash
+npx convex env set EMAIL_PROVIDER gmail
+npx convex env set GMAIL_USER you@gmail.com
+npx convex env set GMAIL_APP_PASSWORD "your app password"
+npx convex env set EMAIL_FROM_NAME ComplxSimple
+# repeat with --prod for production
+```
+
+**Resend** (if you use a verified domain instead): see `.env.example` for `RESEND_API_KEY` and `FROM_EMAIL`.
 
 ### 5. Create `.env.local`
 
