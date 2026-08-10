@@ -58,6 +58,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
   const data = useQuery(api.attempts.getStudentDetailForTeacher, {
     studentId: studentId as Id<"users">,
   });
+  const progress = useQuery(api.assignments.getProgressForStudent, {
+    studentId: studentId as Id<"users">,
+  });
   const tracks = useQuery(api.tracks.list);
   const sendFeedback = useMutation(api.feedback.send);
   const previousFeedback = useQuery(api.feedback.getForStudent, { studentId: studentId as Id<"users"> });
@@ -158,7 +161,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
   }
 
   const { student, trackDetails, overall, totalAttempts } = data;
-  const level = Math.floor((student.xp ?? 0) / 100) + 1;
+  const level = progress?.level ?? 0;
+  const completedAssignments = progress?.completedCount ?? 0;
+  const totalAssignments = progress?.totalCount ?? 0;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-6">
@@ -217,12 +222,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
           </div>
         </div>
 
-        {/* Gamification stats */}
+        {/* Level = completed homework assignments */}
         <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t" style={{ borderColor: "var(--border)" }}>
           {[
-            { icon: Star,     label: "Total XP",    value: student.xp ?? 0,     color: "#F97316" },
-            { icon: TrendingUp, label: "Level",      value: level,               color: "#2563EB" },
-            { icon: Flame,    label: "Day Streak",  value: student.streak ?? 0, color: "#F97316" },
+            { icon: Star, label: "Assignments done", value: `${completedAssignments}/${totalAssignments}`, color: "#F97316" },
+            { icon: TrendingUp, label: "Level", value: level, color: "#2563EB" },
+            { icon: Flame, label: "Day Streak", value: student.streak ?? 0, color: "#F97316" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: `${s.color}10` }}>
               <s.icon size={16} style={{ color: s.color }} />

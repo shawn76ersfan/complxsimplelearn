@@ -8,7 +8,7 @@ Built with Next.js 16, Convex, Clerk, Tailwind CSS, and Resend.
 - **DevOps & Cloud Tracks**: Linux, AWS, Azure, Git/GitHub, Docker, Kubernetes, Terraform, Ansible, CI/CD, and Monitoring
 - **Supplementary Foundations**: Hardware, AI, and Cybersecurity
 - **Interactive Lessons**: Content, quizzes, games, and mandatory activities
-- **Progress Tracking**: % completion per track, scores, XP, and streaks
+- **Progress Tracking**: % completion per track, scores, assignment-based levels, and streaks
 - **Class Videos**: Teachers upload long recordings (Cloudflare R2); students watch on `/videos`
 - **Stark**: Course-aware AI chat with RAG over lessons, homework, quizzes, and teacher knowledge docs
 - **Teacher Dashboard**: Scores, students, homework, calendar, email, quote of the week, knowledge base

@@ -141,7 +141,7 @@ export default function PamphletPage() {
               ["1. Enroll", "Create your account and reserve a place in the next cohort."],
               ["2. Follow the Roadmap", "Progress through 10 structured DevOps and cloud modules."],
               ["3. Learn Interactively", "Combine live instruction, labs, quizzes, crosswords, homework, and Stark AI support."],
-              ["4. Earn XP & Streaks", "Correct answers earn XP points and build your daily streak."],
+              ["4. Level up & streaks", "Finish each homework assignment to gain a level, and keep a daily learning streak."],
               ["5. Build Your Portfolio", "Complete production-style cloud, automation, CI/CD, and monitoring projects."],
             ].map(([title, desc]) => (
               <div key={title} className="flex gap-3">
@@ -181,7 +181,7 @@ export default function PamphletPage() {
               "Mandatory crosswords and homework",
               "Hands-on cloud labs and projects",
               "Flashcard flip cards for memorization",
-              "XP points and daily learning streaks",
+              "Assignment levels and daily learning streaks"
               "Personal feedback from Cassandra",
               "Stark course-aware AI assistant",
               "Recorded class sessions",

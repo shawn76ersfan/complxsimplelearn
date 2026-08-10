@@ -206,7 +206,7 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
       },
       {
         title: "How learning works",
-        text: "Students follow a structured DevOps and cloud roadmap on the Learn page, complete lessons in order, take quizzes, finish Mandatory Work crosswords, submit homework, and build production-style portfolio projects. Each completed lesson earns XP and counts toward track progress.",
+        text: "Students follow a structured DevOps and cloud roadmap on the Learn page, complete lessons in order, take quizzes, finish Mandatory Work crosswords, submit homework, and build production-style portfolio projects. Completing each homework assignment raises their level by one, and lessons count toward track progress and daily streaks.",
       },
       {
         title: "Mandatory Work / Crosswords",

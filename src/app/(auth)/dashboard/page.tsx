@@ -58,9 +58,16 @@ function TrackCard({ track }: { track: { _id: string; name: string; slug: string
   );
 }
 
-function XpBar({ xp }: { xp: number }) {
-  const level = Math.floor(xp / 100) + 1;
-  const xpInLevel = xp % 100;
+function LevelBar({
+  level,
+  completedCount,
+  totalCount,
+}: {
+  level: number;
+  completedCount: number;
+  totalCount: number;
+}) {
+  const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-2">
@@ -70,13 +77,16 @@ function XpBar({ xp }: { xp: number }) {
           </span>
           <span className="font-semibold text-sm" style={{ color: "var(--text)" }}>Level {level}</span>
         </div>
-        <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>{xp} XP total</span>
+        <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+          {completedCount} of {totalCount} assignments
+        </span>
       </div>
-      {/* XP bar — spec: 8px, #E5E7EB track, gradient fill */}
       <div className="w-full rounded-full overflow-hidden" style={{ height: "8px", background: "#E5E7EB", borderRadius: "999px" }}>
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${xpInLevel}%`, background: "linear-gradient(135deg, #2563EB, #F97316)", borderRadius: "999px" }} />
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(135deg, #2563EB, #F97316)", borderRadius: "999px" }} />
       </div>
-      <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>{xpInLevel}/100 XP to level {level + 1}</p>
+      <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
+        Finish each homework assignment to level up.
+      </p>
     </div>
   );
 }
@@ -108,6 +118,7 @@ export default function StudentDashboard() {
   const tracks = useQuery(api.tracks.list);
   const myAttempts = useQuery(api.attempts.getMyAttempts);
   const profile = useQuery(api.users.getMyProfile);
+  const progress = useQuery(api.assignments.getMyProgress);
   const unreadFeedback = useQuery(api.feedback.getUnreadCount);
   const activeWarnings = useQuery(api.feedback.getActiveWarnings);
   const acknowledgeWarning = useMutation(api.feedback.acknowledgeWarning);
@@ -116,7 +127,9 @@ export default function StudentDashboard() {
   const totalMax   = myAttempts?.reduce((s, a) => s + a.maxScore, 0) ?? 0;
   const overallPct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
 
-  const xp     = profile?.xp ?? 0;
+  const level = progress?.level ?? 0;
+  const completedCount = progress?.completedCount ?? 0;
+  const totalCount = progress?.totalCount ?? 0;
   const streak = profile?.streak ?? 0;
 
   return (
@@ -173,9 +186,9 @@ export default function StudentDashboard() {
         <QuoteCard />
       </div>
 
-      {/* XP bar */}
+      {/* Assignment level */}
       <div className="mb-6">
-        <XpBar xp={xp} />
+        <LevelBar level={level} completedCount={completedCount} totalCount={totalCount} />
       </div>
 
       {/* Stats row — spec: p-16px, r-12px, icon 36x36 r-10px, metric 22px/700, label 13px */}
@@ -183,7 +196,7 @@ export default function StudentDashboard() {
         {[
           { label: "Overall Score", value: `${overallPct}%`, icon: Trophy,  color: "#2563EB" },
           { label: "Lessons Done",  value: myAttempts?.length ?? 0, icon: BookOpen, color: "#0EA5E9" },
-          { label: "Total XP",      value: xp,     icon: Star,  color: "#F97316" },
+          { label: "Assignments done", value: completedCount, icon: Star, color: "#F97316" },
           { label: "Day Streak",    value: streak,  icon: Flame, color: "#F97316" },
         ].map((stat) => (
           <div key={stat.label} className="card flex items-center gap-3" style={{ padding: "16px", borderRadius: "12px" }}>

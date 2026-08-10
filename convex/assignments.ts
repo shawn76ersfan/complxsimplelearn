@@ -1,7 +1,50 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { requireTeacher } from "./_lib/auth";
 import { Id } from "./_generated/dataModel";
+
+type AssignmentStatus = "complete" | "late" | "pending" | "empty" | "no-track";
+
+async function statusForAssignment(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  trackId: Id<"tracks"> | undefined,
+  dueDate: number,
+  now: number,
+): Promise<AssignmentStatus> {
+  if (!trackId) return "no-track";
+
+  const attempts = await ctx.db
+    .query("attempts")
+    .withIndex("by_user_track", (q) => q.eq("userId", userId).eq("trackId", trackId))
+    .collect();
+
+  const completedBeforeDue = attempts.some((att) => att.completedAt <= dueDate);
+  if (completedBeforeDue) return "complete";
+  if (attempts.length === 0) return now > dueDate ? "empty" : "pending";
+  return now > dueDate ? "late" : "pending";
+}
+
+function progressFromStatuses(statuses: AssignmentStatus[]): {
+  completedCount: number;
+  totalCount: number;
+  level: number;
+} {
+  const gradable = statuses.filter((s) => s !== "no-track");
+  const completedCount = gradable.filter((s) => s === "complete" || s === "late").length;
+  const totalCount = gradable.length;
+  return {
+    completedCount,
+    totalCount,
+    level: completedCount,
+  };
+}
+
+const progressReturn = v.object({
+  completedCount: v.number(),
+  totalCount: v.number(),
+  level: v.number(),
+});
 
 export const create = mutation({
   args: {
@@ -68,27 +111,26 @@ export const getStatusForStudent = query({
 
     return await Promise.all(
       assignments.map(async (a) => {
-        if (!a.trackId) return { ...a, status: "no-track" as const };
-
-        const attempts = await ctx.db
-          .query("attempts")
-          .withIndex("by_user_track", (q) => q.eq("userId", args.studentId).eq("trackId", a.trackId!))
-          .collect();
-
-        const completedBeforeDue = attempts.some((att) => att.completedAt <= a.dueDate);
-
-        let status: "complete" | "late" | "pending" | "empty";
-        if (completedBeforeDue) {
-          status = "complete";
-        } else if (attempts.length === 0) {
-          status = now > a.dueDate ? "empty" : "pending";
-        } else {
-          status = now > a.dueDate ? "late" : "pending";
-        }
-
+        const status = await statusForAssignment(ctx, args.studentId, a.trackId, a.dueDate, now);
         return { ...a, status };
-      })
+      }),
     );
+  },
+});
+
+export const getProgressForStudent = query({
+  args: { studentId: v.id("users") },
+  returns: progressReturn,
+  handler: async (ctx, args) => {
+    await requireTeacher(ctx);
+    const assignments = await ctx.db.query("assignments").order("desc").collect();
+    const now = Date.now();
+    const statuses = await Promise.all(
+      assignments.map((a) =>
+        statusForAssignment(ctx, args.studentId, a.trackId, a.dueDate, now),
+      ),
+    );
+    return progressFromStatuses(statuses);
   },
 });
 
@@ -107,28 +149,35 @@ export const getMyStatus = query({
     return await Promise.all(
       assignments.map(async (a) => {
         const track = a.trackId ? tracks.find((t) => t._id === a.trackId) : null;
-
+        const status = await statusForAssignment(ctx, user._id, a.trackId, a.dueDate, now);
+        // Keep prior shape for no-track rows shown as pending in student UI
         if (!a.trackId) return { ...a, track: null, status: "pending" as const };
-
-        const attempts = await ctx.db
-          .query("attempts")
-          .withIndex("by_user_track", (q) => q.eq("userId", user._id).eq("trackId", a.trackId!))
-          .collect();
-
-        const completedBeforeDue = attempts.some((att) => att.completedAt <= a.dueDate);
-
-        let status: "complete" | "late" | "pending" | "empty";
-        if (completedBeforeDue) {
-          status = "complete";
-        } else if (attempts.length === 0) {
-          status = now > a.dueDate ? "empty" : "pending";
-        } else {
-          status = now > a.dueDate ? "late" : "pending";
-        }
-
         return { ...a, track, status };
-      })
+      }),
     );
+  },
+});
+
+export const getMyProgress = query({
+  args: {},
+  returns: progressReturn,
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { completedCount: 0, totalCount: 0, level: 0 };
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return { completedCount: 0, totalCount: 0, level: 0 };
+
+    const assignments = await ctx.db.query("assignments").order("desc").collect();
+    const now = Date.now();
+    const statuses = await Promise.all(
+      assignments.map((a) =>
+        statusForAssignment(ctx, user._id, a.trackId, a.dueDate, now),
+      ),
+    );
+    return progressFromStatuses(statuses);
   },
 });
 

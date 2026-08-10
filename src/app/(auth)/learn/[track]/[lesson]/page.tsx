@@ -26,8 +26,8 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
     setResult({ score, max });
     await submitAttempt({ lessonId: lesson._id, trackId: trackData._id, score, maxScore: max, answers });
     const pct = max > 0 ? Math.round((score / max) * 100) : 100;
-    const xpNote = pct >= 80 ? "🏆 Excellent!" : pct >= 60 ? "⭐ Good job!" : "📚 Keep going!";
-    toast.success(`${xpNote} ${pct}%`, { duration: 3000 });
+    const praise = pct >= 80 ? "🏆 Excellent!" : pct >= 60 ? "⭐ Good job!" : "📚 Keep going!";
+    toast.success(`${praise} ${pct}%`, { duration: 3000 });
   }
 
   if (!lesson || !trackData) {

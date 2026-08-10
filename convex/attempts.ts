@@ -45,14 +45,6 @@ export const getStudentQuizDetail = query({
   },
 });
 
-function xpForAttempt(lessonType: string, score: number, maxScore: number): number {
-  const ratio = maxScore > 0 ? score / maxScore : 1;
-  if (lessonType === "content") return 10;
-  if (lessonType === "game")    return 20;
-  if (lessonType === "quiz")    return Math.round(ratio * 30);
-  return Math.round(ratio * 25); // block-based lessons
-}
-
 function todayUTC(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -78,23 +70,19 @@ export const submit = mutation({
       completedAt: Date.now(),
     });
 
-    // Centralized XP + streak update
-    const lesson = await ctx.db.get(args.lessonId);
-    const earnedXp = xpForAttempt(lesson?.type ?? "content", args.score, args.maxScore);
+    // Daily streak only — levels come from completed homework assignments
     const today = todayUTC();
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
-    const prev = user;
-    const prevStreak = prev.streak ?? 0;
-    const prevDate   = prev.lastActivityDate ?? "";
+    const prevStreak = user.streak ?? 0;
+    const prevDate = user.lastActivityDate ?? "";
 
     let newStreak: number;
-    if (prevDate === today)     newStreak = prevStreak;           // already active today
-    else if (prevDate === yesterday) newStreak = prevStreak + 1;  // extend streak
-    else                        newStreak = 1;                    // reset
+    if (prevDate === today) newStreak = prevStreak;
+    else if (prevDate === yesterday) newStreak = prevStreak + 1;
+    else newStreak = 1;
 
     await ctx.db.patch(user._id, {
-      xp: (prev.xp ?? 0) + earnedXp,
       streak: newStreak,
       lastActivityDate: today,
     });
