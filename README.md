@@ -71,14 +71,32 @@ npx convex env set EMAIL_FROM_NAME ComplxSimple
 
 **Resend** (if you use a verified domain instead): see `.env.example` for `RESEND_API_KEY` and `FROM_EMAIL`.
 
-### 5. Create `.env.local`
+### 5. Protect public registrations with Turnstile
+
+1. Create a [Cloudflare Turnstile widget](https://dash.cloudflare.com/?to=/:account/turnstile) for your production and local hostnames.
+2. Add the public site key to `.env.local` and Vercel:
+
+```bash
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=your_site_key
+```
+
+3. Add the secret key to both Convex deployments:
+
+```bash
+npx convex env set TURNSTILE_SECRET_KEY your_secret_key
+npx convex env set TURNSTILE_SECRET_KEY your_secret_key --prod
+```
+
+The backend verifies every token before it can call the internal info-session registration mutation. Duplicate registrations, honeypot submissions, and more than three active registrations per email in 24 hours are also blocked.
+
+### 6. Create `.env.local`
 
 ```bash
 cp .env.example .env.local
 # Fill in all values
 ```
 
-### 6. Seed initial content
+### 7. Seed initial content
 
 After `npx convex dev` is running, in the Convex dashboard:
 - Go to **Functions** → `seed.seedAll` → **Run**

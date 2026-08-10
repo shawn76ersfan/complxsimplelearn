@@ -251,7 +251,7 @@ export const update = mutation({
   },
 });
 
-export const register = mutation({
+export const registerVerified = internalMutation({
   args: {
     sessionId: v.id("infoSessions"),
     name: v.string(),
@@ -288,6 +288,24 @@ export const register = mutation({
         registrationId: existing._id,
         alreadyRegistered: true,
       };
+    }
+
+    const recentRegistrations = await ctx.db
+      .query("infoSessionRegistrations")
+      .withIndex("by_normalized_email", (q) =>
+        q
+          .eq("normalizedEmail", normalizedEmail)
+          .gte("registeredAt", now - 24 * 60 * 60 * 1000),
+      )
+      .take(4);
+    if (
+      recentRegistrations.filter(
+        (registration) => registration.status === "active",
+      ).length >= 3
+    ) {
+      throw new Error(
+        "This email has reached the info-session registration limit. Please try again tomorrow.",
+      );
     }
 
     const reminderAt = session.startsAt - 30 * 60 * 1000;

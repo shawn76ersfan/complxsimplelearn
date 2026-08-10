@@ -118,7 +118,8 @@ export default defineSchema({
     reminderSentAt: v.optional(v.number()),
   })
     .index("by_session", ["sessionId"])
-    .index("by_session_email", ["sessionId", "normalizedEmail"]),
+    .index("by_session_email", ["sessionId", "normalizedEmail"])
+    .index("by_normalized_email", ["normalizedEmail", "registeredAt"]),
 
   emailLogs: defineTable({
     subject: v.string(),

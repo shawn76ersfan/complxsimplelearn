@@ -1,11 +1,18 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { CalendarDays, CheckCircle2, Clock, Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { TurnstileWidget } from "./TurnstileWidget";
+
+const TURNSTILE_SITE_KEY =
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ??
+  (process.env.NODE_ENV === "development"
+    ? "1x00000000000000000000AA"
+    : "");
 
 type PublicSession = {
   _id: Id<"infoSessions">;
@@ -33,18 +40,25 @@ export function InfoSessionsSection() {
   const sessions = useQuery(api.infoSessions.listPublic, {
     now: queryNow,
   }) as PublicSession[] | undefined;
-  const register = useMutation(api.infoSessions.register);
+  const register = useAction(api.infoSessionActions.register);
 
   const [selectedId, setSelectedId] = useState<Id<"infoSessions"> | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [consented, setConsented] = useState(false);
+  const [website, setWebsite] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [challengeKey, setChallengeKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [registeredId, setRegisteredId] = useState<Id<"infoSessions"> | null>(null);
 
   async function handleRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedId) return;
+    if (!turnstileToken) {
+      toast.error("Complete the security check before registering.");
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await register({
@@ -52,6 +66,8 @@ export function InfoSessionsSection() {
         name,
         email,
         consentToReminders: consented,
+        turnstileToken,
+        website,
       });
       setRegisteredId(selectedId);
       toast.success(
@@ -65,6 +81,8 @@ export function InfoSessionsSection() {
       );
     } finally {
       setSubmitting(false);
+      setTurnstileToken("");
+      setChallengeKey((current) => current + 1);
     }
   }
 
@@ -162,10 +180,34 @@ export function InfoSessionsSection() {
                       />
                       I agree to receive confirmation and reminder emails about this info session.
                     </label>
+                    <label
+                      aria-hidden="true"
+                      className="absolute -left-[10000px] h-px w-px overflow-hidden"
+                    >
+                      Website
+                      <input
+                        name="website"
+                        value={website}
+                        onChange={(event) => setWebsite(event.target.value)}
+                        autoComplete="off"
+                        tabIndex={-1}
+                      />
+                    </label>
+                    {TURNSTILE_SITE_KEY ? (
+                      <TurnstileWidget
+                        key={`${session._id}-${challengeKey}`}
+                        siteKey={TURNSTILE_SITE_KEY}
+                        setToken={setTurnstileToken}
+                      />
+                    ) : (
+                      <p className="text-xs p-3 rounded-xl" style={{ background: "#EF444412", color: "#DC2626" }}>
+                        Registration security is not configured yet. Please contact ComplxSimple.
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <button
                         type="submit"
-                        disabled={submitting}
+                        disabled={submitting || !turnstileToken || !TURNSTILE_SITE_KEY}
                         className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50"
                         style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
                       >
@@ -186,6 +228,7 @@ export function InfoSessionsSection() {
                     onClick={() => {
                       setSelectedId(session._id);
                       setRegisteredId(null);
+                      setTurnstileToken("");
                     }}
                     className="mt-6 w-full py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2"
                     style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
