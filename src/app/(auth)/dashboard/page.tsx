@@ -5,8 +5,8 @@ import { api } from "../../../../convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Calendar, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge } from "lucide-react";
-import { FeedbackInbox } from "@/components/teacher/FeedbackInbox";
 import { StudentHomework } from "@/components/learn/StudentHomework";
+import { FeedbackPreviewCard } from "@/components/learn/FeedbackPreviewCard";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
   hardware: Cpu,
@@ -119,7 +119,6 @@ export default function StudentDashboard() {
   const myAttempts = useQuery(api.attempts.getMyAttempts);
   const profile = useQuery(api.users.getMyProfile);
   const progress = useQuery(api.assignments.getMyProgress);
-  const unreadFeedback = useQuery(api.feedback.getUnreadCount);
   const activeWarnings = useQuery(api.feedback.getActiveWarnings);
   const acknowledgeWarning = useMutation(api.feedback.acknowledgeWarning);
 
@@ -189,6 +188,11 @@ export default function StudentDashboard() {
       {/* Assignment level */}
       <div className="mb-6">
         <LevelBar level={level} completedCount={completedCount} totalCount={totalCount} />
+      </div>
+
+      {/* Messages preview — high on the page so feedback isn’t buried */}
+      <div className="mb-6">
+        <FeedbackPreviewCard />
       </div>
 
       {/* Stats row — spec: p-16px, r-12px, icon 36x36 r-10px, metric 22px/700, label 13px */}
@@ -312,17 +316,6 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Feedback from Cassandra */}
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Feedback from Cassandra</h2>
-        {!!unreadFeedback && unreadFeedback > 0 && (
-          <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold text-white" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
-            {unreadFeedback}
-          </span>
-        )}
-      </div>
-      <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Personal notes and encouragement from your teacher.</p>
-      <FeedbackInbox />
     </div>
   );
 }

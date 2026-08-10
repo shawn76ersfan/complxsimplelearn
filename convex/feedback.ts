@@ -100,7 +100,12 @@ export const markAllRead = mutation({
         q.eq("studentId", user._id).eq("isRead", false)
       )
       .collect();
-    await Promise.all(unread.map((f) => ctx.db.patch(f._id, { isRead: true })));
+    // Warnings stay unread until acknowledged (dashboard banner + inbox CTA).
+    await Promise.all(
+      unread
+        .filter((f) => f.type !== "warning")
+        .map((f) => ctx.db.patch(f._id, { isRead: true })),
+    );
   },
 });
 
@@ -114,13 +119,15 @@ export const getActiveWarnings = query({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
     if (!user) return [];
+    // Stay on the dashboard until the student explicitly acknowledges —
+    // reading in Messages alone does not dismiss the banner.
     const all = await ctx.db
       .query("feedback")
-      .withIndex("by_student_unread", (q) =>
-        q.eq("studentId", user._id).eq("isRead", false)
-      )
+      .withIndex("by_student", (q) => q.eq("studentId", user._id))
       .collect();
-    return all.filter((f) => f.type === "warning");
+    return all
+      .filter((f) => f.type === "warning" && f.acknowledgedAt === undefined)
+      .sort((a, b) => b.createdAt - a.createdAt);
   },
 });
 

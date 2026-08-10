@@ -181,7 +181,7 @@ export default function PamphletPage() {
               "Mandatory crosswords and homework",
               "Hands-on cloud labs and projects",
               "Flashcard flip cards for memorization",
-              "Assignment levels and daily learning streaks"
+              "Assignment levels and daily learning streaks",
               "Personal feedback from Cassandra",
               "Stark course-aware AI assistant",
               "Recorded class sessions",
