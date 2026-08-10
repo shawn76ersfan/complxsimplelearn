@@ -8,6 +8,7 @@ import { HomeworkTab } from "@/components/teacher/HomeworkTab";
 import { KnowledgeManager } from "@/components/teacher/KnowledgeManager";
 import { VideoManager } from "@/components/teacher/VideoManager";
 import { InfoSessionManager } from "@/components/teacher/InfoSessionManager";
+import { InviteStudentPanel } from "@/components/teacher/InviteStudentPanel";
 import { BarChart3, Calendar, CalendarClock, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
@@ -116,6 +117,8 @@ function StudentManagementTab() {
 
   return (
     <div className="space-y-8">
+      <InviteStudentPanel />
+
       {/* Active students */}
       <div>
         <h2 className="text-xl font-bold mb-1" style={{ color: "var(--text)" }}>Active Students</h2>

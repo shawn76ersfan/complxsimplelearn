@@ -27,7 +27,7 @@ import {
   Zap,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { SignInBtn, SignUpBtn, EnrollmentButtons } from "@/components/layout/AuthButtons";
+import { SignInBtn, SignUpBtn, EnrollmentButtons, InviteOnlyNote } from "@/components/layout/AuthButtons";
 import { RainAnimation } from "@/components/layout/RainAnimation";
 import { InfoSessionsSection } from "@/components/marketing/InfoSessionsSection";
 
@@ -224,10 +224,6 @@ export default async function LandingPage() {
           </a>
           <ThemeToggle />
           <SignInBtn
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-80"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
-          />
-          <SignUpBtn
             className="px-4 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-all hover:scale-105 active:scale-95"
             style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
           />
@@ -272,6 +268,7 @@ export default async function LandingPage() {
             ))}
           </div>
           <EnrollmentButtons />
+          <InviteOnlyNote className="mt-6" />
         </div>
       </section>
 
@@ -562,7 +559,7 @@ export default async function LandingPage() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
                 style={{ background: "#14B8A6", color: "#fff" }}
               >
-                Join ComplxSimple to access Stark
+                Sign in to access Stark
               </SignUpBtn>
             </div>
           </div>
@@ -635,7 +632,7 @@ export default async function LandingPage() {
                 className="w-full py-3.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
                 style={{ background: "linear-gradient(135deg, #2563EB, #F97316)", color: "white" }}
               >
-                Enroll / get bootcamp pricing
+                Sign in (invite only)
               </SignUpBtn>
               <p className="text-center text-xs mt-4" style={{ color: "rgba(255,255,255,0.5)" }}>Next cohort date to be announced</p>
             </div>
@@ -675,12 +672,13 @@ export default async function LandingPage() {
               <span className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>one-time</span>
             </div>
             <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Installment payment available—contact the administrator for details.</p>
-            <SignUpBtn
-              className="px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
+            <a
+              href="#info-sessions"
+              className="px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-[1.02] inline-block"
               style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
             >
               Inquire about instructor course
-            </SignUpBtn>
+            </a>
           </div>
         </div>
       </section>
@@ -720,6 +718,7 @@ export default async function LandingPage() {
               Master AWS, Azure, Docker, Kubernetes, Terraform, CI/CD, and DevOps through practical projects and expert mentorship.
             </p>
             <EnrollmentButtons />
+          <InviteOnlyNote className="mt-6" />
           </div>
         </div>
       </section>

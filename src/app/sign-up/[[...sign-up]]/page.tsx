@@ -10,7 +10,9 @@ export default function SignUpPage() {
       <div className="relative z-10">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold gradient-text">ComplxSimpleLearn</h1>
-          <p className="mt-2" style={{ color: "var(--text-muted)" }}>Create your account and start learning</p>
+          <p className="mt-2" style={{ color: "var(--text-muted)" }}>
+            Accept your invitation — set your name and password to join
+          </p>
         </div>
         <SignUp
           appearance={{

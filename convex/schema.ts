@@ -21,6 +21,23 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_role", ["role"]),
 
+  enrollments: defineTable({
+    email: v.string(),
+    role: v.union(v.literal("student"), v.literal("teacher")),
+    status: v.union(
+      v.literal("invited"),
+      v.literal("accepted"),
+      v.literal("revoked"),
+    ),
+    invitedBy: v.id("users"),
+    invitedAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+    clerkInvitationId: v.optional(v.string()),
+    displayName: v.optional(v.string()),
+  })
+    .index("by_email", ["email"])
+    .index("by_status", ["status"]),
+
   tracks: defineTable({
     name: v.string(),
     slug: v.string(),

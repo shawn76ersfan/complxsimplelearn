@@ -1,6 +1,25 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "./_lib/auth";
+import { isTeacherEmail } from "./lib/teacherEmails";
+import {
+  emailHasActiveEnrollment,
+  getEnrollmentByEmail,
+  isPlaceholderName,
+} from "./lib/enrollmentAccess";
+import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
+
+function resolveDisplayName(
+  clerkName: string,
+  fallback?: string | null,
+  existingName?: string | null,
+): string {
+  if (!isPlaceholderName(clerkName)) return clerkName.trim();
+  if (!isPlaceholderName(existingName)) return existingName!.trim();
+  if (!isPlaceholderName(fallback)) return fallback!.trim();
+  return "Student";
+}
 
 export const store = mutation({
   args: {
@@ -9,35 +28,65 @@ export const store = mutation({
     name: v.string(),
     imageUrl: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  returns: v.id("users"),
+  handler: async (ctx, args): Promise<Id<"users">> => {
     const existing = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
 
-    const teacherEmails = (process.env.TEACHER_EMAILS ?? process.env.TEACHER_EMAIL ?? "")
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-    const role: "teacher" | "student" =
-      teacherEmails.includes(args.email.toLowerCase()) ? "teacher" : "student";
+    const enrollment = await getEnrollmentByEmail(ctx, args.email);
+    const role: "teacher" | "student" = isTeacherEmail(args.email)
+      ? "teacher"
+      : "student";
+    const name = resolveDisplayName(
+      args.name,
+      enrollment?.displayName,
+      existing?.name,
+    );
 
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        name: args.name,
+      const patch: { name?: string; imageUrl?: string } = {
         imageUrl: args.imageUrl,
-      });
+      };
+      // Never overwrite a real name with the placeholder "Student"
+      if (!isPlaceholderName(name) || isPlaceholderName(existing.name)) {
+        patch.name = name;
+      }
+      await ctx.db.patch(existing._id, patch);
       return existing._id;
     }
 
-    return await ctx.db.insert("users", {
+    if (role === "teacher") {
+      return await ctx.db.insert("users", {
+        clerkId: args.clerkId,
+        email: args.email,
+        name,
+        imageUrl: args.imageUrl,
+        role,
+        createdAt: Date.now(),
+      });
+    }
+
+    const allowed = await emailHasActiveEnrollment(ctx, args.email);
+    if (!allowed) {
+      throw new Error("NOT_ENROLLED");
+    }
+
+    const userId = await ctx.db.insert("users", {
       clerkId: args.clerkId,
       email: args.email,
-      name: args.name,
+      name,
       imageUrl: args.imageUrl,
-      role,
+      role: "student",
       createdAt: Date.now(),
     });
+
+    await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, {
+      email: args.email,
+    });
+
+    return userId;
   },
 });
 
@@ -120,6 +169,13 @@ export const reactivateStudent = mutation({
       droppedAt: undefined,
       droppedBy: undefined,
     });
+
+    const student = await ctx.db.get(args.studentId);
+    if (student) {
+      await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, {
+        email: student.email,
+      });
+    }
   },
 });
 
