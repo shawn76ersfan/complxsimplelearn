@@ -16,7 +16,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday } from "date-fns";
 import toast from "react-hot-toast";
 
-const EVENT_COLORS = ["#2563EB", "#0EA5E9", "#0EA5E9", "#F59E0B", "#E11D48", "#2563EB"];
+const EVENT_COLORS = ["#2563EB", "#0EA5E9", "#10B981", "#F59E0B", "#E11D48", "#8B5CF6"];
 
 interface CalendarEvent {
   _id: Id<"calendarEvents">;
