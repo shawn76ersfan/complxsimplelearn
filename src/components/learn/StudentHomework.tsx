@@ -2,12 +2,14 @@
 
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { CheckCircle, Clock, AlertTriangle, X, BookOpen, ArrowRight } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle, X, BookOpen, ArrowRight, FileText, Star } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 
 const STATUS_STYLES = {
   complete:    { bg: "#0EA5E920", color: "#0EA5E9", label: "Complete ✓", icon: CheckCircle },
+  graded:      { bg: "#0EA5E920", color: "#0EA5E9", label: "Graded",     icon: Star },
+  submitted:   { bg: "#8B5CF620", color: "#8B5CF6", label: "Submitted",  icon: FileText },
   late:        { bg: "#EF444420", color: "#EF4444", label: "Late",        icon: AlertTriangle },
   pending:     { bg: "#2563EB20", color: "#2563EB", label: "Pending",     icon: Clock },
   empty:       { bg: "#F9731620", color: "#F97316", label: "Empty",       icon: X },
@@ -66,7 +68,7 @@ export function StudentHomework() {
                 scrollSnapAlign: "start",
                 borderColor: a.status === "late" || a.status === "empty"
                   ? "#EF444433"
-                  : a.status === "complete" ? "#0EA5E933" : "var(--border)",
+                  : a.status === "complete" || a.status === "graded" ? "#0EA5E933" : "var(--border)",
               }}
             >
               <div>
@@ -88,12 +90,12 @@ export function StudentHomework() {
                 {/* Due date */}
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                   Due:{" "}
-                  <span style={{ color: isPast && a.status !== "complete" ? "#EF4444" : "var(--text)" }}>
+                  <span style={{ color: isPast && a.status !== "complete" && a.status !== "graded" ? "#EF4444" : "var(--text)" }}>
                     {formatDate(a.dueDate)}
                   </span>
                 </p>
                 {/* Countdown */}
-                {!isPast && a.status !== "complete" && daysLeft <= 7 && (
+                {!isPast && a.status !== "complete" && a.status !== "graded" && daysLeft <= 7 && (
                   <p className="text-xs font-semibold" style={{ color: daysLeft <= 2 ? "#EF4444" : "#F59E0B" }}>
                     {daysLeft <= 0 ? "Due today!" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}
                   </p>

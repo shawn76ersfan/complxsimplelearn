@@ -179,10 +179,37 @@ export default defineSchema({
     dueDate: v.number(),
     createdBy: v.id("users"),
     assignedToAll: v.boolean(),
+    // When true, students submit text/file work for teacher grading.
+    // When false/undefined, status is inferred from track lesson attempts (legacy).
+    requiresSubmission: v.optional(v.boolean()),
+    allowFileUpload: v.optional(v.boolean()),
   })
     .index("by_created_by", ["createdBy"])
     .index("by_title", ["title"])
     .index("by_due_date", ["dueDate"]),
+
+  assignmentSubmissions: defineTable({
+    assignmentId: v.id("assignments"),
+    studentId: v.id("users"),
+    textContent: v.optional(v.string()),
+    fileKey: v.optional(v.string()),
+    fileName: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
+    submittedAt: v.number(),
+    status: v.union(
+      v.literal("submitted"),
+      v.literal("graded"),
+      v.literal("returned"),
+    ),
+    grade: v.optional(v.number()), // 0–100
+    feedback: v.optional(v.string()),
+    gradedBy: v.optional(v.id("users")),
+    gradedAt: v.optional(v.number()),
+  })
+    .index("by_assignment", ["assignmentId"])
+    .index("by_student", ["studentId"])
+    .index("by_assignment_student", ["assignmentId", "studentId"]),
 
   // Stark chatbot: saved conversations
   starkConversations: defineTable({

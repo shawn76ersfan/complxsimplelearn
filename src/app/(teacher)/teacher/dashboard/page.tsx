@@ -5,11 +5,12 @@ import { ScoresDashboard } from "@/components/teacher/ScoresDashboard";
 import { CalendarWidget } from "@/components/teacher/CalendarWidget";
 import { EmailComposer } from "@/components/teacher/EmailComposer";
 import { HomeworkTab } from "@/components/teacher/HomeworkTab";
+import { CurriculumManager } from "@/components/teacher/CurriculumManager";
 import { KnowledgeManager } from "@/components/teacher/KnowledgeManager";
 import { VideoManager } from "@/components/teacher/VideoManager";
 import { InfoSessionManager } from "@/components/teacher/InfoSessionManager";
 import { InviteStudentPanel } from "@/components/teacher/InviteStudentPanel";
-import { BarChart3, Calendar, CalendarClock, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video } from "lucide-react";
+import { BarChart3, Calendar, CalendarClock, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
@@ -18,6 +19,7 @@ import { api } from "../../../../../convex/_generated/api";
 const TABS = [
   { id: "scores",   label: "Scores",         icon: BarChart3   },
   { id: "students", label: "Students",       icon: Users       },
+  { id: "curriculum", label: "Curriculum",   icon: Library     },
   { id: "homework", label: "Homework",       icon: BookMarked  },
   { id: "calendar", label: "Calendar",       icon: Calendar    },
   { id: "info-sessions", label: "Info Sessions", icon: CalendarClock },
@@ -254,12 +256,24 @@ export default function TeacherDashboard() {
         </div>
       )}
 
+      {activeTab === "curriculum" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Curriculum CMS</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Create and edit learning tracks and lessons — publish when ready for students.
+            </p>
+          </div>
+          <CurriculumManager />
+        </div>
+      )}
+
       {activeTab === "homework" && (
         <div>
           <div className="mb-6">
             <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Homework & Assignments</h2>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Assign tracks or tasks with deadlines. See each student&apos;s status: Complete, Pending, Late, or Empty.
+              Assign work with deadlines, collect submissions, and grade with feedback.
             </p>
           </div>
           <HomeworkTab />
