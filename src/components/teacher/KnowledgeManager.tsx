@@ -21,6 +21,7 @@ export function KnowledgeManager() {
   const createDoc = useMutation(api.knowledge.create);
   const updateDoc = useMutation(api.knowledge.update);
   const removeDoc = useMutation(api.knowledge.remove);
+  const seedResume = useMutation(api.resumeCoach.seedResumeGuidance);
   const rebuild = useAction(api.embeddings.generateAllEmbeddings);
 
   const [editing, setEditing] = useState<EditingDoc | null>(null);
@@ -120,7 +121,29 @@ export function KnowledgeManager() {
           <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
           {syncing ? "Syncing…" : "Sync Stark now"}
         </button>
+        <button
+          onClick={async () => {
+            try {
+              const res = await seedResume({});
+              toast.success(
+                res.inserted > 0
+                  ? `Added ${res.inserted} resume guidance doc(s). Sync Stark to index them.`
+                  : "Resume guidance already present.",
+              );
+            } catch {
+              toast.error("Could not seed resume guidance.");
+            }
+          }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all hover:opacity-80"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+        >
+          Seed Coach resume tips
+        </button>
       </div>
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        Use category <code className="px-1 rounded" style={{ background: "var(--surface-2)" }}>resume</code> for Coach Mode guidance.
+        Rubric weights stay in code so scores stay consistent; knowledge shapes the advice.
+      </p>
 
       {/* Editor */}
       {editing && (
@@ -155,7 +178,7 @@ export function KnowledgeManager() {
                 type="text"
                 value={editing.category}
                 onChange={(e) => setEditing({ ...editing, category: e.target.value })}
-                placeholder="e.g. Policy"
+                placeholder='e.g. resume (feeds Coach Mode tips)'
                 className="w-full px-3 py-2 rounded-xl text-sm outline-none transition-all"
                 style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
                 onFocus={(e) => (e.target.style.borderColor = "#2563EB")}

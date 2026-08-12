@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { requireTeacher } from "./_lib/auth";
+import { getCurrentUser, requireTeacher } from "./_lib/auth";
 
 /** List all knowledge docs, newest-updated first. Teacher-only. */
 export const list = query({
@@ -9,6 +9,35 @@ export const list = query({
   handler: async (ctx) => {
     await requireTeacher(ctx);
     return await ctx.db.query("knowledgeDocs").withIndex("by_updated").order("desc").collect();
+  },
+});
+
+/**
+ * Authenticated students/teachers: resume coaching guidance docs.
+ * Used by Coach Mode (Cassandra's tips) — does not affect deterministic scoring weights.
+ */
+export const listPublicResumeGuidance = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      title: v.string(),
+      content: v.string(),
+      category: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx) => {
+    await getCurrentUser(ctx);
+    const docs = await ctx.db.query("knowledgeDocs").collect();
+    return docs
+      .filter((d) => {
+        const cat = (d.category ?? "").toLowerCase();
+        return cat === "resume" || cat.startsWith("resume/");
+      })
+      .map((d) => ({
+        title: d.title,
+        content: d.content,
+        category: d.category,
+      }));
   },
 });
 

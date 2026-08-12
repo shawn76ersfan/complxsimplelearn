@@ -517,6 +517,7 @@ async function persistExchange(
     }
   }
 
+  if (!convId) throw new Error("Failed to create conversation");
   return convId;
 }
 

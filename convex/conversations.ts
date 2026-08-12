@@ -37,7 +37,12 @@ export const getMessages = query({
 
 /** Create a new conversation and return its ID. */
 export const create = mutation({
-  args: { title: v.string() },
+  args: {
+    title: v.string(),
+    mode: v.optional(v.union(v.literal("default"), v.literal("coach"))),
+    careerTrack: v.optional(v.string()),
+  },
+  returns: v.id("starkConversations"),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
     const now = Date.now();
@@ -46,7 +51,33 @@ export const create = mutation({
       title: args.title.trim().slice(0, 60) || "New conversation",
       createdAt: now,
       updatedAt: now,
+      mode: args.mode,
+      careerTrack: args.careerTrack,
     });
+  },
+});
+
+/** Set Coach Mode metadata on a conversation. */
+export const setCoachMeta = mutation({
+  args: {
+    conversationId: v.id("starkConversations"),
+    mode: v.optional(v.union(v.literal("default"), v.literal("coach"))),
+    careerTrack: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    const convo = await ctx.db.get(args.conversationId);
+    if (!convo || convo.userId !== user._id) throw new Error("Not found");
+    const patch: {
+      mode?: "default" | "coach";
+      careerTrack?: string;
+      updatedAt: number;
+    } = { updatedAt: Date.now() };
+    if (args.mode !== undefined) patch.mode = args.mode;
+    if (args.careerTrack !== undefined) patch.careerTrack = args.careerTrack;
+    await ctx.db.patch(args.conversationId, patch);
+    return null;
   },
 });
 

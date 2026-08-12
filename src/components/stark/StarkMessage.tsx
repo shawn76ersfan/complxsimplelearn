@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { motion } from "framer-motion";
 import { Check, Copy } from "lucide-react";
 import toast from "react-hot-toast";
-import { StarkCodeBlock } from "./StarkCodeBlock";
+import { StreamingText } from "./StreamingText";
 
 type Props = {
   role: "user" | "assistant";
   content: string;
   showCopy?: boolean;
+  /** Typewriter-style reveal for fresh assistant replies */
+  stream?: boolean;
 };
 
-export function StarkMessage({ role, content, showCopy = true }: Props) {
+export function StarkMessage({ role, content, showCopy = true, stream = false }: Props) {
   const [copied, setCopied] = useState(false);
+  const [streamDone, setStreamDone] = useState(!stream);
 
   async function handleCopyMessage() {
     try {
@@ -29,88 +31,36 @@ export function StarkMessage({ role, content, showCopy = true }: Props) {
 
   if (role === "user") {
     return (
-      <div className="flex justify-end">
+      <motion.div
+        className="flex justify-end"
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.22 }}
+      >
         <div
           className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
           style={{ background: "var(--stark-surface)", color: "var(--stark-text)" }}
         >
           <p className="whitespace-pre-wrap">{content}</p>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
     <div className="group/msg">
-      <div
-        className="stark-markdown text-sm leading-relaxed max-w-none"
-        style={{ color: "var(--stark-text)" }}
-      >
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
-            p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-            ul: ({ children }) => <ul className="mb-3 ml-4 list-disc space-y-1">{children}</ul>,
-            ol: ({ children }) => <ol className="mb-3 ml-4 list-decimal space-y-1">{children}</ol>,
-            li: ({ children }) => <li>{children}</li>,
-            strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-            em: ({ children }) => <em>{children}</em>,
-            h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4 first:mt-0">{children}</h1>,
-            h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-4 first:mt-0">{children}</h2>,
-            h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-3 first:mt-0">{children}</h3>,
-            a: ({ href, children }) => (
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2"
-                style={{ color: "var(--stark-accent)" }}
-              >
-                {children}
-              </a>
-            ),
-            blockquote: ({ children }) => (
-              <blockquote
-                className="border-l-2 pl-3 my-3 italic"
-                style={{ borderColor: "var(--stark-border)", color: "var(--stark-muted)" }}
-              >
-                {children}
-              </blockquote>
-            ),
-            code: ({ className, children, ...props }) => {
-              const match = /language-(\w+)/.exec(className ?? "");
-              const codeString = String(children).replace(/\n$/, "");
+      <StreamingText
+        content={content}
+        animate={stream}
+        onDone={() => setStreamDone(true)}
+      />
 
-              if (match) {
-                return <StarkCodeBlock language={match[1]} code={codeString} />;
-              }
-
-              if (codeString.includes("\n")) {
-                return <StarkCodeBlock language="text" code={codeString} />;
-              }
-
-              return (
-                <code
-                  className="px-1.5 py-0.5 rounded text-[0.8125rem]"
-                  style={{
-                    background: "var(--stark-surface)",
-                    fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  }}
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            },
-            pre: ({ children }) => <>{children}</>,
-          }}
+      {showCopy && streamDone && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-1 mt-2 opacity-0 group-hover/msg:opacity-100 transition-opacity"
         >
-          {content}
-        </ReactMarkdown>
-      </div>
-
-      {showCopy && (
-        <div className="flex items-center gap-1 mt-2 opacity-0 group-hover/msg:opacity-100 transition-opacity">
           <button
             type="button"
             onClick={handleCopyMessage}
@@ -120,7 +70,7 @@ export function StarkMessage({ role, content, showCopy = true }: Props) {
           >
             {copied ? <Check size={15} /> : <Copy size={15} />}
           </button>
-        </div>
+        </motion.div>
       )}
     </div>
   );

@@ -217,6 +217,9 @@ export default defineSchema({
     title: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    mode: v.optional(v.union(v.literal("default"), v.literal("coach"))),
+    careerTrack: v.optional(v.string()),
+    activeResumeVersionId: v.optional(v.id("resumeVersions")),
   })
     .index("by_user", ["userId"])
     .index("by_user_updated", ["userId", "updatedAt"]),
@@ -228,6 +231,44 @@ export default defineSchema({
     content: v.string(),
     createdAt: v.number(),
   }).index("by_conversation", ["conversationId"]),
+
+  // Stark Coach Mode: resume versions + structured reviews
+  resumeVersions: defineTable({
+    userId: v.id("users"),
+    conversationId: v.id("starkConversations"),
+    versionNumber: v.number(),
+    rawText: v.string(),
+    parsedJson: v.string(), // JSON.stringify(ParsedResume)
+    careerTrack: v.string(),
+    jobDescription: v.optional(v.string()),
+    fileKey: v.optional(v.string()),
+    fileName: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_conversation", ["conversationId"])
+    .index("by_user_created", ["userId", "createdAt"]),
+
+  resumeReviews: defineTable({
+    userId: v.id("users"),
+    conversationId: v.id("starkConversations"),
+    versionId: v.id("resumeVersions"),
+    rubricVersion: v.string(),
+    careerTrack: v.string(),
+    overallScore: v.number(),
+    strengthLabel: v.string(),
+    readinessLabel: v.string(),
+    categoryScoresJson: v.string(),
+    milestonesJson: v.string(),
+    feedbackMarkdown: v.string(),
+    jdMatchJson: v.optional(v.string()),
+    scoreChangeSummary: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_version", ["versionId"])
+    .index("by_conversation", ["conversationId"])
+    .index("by_user_created", ["userId", "createdAt"]),
 
   // Teacher-editable knowledge that gets embedded into Stark's RAG index
   knowledgeDocs: defineTable({
