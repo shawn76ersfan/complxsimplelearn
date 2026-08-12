@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { getCurrentUser } from "./_lib/auth";
 
 export const getStudentQuizDetail = query({
@@ -140,8 +141,9 @@ export const getTrackProgress = query({
 
     const lessons = await ctx.db
       .query("lessons")
-      .withIndex("by_track", (q) => q.eq("trackId", args.trackId))
-      .filter((q) => q.eq(q.field("published"), true))
+      .withIndex("by_track_published", (q) =>
+        q.eq("trackId", args.trackId).eq("published", true)
+      )
       .collect();
 
     const attempts = await ctx.db
@@ -159,6 +161,115 @@ export const getTrackProgress = query({
       completed,
       total,
       percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+    };
+  },
+});
+
+/** First incomplete published lesson in curriculum order, for the dashboard CTA. */
+export const getContinueLearning = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      lessonId: v.id("lessons"),
+      lessonTitle: v.string(),
+      trackId: v.id("tracks"),
+      trackName: v.string(),
+      trackSlug: v.string(),
+      trackColor: v.string(),
+      completed: v.number(),
+      total: v.number(),
+      percentage: v.number(),
+      allComplete: v.literal(false),
+    }),
+    v.object({
+      allComplete: v.literal(true),
+      completed: v.number(),
+      total: v.number(),
+      percentage: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return null;
+
+    const tracks = (
+      await ctx.db
+        .query("tracks")
+        .withIndex("by_published", (q) => q.eq("published", true))
+        .collect()
+    ).sort((a, b) => a.order - b.order);
+
+    const attempts = await ctx.db
+      .query("attempts")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    const completedLessonIds = new Set(attempts.map((a) => a.lessonId));
+
+    let totalLessons = 0;
+    let completedLessons = 0;
+    let next: {
+      lessonId: Id<"lessons">;
+      lessonTitle: string;
+      trackId: Id<"tracks">;
+      trackName: string;
+      trackSlug: string;
+      trackColor: string;
+    } | null = null;
+
+    for (const track of tracks) {
+      const lessons = (
+        await ctx.db
+          .query("lessons")
+          .withIndex("by_track_published", (q) =>
+            q.eq("trackId", track._id).eq("published", true)
+          )
+          .collect()
+      ).sort((a, b) => a.order - b.order);
+
+      totalLessons += lessons.length;
+      for (const lesson of lessons) {
+        if (completedLessonIds.has(lesson._id)) {
+          completedLessons += 1;
+          continue;
+        }
+        if (!next) {
+          next = {
+            lessonId: lesson._id,
+            lessonTitle: lesson.title,
+            trackId: track._id,
+            trackName: track.name,
+            trackSlug: track.slug,
+            trackColor: track.color,
+          };
+        }
+      }
+    }
+
+    const percentage =
+      totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+    if (!next) {
+      if (totalLessons === 0) return null;
+      return {
+        allComplete: true as const,
+        completed: completedLessons,
+        total: totalLessons,
+        percentage,
+      };
+    }
+
+    return {
+      ...next,
+      completed: completedLessons,
+      total: totalLessons,
+      percentage,
+      allComplete: false as const,
     };
   },
 });

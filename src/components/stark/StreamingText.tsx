@@ -124,8 +124,8 @@ export function StreamingText({ content, animate = false, onDone }: Props) {
           aria-hidden
           className="inline-block w-[2px] h-[1.05em] ml-0.5 align-[-0.2em] rounded-full"
           style={{
-            background: "linear-gradient(180deg, #2DD4BF, #14B8A6)",
-            boxShadow: "0 0 12px rgba(20,184,166,0.85)",
+            background: "linear-gradient(180deg, #14B8A6, #0D9488)",
+            boxShadow: "0 0 12px rgba(13,148,136,0.8)",
           }}
           animate={{ opacity: [1, 0.15, 1] }}
           transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}

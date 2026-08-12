@@ -168,7 +168,7 @@ function FeedbackCard({
       onClick={isWarning ? undefined : onRead}
       className="rounded-2xl transition-all hover:shadow-sm"
       style={{
-        background: isWarning && !item.acknowledgedAt ? "#FFFBEB" : "var(--surface)",
+        background: isWarning && !item.acknowledgedAt ? "var(--warning-bg)" : "var(--surface)",
         border: `1px solid ${item.isRead && !isWarning ? "var(--border)" : accent + "55"}`,
         borderLeft: `4px solid ${item.isRead && !(isWarning && !item.acknowledgedAt) ? "var(--border)" : accent}`,
         cursor: isWarning || item.isRead ? "default" : "pointer",

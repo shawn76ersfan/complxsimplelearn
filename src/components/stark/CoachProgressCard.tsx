@@ -59,7 +59,7 @@ export function CoachProgressCard({
           <p className="text-xs" style={{ color: "var(--stark-muted)" }}>
             Progress score
           </p>
-          <p className="text-lg font-semibold" style={{ color: "#14B8A6" }}>
+          <p className="text-lg font-semibold" style={{ color: "var(--stark-accent)" }}>
             {overallScore}
             <span className="text-sm font-medium" style={{ color: "var(--stark-muted)" }}>
               /100
@@ -76,7 +76,7 @@ export function CoachProgressCard({
       {improvementSummary && (
         <p
           className="text-sm rounded-xl px-3 py-2"
-          style={{ background: "rgba(20,184,166,0.12)", color: "var(--stark-text)" }}
+          style={{ background: "color-mix(in srgb, var(--stark-accent) 12%, transparent)", color: "var(--stark-text)" }}
         >
           {improvementSummary}
         </p>
@@ -103,7 +103,7 @@ export function CoachProgressCard({
               style={{ color: "var(--stark-text)" }}
             >
               <span>{m.title}</span>
-              <span className="font-semibold flex-shrink-0" style={{ color: "#14B8A6" }}>
+              <span className="font-semibold flex-shrink-0" style={{ color: "var(--stark-accent)" }}>
                 +{m.potentialGain}
               </span>
             </li>
@@ -130,7 +130,7 @@ export function CoachProgressCard({
                   className="h-full rounded-full"
                   style={{
                     width: `${Math.min(100, (c.score / 10) * 100)}%`,
-                    background: "#14B8A6",
+                    background: "var(--stark-accent)",
                   }}
                 />
               </div>

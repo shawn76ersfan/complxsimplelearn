@@ -253,20 +253,9 @@ export default async function LandingPage() {
             <br />
             <span className="gradient-text">DevOps &amp; Cloud Engineer</span>
           </h1>
-          <p className="text-xl max-w-3xl mx-auto mb-7" style={{ color: "var(--text-muted)" }}>
-            Master Linux, AWS, Azure, Docker, Kubernetes, Terraform, Jenkins, GitHub Actions, Ansible, and Infrastructure as Code through live training, hands-on labs, and real-world projects.
+          <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--text-muted)" }}>
+            Live instructor-led training with hands-on labs and real projects that get you hired.
           </p>
-          <div className="flex flex-wrap justify-center gap-2 mb-10">
-            {["Beginner Friendly", "Live Instructor-Led Classes", "Hands-On Projects", "Career Support", "Free AWS Certification Voucher"].map((item) => (
-              <span
-                key={item}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
-              >
-                {item}
-              </span>
-            ))}
-          </div>
           <EnrollmentButtons />
           <InviteOnlyNote className="mt-6" />
         </div>
@@ -504,35 +493,27 @@ export default async function LandingPage() {
                 border: "1px solid rgba(20,184,166,0.4)",
               }}
             >
-              <span style={{ fontFamily: "var(--font-orbitron)", fontWeight: 900, fontSize: "28px", color: "#fff", letterSpacing: "-1px" }}>S</span>
+              <span className="font-extrabold text-[28px] text-white tracking-tight">S</span>
             </div>
 
             <div className="flex-1">
               {/* Name + badge */}
               <div className="flex items-center gap-3 mb-3 flex-wrap">
                 <h2
+                  className="font-extrabold text-white leading-none"
                   style={{
-                    fontFamily: "var(--font-orbitron)",
-                    fontWeight: 900,
                     fontSize: "clamp(28px, 5vw, 40px)",
-                    color: "#fff",
-                    letterSpacing: "0.05em",
-                    lineHeight: 1,
+                    letterSpacing: "0.18em",
                   }}
                 >
                   STARK
                 </h2>
                 <span
+                  className="font-bold text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-full"
                   style={{
-                    fontFamily: "var(--font-orbitron)",
-                    fontWeight: 700,
-                    fontSize: "10px",
-                    letterSpacing: "0.12em",
                     color: "#14B8A6",
                     border: "1px solid #14B8A644",
                     background: "#14B8A610",
-                    padding: "4px 10px",
-                    borderRadius: "99px",
                   }}
                 >
                   INCLUDED WITH ENROLLMENT
@@ -705,16 +686,15 @@ export default async function LandingPage() {
       {/* Final CTA */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
         <div
-          className="rounded-3xl p-10 sm:p-14 text-center relative overflow-hidden"
-          style={{ background: "linear-gradient(135deg, #EFF6FF, #FFF7ED)", border: "1px solid var(--border)" }}
+          className="rounded-3xl p-10 sm:p-14 text-center relative overflow-hidden card"
         >
-          <div className="absolute -top-16 left-1/4 w-64 h-64 rounded-full" style={{ background: "rgba(37,99,235,0.10)", filter: "blur(50px)" }} />
+          <div className="absolute -top-16 left-1/4 w-64 h-64 rounded-full" style={{ background: "color-mix(in srgb, var(--primary) 12%, transparent)", filter: "blur(50px)" }} />
           <div className="relative">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}>
               <Rocket size={25} color="white" />
             </div>
-            <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "#111827" }}>Start your cloud engineering career</h2>
-            <p className="max-w-2xl mx-auto mb-8" style={{ color: "#4B5563" }}>
+            <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>Start your cloud engineering career</h2>
+            <p className="max-w-2xl mx-auto mb-8" style={{ color: "var(--text-muted)" }}>
               Master AWS, Azure, Docker, Kubernetes, Terraform, CI/CD, and DevOps through practical projects and expert mentorship.
             </p>
             <EnrollmentButtons />

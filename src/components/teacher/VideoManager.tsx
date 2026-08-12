@@ -203,7 +203,7 @@ export function VideoManager() {
               <span>Uploading… keep this tab open</span>
               <span>{progress}%</span>
             </div>
-            <div className="w-full rounded-full overflow-hidden" style={{ height: "8px", background: "#E5E7EB" }}>
+            <div className="w-full rounded-full overflow-hidden" style={{ height: "8px", background: "var(--surface-2)" }}>
               <div
                 className="h-full rounded-full transition-all"
                 style={{ width: `${progress}%`, background: "linear-gradient(135deg, #2563EB, #F97316)" }}

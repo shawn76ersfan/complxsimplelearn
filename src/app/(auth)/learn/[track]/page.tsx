@@ -74,15 +74,14 @@ export default function TrackPage({ params }: { params: Promise<{ track: string 
           </div>
         </div>
 
-        {/* Progress bar — spec: 6px, #E5E7EB track, brand purple fill */}
         <div>
           <div className="flex justify-between text-sm mb-1.5" style={{ color: "var(--text-muted)" }}>
             <span>{progress?.completed ?? 0} of {progress?.total ?? 0} lessons completed</span>
-            <span className="font-semibold" style={{ color: "#2563EB" }}>{pct}%</span>
+            <span className="font-semibold" style={{ color: "var(--primary)" }}>{pct}%</span>
           </div>
-          <div className="w-full" style={{ height: "6px", background: "#E5E7EB", borderRadius: "999px", overflow: "hidden" }}>
+          <div className="w-full" style={{ height: "6px", background: "var(--surface-2)", borderRadius: "999px", overflow: "hidden" }}>
             <div
-              style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(135deg, #2563EB, #F97316)", borderRadius: "999px", transition: "width 0.7s ease" }}
+              style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(135deg, var(--primary), var(--accent))", borderRadius: "999px", transition: "width 0.7s ease" }}
             />
           </div>
         </div>

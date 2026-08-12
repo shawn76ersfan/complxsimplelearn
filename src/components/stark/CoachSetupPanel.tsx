@@ -200,7 +200,7 @@ export function CoachSetupPanel({ tracks, busy, onReview, hasActiveVersion }: Pr
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm"
                 style={{ background: "var(--stark-bg)", border: "1px solid var(--stark-border)" }}
               >
-                <FileUp size={16} style={{ color: "#14B8A6" }} />
+                <FileUp size={16} style={{ color: "var(--stark-accent)" }} />
                 <span className="flex-1 truncate" style={{ color: "var(--stark-text)" }}>
                   {extracting ? "Extracting text…" : fileName}
                 </span>
@@ -256,7 +256,7 @@ export function CoachSetupPanel({ tracks, busy, onReview, hasActiveVersion }: Pr
             disabled={working || rawText.trim().length < 40}
             onClick={handleSubmit}
             className="w-full py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40"
-            style={{ background: "#14B8A6" }}
+            style={{ background: "var(--stark-accent)" }}
           >
             {extracting
               ? "Extracting PDF…"

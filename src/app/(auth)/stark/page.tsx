@@ -48,7 +48,7 @@ const STARK_VARS = {
     "--stark-border": "#d4d0c8",
     "--stark-text": "#1a1a1a",
     "--stark-muted": "#6b6560",
-    "--stark-accent": "#c96442",
+    "--stark-accent": "#0D9488",
     "--stark-hover": "#e0dcd4",
     "--stark-active": "#d8d3cb",
   },
@@ -59,7 +59,7 @@ const STARK_VARS = {
     "--stark-border": "#3a3a3a",
     "--stark-text": "#ececec",
     "--stark-muted": "#9b9b9b",
-    "--stark-accent": "#d97757",
+    "--stark-accent": "#14B8A6",
     "--stark-hover": "#2a2a2a",
     "--stark-active": "#333333",
   },
@@ -323,7 +323,7 @@ export default function StarkPage() {
     <>
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
         <div className="flex items-center gap-2">
-          <span className="stark-logo-dot inline-block w-2 h-2 rounded-full" style={{ background: "#14B8A6" }} />
+          <span className="stark-logo-dot inline-block w-2 h-2 rounded-full" style={{ background: "var(--stark-accent)" }} />
           <span className="stark-logo-text text-xl">STARK</span>
         </div>
         <div className="flex items-center gap-1">
@@ -395,7 +395,7 @@ export default function StarkPage() {
                 {convo.mode === "coach" && (
                   <span
                     className="text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0"
-                    style={{ background: "rgba(20,184,166,0.2)", color: "#14B8A6" }}
+                    style={{ background: "color-mix(in srgb, var(--stark-accent) 20%, transparent)", color: "var(--stark-accent)" }}
                   >
                     Coach β
                   </span>
@@ -532,7 +532,7 @@ export default function StarkPage() {
                     <motion.span
                       layoutId="stark-mode-pill"
                       className="absolute inset-0 rounded-lg"
-                      style={{ background: "#14B8A6" }}
+                      style={{ background: "var(--stark-accent)" }}
                       transition={{ type: "spring", stiffness: 420, damping: 32 }}
                     />
                   )}
@@ -541,8 +541,8 @@ export default function StarkPage() {
                     <span
                       className="relative text-[9px] font-bold uppercase tracking-wide px-1 py-0.5 rounded"
                       style={{
-                        background: active ? "rgba(255,255,255,0.22)" : "rgba(20,184,166,0.18)",
-                        color: active ? "#fff" : "#14B8A6",
+                        background: active ? "rgba(255,255,255,0.22)" : "color-mix(in srgb, var(--stark-accent) 18%, transparent)",
+                        color: active ? "#fff" : "var(--stark-accent)",
                       }}
                     >
                       Beta
@@ -562,13 +562,13 @@ export default function StarkPage() {
                   className="rounded-2xl px-4 py-3 flex items-start gap-3"
                   style={{
                     background:
-                      "linear-gradient(135deg, rgba(20,184,166,0.14), rgba(45,212,191,0.06))",
-                    border: "1px solid rgba(20,184,166,0.35)",
+                      "linear-gradient(135deg, color-mix(in srgb, var(--stark-accent) 14%, transparent), color-mix(in srgb, var(--stark-accent) 6%, transparent))",
+                    border: "1px solid color-mix(in srgb, var(--stark-accent) 35%, transparent)",
                   }}
                 >
                   <span
                     className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md flex-shrink-0 mt-0.5"
-                    style={{ background: "#14B8A6", color: "#fff" }}
+                    style={{ background: "var(--stark-accent)", color: "#fff" }}
                   >
                     Beta
                   </span>
@@ -663,7 +663,7 @@ export default function StarkPage() {
                       key={d}
                       className="inline-block w-2 h-2 rounded-full"
                       style={{
-                        background: "#14B8A6",
+                        background: "var(--stark-accent)",
                         animation: `stark-bounce 1s ease-in-out ${d * 0.15}s infinite`,
                       }}
                     />
@@ -767,18 +767,19 @@ export default function StarkPage() {
                   >
                     <motion.span
                       style={{
-                        fontFamily: "var(--font-stark), sans-serif",
-                        fontWeight: 900,
+                        fontFamily: "var(--font-sans), sans-serif",
+                        fontWeight: 800,
+                        letterSpacing: "0.06em",
                         display: "inline-block",
                       }}
                       animate={{
-                        color: ["#14B8A6", "#2DD4BF", "#0D9488", "#5EEAD4", "#14B8A6"],
+                        color: ["#0D9488", "#14B8A6", "#0F766E", "#2DD4BF", "#0D9488"],
                         textShadow: [
-                          "0 0 0px rgba(20,184,166,0)",
-                          "0 0 10px rgba(45,212,191,0.65)",
-                          "0 0 4px rgba(13,148,136,0.35)",
-                          "0 0 12px rgba(94,234,212,0.55)",
-                          "0 0 0px rgba(20,184,166,0)",
+                          "0 0 0px rgba(13,148,136,0)",
+                          "0 0 10px rgba(20,184,166,0.55)",
+                          "0 0 4px rgba(15,118,110,0.35)",
+                          "0 0 12px rgba(45,212,191,0.45)",
+                          "0 0 0px rgba(13,148,136,0)",
                         ],
                         scale: [1, 1.08, 1, 1.06, 1],
                       }}
@@ -798,7 +799,7 @@ export default function StarkPage() {
                     disabled={!input.trim() || loading || reviewing}
                     className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{
-                      background: input.trim() && !loading && !reviewing ? "#14B8A6" : "var(--stark-border)",
+                      background: input.trim() && !loading && !reviewing ? "var(--stark-accent)" : "var(--stark-border)",
                       color: input.trim() && !loading && !reviewing ? "#fff" : "var(--stark-muted)",
                     }}
                     aria-label="Send message"

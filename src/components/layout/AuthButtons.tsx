@@ -47,20 +47,20 @@ export function HeroButtons() {
 
 export function EnrollmentButtons() {
   return (
-    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+    <div className="flex flex-col items-center gap-4">
       <Link
         href="/sign-in"
-        className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-lg font-semibold text-white hover:opacity-90 transition-all hover:scale-105 active:scale-95 shadow-lg"
-        style={{ background: "linear-gradient(135deg, #2563EB, #F97316)", boxShadow: "0 8px 24px rgba(37,99,235,0.35)" }}
+        className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-lg font-semibold text-white hover:opacity-90 transition-opacity shadow-lg"
+        style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))", boxShadow: "0 8px 24px rgba(37,99,235,0.35)" }}
       >
         Sign In <ArrowRight size={20} />
       </Link>
       <a
         href="#info-sessions"
-        className="px-8 py-4 rounded-2xl text-lg font-medium transition-all hover:scale-105 active:scale-95 text-center"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
+        className="text-sm font-medium hover:opacity-70 transition-opacity"
+        style={{ color: "var(--text-muted)" }}
       >
-        View Info Sessions
+        View upcoming info sessions
       </a>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScoresDashboard } from "@/components/teacher/ScoresDashboard";
 import { CalendarWidget } from "@/components/teacher/CalendarWidget";
 import { EmailComposer } from "@/components/teacher/EmailComposer";
@@ -10,26 +10,29 @@ import { KnowledgeManager } from "@/components/teacher/KnowledgeManager";
 import { VideoManager } from "@/components/teacher/VideoManager";
 import { InfoSessionManager } from "@/components/teacher/InfoSessionManager";
 import { InviteStudentPanel } from "@/components/teacher/InviteStudentPanel";
-import { BarChart3, Calendar, CalendarClock, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library } from "lucide-react";
+import { BarChart3, Calendar, CalendarClock, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 
-const TABS = [
-  { id: "scores",   label: "Scores",         icon: BarChart3   },
-  { id: "students", label: "Students",       icon: Users       },
-  { id: "curriculum", label: "Curriculum",   icon: Library     },
-  { id: "homework", label: "Homework",       icon: BookMarked  },
-  { id: "calendar", label: "Calendar",       icon: Calendar    },
-  { id: "info-sessions", label: "Info Sessions", icon: CalendarClock },
-  { id: "videos",   label: "Videos",         icon: Video       },
-  { id: "email",    label: "Email Students", icon: Mail        },
-  { id: "quote",    label: "Quote",          icon: Quote       },
-  { id: "knowledge", label: "Stark Knowledge", icon: Sparkles   },
+const PRIMARY_TABS = [
+  { id: "scores", label: "Scores", icon: BarChart3 },
+  { id: "students", label: "Students", icon: Users },
+  { id: "curriculum", label: "Curriculum", icon: Library },
+  { id: "homework", label: "Homework", icon: BookMarked },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+const MORE_TABS = [
+  { id: "calendar", label: "Calendar", icon: Calendar },
+  { id: "info-sessions", label: "Info Sessions", icon: CalendarClock },
+  { id: "videos", label: "Videos", icon: Video },
+  { id: "email", label: "Email Students", icon: Mail },
+  { id: "quote", label: "Quote", icon: Quote },
+  { id: "knowledge", label: "Stark Knowledge", icon: Sparkles },
+] as const;
+
+type TabId = (typeof PRIMARY_TABS)[number]["id"] | (typeof MORE_TABS)[number]["id"];
 
 function QuoteEditor() {
   const current = useQuery(api.quotes.getCurrent);
@@ -206,40 +209,109 @@ function StudentManagementTab() {
 
 export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState<TabId>("scores");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  const activeMoreTab = MORE_TABS.find((tab) => tab.id === activeTab);
+  const moreActive = Boolean(activeMoreTab);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onPointerDown(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [moreOpen]);
+
+  function tabStyle(active: boolean) {
+    return {
+      background: active ? "linear-gradient(135deg, var(--primary), var(--accent))" : "var(--surface-2)",
+      color: active ? "white" : "var(--text)",
+      border: `1px solid ${active ? "transparent" : "var(--border)"}`,
+      boxShadow: active ? "0 4px 15px rgba(37,99,235,0.3)" : "none",
+    } as const;
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}>
             <GraduationCap size={20} className="text-white" />
           </div>
           <div>
             <h1 className="text-3xl font-black" style={{ color: "var(--text)" }}>Teacher Hub</h1>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>Welcome back, Cassandra! 👋</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>Welcome back, Cassandra</p>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-8 flex-wrap">
-        {TABS.map((tab) => (
+      {/* Tabs: primary + More */}
+      <div className="flex gap-2 mb-8 flex-wrap items-center">
+        {PRIMARY_TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={cn("flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all hover:scale-105 active:scale-95")}
-            style={{
-              background: activeTab === tab.id ? "linear-gradient(135deg, #2563EB, #F97316)" : "var(--surface-2)",
-              color: activeTab === tab.id ? "white" : "var(--text)",
-              border: `1px solid ${activeTab === tab.id ? "transparent" : "var(--border)"}`,
-              boxShadow: activeTab === tab.id ? "0 4px 15px rgba(37,99,235,0.3)" : "none",
-            }}
+            className={cn("flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-opacity hover:opacity-90")}
+            style={tabStyle(activeTab === tab.id)}
           >
             <tab.icon size={15} />
             {tab.label}
           </button>
         ))}
+
+        <div className="relative" ref={moreRef}>
+          <button
+            type="button"
+            onClick={() => setMoreOpen((o) => !o)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-opacity hover:opacity-90"
+            style={tabStyle(moreActive)}
+            aria-expanded={moreOpen}
+            aria-haspopup="menu"
+          >
+            {activeMoreTab ? (
+              <>
+                <activeMoreTab.icon size={15} />
+                {activeMoreTab.label}
+              </>
+            ) : (
+              <>More</>
+            )}
+            <ChevronDown size={14} className={cn("transition-transform", moreOpen && "rotate-180")} />
+          </button>
+
+          {moreOpen && (
+            <div
+              role="menu"
+              className="absolute left-0 top-full mt-2 z-30 min-w-[220px] rounded-xl py-1 shadow-lg"
+              style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+            >
+              {MORE_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setMoreOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-left transition-colors hover:opacity-90"
+                  style={{
+                    color: activeTab === tab.id ? "var(--primary)" : "var(--text)",
+                    background: activeTab === tab.id ? "var(--surface-2)" : "transparent",
+                  }}
+                >
+                  <tab.icon size={15} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {activeTab === "students" && (

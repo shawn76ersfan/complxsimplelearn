@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Calendar, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge } from "lucide-react";
+import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Calendar, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge, Play } from "lucide-react";
 import { StudentHomework } from "@/components/learn/StudentHomework";
 import { FeedbackPreviewCard } from "@/components/learn/FeedbackPreviewCard";
 
@@ -23,6 +23,111 @@ const TRACK_ICONS: Record<string, React.ElementType> = {
   cicd: Workflow,
   monitoring: Gauge,
 };
+
+function ProgressRing({ percentage, color, size = 88 }: { percentage: number; color: string; size?: number }) {
+  const stroke = 7;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c - (Math.min(100, Math.max(0, percentage)) / 100) * c;
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-2)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.7s ease" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-sm font-bold" style={{ color: "var(--text)" }}>{percentage}%</span>
+      </div>
+    </div>
+  );
+}
+
+function ContinueLearningCard() {
+  const next = useQuery(api.attempts.getContinueLearning);
+
+  if (next === undefined) {
+    return <div className="card p-8 mb-6 animate-pulse h-40" style={{ background: "var(--surface-2)" }} />;
+  }
+
+  if (next === null || next.allComplete) {
+    return (
+      <div
+        className="card p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-6"
+        style={{
+          border: "1px solid transparent",
+          backgroundImage: "linear-gradient(var(--surface), var(--surface)), linear-gradient(135deg, var(--primary), var(--accent))",
+          backgroundOrigin: "border-box",
+          backgroundClip: "padding-box, border-box",
+        }}
+      >
+        <ProgressRing percentage={next?.percentage ?? 100} color="var(--primary)" size={96} />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--primary)" }}>
+            Continue Learning
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: "var(--text)" }}>
+            {next?.allComplete ? "All lessons complete" : "Start your first lesson"}
+          </h2>
+          <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+            {next?.allComplete
+              ? "Nice work — browse tracks anytime to review material."
+              : "Pick a track and begin building job-ready skills."}
+          </p>
+          <Link
+            href="/learn"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}
+          >
+            Browse tracks <ArrowRight size={16} />
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="card p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-6"
+      style={{
+        border: "1px solid transparent",
+        backgroundImage: "linear-gradient(var(--surface), var(--surface)), linear-gradient(135deg, var(--primary), var(--accent))",
+        backgroundOrigin: "border-box",
+        backgroundClip: "padding-box, border-box",
+      }}
+    >
+      <ProgressRing percentage={next.percentage} color={next.trackColor} size={96} />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: next.trackColor }}>
+          Continue Learning · {next.trackName}
+        </p>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-2 truncate" style={{ color: "var(--text)" }}>
+          {next.lessonTitle}
+        </h2>
+        <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+          {next.completed} of {next.total} lessons complete
+        </p>
+        <Link
+          href={`/learn/${next.trackSlug}/${next.lessonId}`}
+          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
+          style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}
+        >
+          <Play size={16} fill="currentColor" /> Continue
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function TrackCard({ track }: { track: { _id: string; name: string; slug: string; description: string; color: string; icon: string } }) {
   const progress = useQuery(api.attempts.getTrackProgress, { trackId: track._id as never });
@@ -46,9 +151,8 @@ function TrackCard({ track }: { track: { _id: string; name: string; slug: string
           <span>{progress?.completed ?? 0}/{progress?.total ?? 0} lessons</span>
           <span>{pct}% complete</span>
         </div>
-        {/* Progress bar — spec: 6px, #E5E7EB track, brand purple fill */}
-        <div className="w-full rounded-full overflow-hidden" style={{ height: "6px", background: "#E5E7EB", borderRadius: "999px" }}>
-          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(135deg, #2563EB, #F97316)", borderRadius: "999px" }} />
+        <div className="w-full rounded-full overflow-hidden" style={{ height: "6px", background: "var(--surface-2)", borderRadius: "999px" }}>
+          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(135deg, var(--primary), var(--accent))", borderRadius: "999px" }} />
         </div>
       </div>
       <div className="flex items-center gap-1 text-sm font-medium group-hover:gap-2 transition-all" style={{ color: track.color }}>
@@ -58,7 +162,7 @@ function TrackCard({ track }: { track: { _id: string; name: string; slug: string
   );
 }
 
-function LevelBar({
+function DenseLevel({
   level,
   completedCount,
   totalCount,
@@ -69,24 +173,19 @@ function LevelBar({
 }) {
   const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between mb-2">
+    <div className="card p-3.5 h-full">
+      <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
+          <span className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}>
             {level}
           </span>
-          <span className="font-semibold text-sm" style={{ color: "var(--text)" }}>Level {level}</span>
+          <span className="font-semibold text-xs" style={{ color: "var(--text)" }}>Level {level}</span>
         </div>
-        <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-          {completedCount} of {totalCount} assignments
-        </span>
+        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{completedCount}/{totalCount}</span>
       </div>
-      <div className="w-full rounded-full overflow-hidden" style={{ height: "8px", background: "#E5E7EB", borderRadius: "999px" }}>
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(135deg, #2563EB, #F97316)", borderRadius: "999px" }} />
+      <div className="w-full rounded-full overflow-hidden" style={{ height: "5px", background: "var(--surface-2)" }}>
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(135deg, var(--primary), var(--accent))" }} />
       </div>
-      <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
-        Finish each homework assignment to level up.
-      </p>
     </div>
   );
 }
@@ -97,11 +196,16 @@ function QuoteCard() {
   return (
     <div
       className="card p-6 relative overflow-hidden"
-      style={{ border: "2px solid transparent", backgroundImage: "linear-gradient(var(--surface), var(--surface)), linear-gradient(135deg, #2563EB, #F97316)", backgroundOrigin: "border-box", backgroundClip: "padding-box, border-box" }}
+      style={{
+        border: "2px solid transparent",
+        backgroundImage: "linear-gradient(var(--surface), var(--surface)), linear-gradient(135deg, var(--primary), var(--accent))",
+        backgroundOrigin: "border-box",
+        backgroundClip: "padding-box, border-box",
+      }}
     >
-      <Quote size={40} className="absolute -top-1 -left-1 opacity-10" style={{ color: "#2563EB" }} />
+      <Quote size={40} className="absolute -top-1 -left-1 opacity-10" style={{ color: "var(--primary)" }} />
       <div className="relative">
-        <p className="text-sm font-semibold mb-1" style={{ color: "#2563EB" }}>Quote of the Week</p>
+        <p className="text-sm font-semibold mb-1" style={{ color: "var(--primary)" }}>Quote of the Week</p>
         <p className="text-base leading-relaxed italic font-medium" style={{ color: "var(--text)" }}>
           &ldquo;{quote.text}&rdquo;
         </p>
@@ -133,28 +237,26 @@ export default function StudentDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Welcome */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-3xl mb-1" style={{ fontWeight: 700, color: "var(--text)" }}>
-          Hey, {user?.firstName ?? "Student"} 👋
+          Hey, {user?.firstName ?? "Student"}
         </h1>
         <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>Ready to learn something new today?</p>
       </div>
 
-      {/* Warning banners — softened per spec */}
       {activeWarnings && activeWarnings.length > 0 && (
         <div className="space-y-3 mb-6">
           {activeWarnings.map((w) => (
             <div
               key={w._id}
               className="rounded-2xl p-5 space-y-4"
-              style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}
+              style={{ background: "var(--warning-bg)", border: "1px solid var(--warning-border)" }}
             >
               <div className="flex items-start gap-3">
-                <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" style={{ color: "#92400E" }} />
+                <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" style={{ color: "var(--warning-text)" }} />
                 <div className="flex-1">
-                  <p className="font-semibold text-sm mb-1" style={{ color: "#92400E" }}>Warning from Cassandra</p>
-                  <p className="text-sm leading-relaxed" style={{ color: "#1C1917" }}>{w.message}</p>
+                  <p className="font-semibold text-sm mb-1" style={{ color: "var(--warning-text)" }}>Warning from Cassandra</p>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--text)" }}>{w.message}</p>
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 pl-7">
@@ -163,14 +265,14 @@ export default function StudentDashboard() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ border: "1px solid #2563EB", color: "#2563EB", borderRadius: "8px", background: "transparent" }}
+                  style={{ border: "1px solid var(--primary)", color: "var(--primary)", borderRadius: "8px", background: "transparent" }}
                 >
                   <Calendar size={13} /> Schedule a meeting with Cassandra
                 </a>
                 <button
                   onClick={() => acknowledgeWarning({ feedbackId: w._id })}
                   className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ border: "1px solid #B45309", color: "#B45309", borderRadius: "8px", background: "transparent" }}
+                  style={{ border: "1px solid var(--warning-text)", color: "var(--warning-text)", borderRadius: "8px", background: "transparent" }}
                 >
                   <AlertTriangle size={13} /> I acknowledge this warning
                 </button>
@@ -180,45 +282,42 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Quote of the week */}
       <div className="mb-6">
         <QuoteCard />
       </div>
 
-      {/* Assignment level */}
-      <div className="mb-6">
-        <LevelBar level={level} completedCount={completedCount} totalCount={totalCount} />
-      </div>
+      <ContinueLearningCard />
 
-      {/* Messages preview — high on the page so feedback isn’t buried */}
-      <div className="mb-6">
-        <FeedbackPreviewCard />
-      </div>
-
-      {/* Stats row — spec: p-16px, r-12px, icon 36x36 r-10px, metric 22px/700, label 13px */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
+      {/* Secondary dense row */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+        <div className="col-span-2 sm:col-span-1">
+          <DenseLevel level={level} completedCount={completedCount} totalCount={totalCount} />
+        </div>
         {[
-          { label: "Overall Score", value: `${overallPct}%`, icon: Trophy,  color: "#2563EB" },
-          { label: "Lessons Done",  value: myAttempts?.length ?? 0, icon: BookOpen, color: "#0EA5E9" },
-          { label: "Assignments done", value: completedCount, icon: Star, color: "#F97316" },
-          { label: "Day Streak",    value: streak,  icon: Flame, color: "#F97316" },
+          { label: "Score", value: `${overallPct}%`, icon: Trophy, color: "var(--primary)" },
+          { label: "Lessons", value: myAttempts?.length ?? 0, icon: BookOpen, color: "var(--secondary)" },
+          { label: "Homework", value: completedCount, icon: Star, color: "var(--accent)" },
+          { label: "Streak", value: streak, icon: Flame, color: "var(--accent)" },
         ].map((stat) => (
-          <div key={stat.label} className="card flex items-center gap-3" style={{ padding: "16px", borderRadius: "12px" }}>
-            <div className="flex items-center justify-center flex-shrink-0" style={{ width: "36px", height: "36px", borderRadius: "10px", background: `${stat.color}18` }}>
-              <stat.icon size={16} style={{ color: stat.color }} />
+          <div key={stat.label} className="card flex items-center gap-2.5 p-3.5">
+            <div className="flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg" style={{ background: "var(--surface-2)" }}>
+              <stat.icon size={14} style={{ color: stat.color }} />
             </div>
-            <div>
-              <p style={{ fontSize: "22px", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{stat.value}</p>
-              <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>{stat.label}</p>
+            <div className="min-w-0">
+              <p className="text-base font-bold leading-none" style={{ color: "var(--text)" }}>{stat.value}</p>
+              <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{stat.label}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Tracks grid */}
+      <div className="mb-6">
+        <FeedbackPreviewCard />
+      </div>
+
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Your Learning Tracks</h2>
-        <Link href="/learn" className="text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: "#2563EB" }}>View all</Link>
+        <Link href="/learn" className="text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: "var(--primary)" }}>View all</Link>
       </div>
 
       {(!tracks || tracks.length === 0) ? (
@@ -233,24 +332,20 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Homework */}
       <div className="mb-8">
         <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text)" }}>Homework & Assignments</h2>
         <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Assignments from Cassandra — complete them before the deadline.</p>
         <StudentHomework />
       </div>
 
-      {/* Stark */}
       <div
         className="card p-6 mb-8 relative overflow-hidden"
         style={{ background: "linear-gradient(135deg, #020d0d, #071a17, #030f0f)", border: "1px solid rgba(20,184,166,0.25)" }}
       >
-        {/* Teal glow blobs */}
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none" style={{ background: "rgba(20,184,166,0.14)", filter: "blur(40px)" }} />
         <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full pointer-events-none" style={{ background: "rgba(13,148,136,0.10)", filter: "blur(36px)" }} />
 
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-5">
-          {/* Logo */}
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{
@@ -259,33 +354,20 @@ export default function StudentDashboard() {
               border: "1px solid rgba(20,184,166,0.35)",
             }}
           >
-            <span style={{ fontFamily: "var(--font-orbitron)", fontWeight: 900, fontSize: "22px", color: "#fff" }}>S</span>
+            <span className="font-black text-[22px] text-white tracking-tight">S</span>
           </div>
 
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <h2
-                style={{
-                  fontFamily: "var(--font-orbitron)",
-                  fontWeight: 900,
-                  fontSize: "22px",
-                  color: "#fff",
-                  letterSpacing: "0.06em",
-                }}
-              >
+              <h2 className="font-black text-[22px] text-white tracking-[0.18em]">
                 STARK
               </h2>
               <span
+                className="font-bold text-[9px] tracking-[0.1em] px-2.5 py-0.5 rounded-full"
                 style={{
-                  fontFamily: "var(--font-orbitron)",
-                  fontWeight: 700,
-                  fontSize: "9px",
-                  letterSpacing: "0.1em",
                   color: "#14B8A6",
                   border: "1px solid #14B8A633",
                   background: "#14B8A610",
-                  padding: "3px 9px",
-                  borderRadius: "99px",
                 }}
               >
                 AVAILABLE NOW
@@ -294,20 +376,9 @@ export default function StudentDashboard() {
             <p className="text-sm leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.55)" }}>
               Stark is included with your platform access. Ask course questions, review Linux and cloud concepts, break down DevOps tools, and get learning guidance whenever you need it.
             </p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {["Course FAQs", "Tech Concepts", "Career Advice", "Bias-Aware AI"].map((tag) => (
-                <span
-                  key={tag}
-                  className="text-xs px-2.5 py-1 rounded-full font-medium"
-                  style={{ background: "rgba(20,184,166,0.08)", color: "#5eead4", border: "1px solid rgba(20,184,166,0.18)" }}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
             <Link
               href="/stark"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-opacity hover:opacity-90"
               style={{ background: "#14B8A6", color: "#fff" }}
             >
               Open Stark <ArrowRight size={13} />
@@ -315,7 +386,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
-
     </div>
   );
 }
