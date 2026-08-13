@@ -96,7 +96,9 @@ export function FeedbackInbox() {
             }}
             onAcknowledge={
               item.type === "warning" && !item.acknowledgedAt
-                ? () => acknowledgeWarning({ feedbackId: item._id as Id<"feedback"> })
+                ? async () => {
+                    await acknowledgeWarning({ feedbackId: item._id as Id<"feedback"> });
+                  }
                 : undefined
             }
           />
@@ -120,7 +122,9 @@ export function FeedbackInbox() {
                 }}
                 onAcknowledge={
                   item.type === "warning" && !item.acknowledgedAt
-                    ? () => acknowledgeWarning({ feedbackId: item._id as Id<"feedback"> })
+                    ? async () => {
+                        await acknowledgeWarning({ feedbackId: item._id as Id<"feedback"> });
+                      }
                     : undefined
                 }
               />
