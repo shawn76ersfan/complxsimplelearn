@@ -5,7 +5,7 @@
  * RUBRIC_VERSION must bump when weights/criteria change so historical reviews stay meaningful.
  */
 
-export const RUBRIC_VERSION = "v1.0.0";
+export const RUBRIC_VERSION = "v2.1.0";
 
 export type CareerTrack =
   | "devops"
@@ -14,20 +14,28 @@ export type CareerTrack =
   | "data"
   | "consulting";
 
+export type JobLevel =
+  | "internship"
+  | "entry"
+  | "early_career"
+  | "mid"
+  | "senior";
+
 export type RubricCategoryId =
   | "clarity_formatting"
   | "impact_results"
   | "role_relevance"
   | "ats_keywords"
+  | "recruiter_appeal"
   | "completeness"
   | "technical_depth";
 
 export type RubricCategory = {
   id: RubricCategoryId;
   label: string;
-  weight: number; // relative weight; normalized at score time
+  weight: number;
   criteria: string[];
-  scoringRules: string; // guidance for the evaluator LLM
+  scoringRules: string;
 };
 
 export type CareerRubric = {
@@ -36,6 +44,55 @@ export type CareerRubric = {
   description: string;
   categories: RubricCategory[];
 };
+
+export const JOB_LEVEL_OPTIONS: Array<{ id: JobLevel; label: string }> = [
+  { id: "internship", label: "Internship" },
+  { id: "entry", label: "Entry-level / full-time" },
+  { id: "early_career", label: "Early career" },
+  { id: "mid", label: "Mid-level" },
+  { id: "senior", label: "Senior / leadership" },
+];
+
+export function isJobLevel(value: string): value is JobLevel {
+  return JOB_LEVEL_OPTIONS.some((o) => o.id === value);
+}
+
+export function jobLevelLabel(level: JobLevel): string {
+  return JOB_LEVEL_OPTIONS.find((o) => o.id === level)?.label ?? level;
+}
+
+/** Coaching emphasis by job level — used in scorer + coach prompts. */
+export function jobLevelCoachingFocus(level: JobLevel): string {
+  switch (level) {
+    case "internship":
+      return "Demonstrate potential, technical foundation, learning ability, coursework/projects, and curiosity. Emphasize growth signals over deep ownership.";
+    case "entry":
+      return "Demonstrate readiness for full-time work: clear projects, measurable outcomes where honest, collaboration, and applied skills.";
+    case "early_career":
+      return "Demonstrate ownership, measurable outcomes, stakeholder collaboration, increasing responsibility, and translating work into business impact.";
+    case "mid":
+      return "Demonstrate scope, cross-team influence, reliable delivery at scale, mentoring signals, and clear business outcomes.";
+    case "senior":
+      return "Demonstrate strategy, leadership, organizational impact, mentoring, architecture/judgment, and business outcomes — not just individual tasks.";
+  }
+}
+
+/** Consulting competency dimensions scored 0–100 (explainability, not separate overall weights). */
+export const CONSULTING_COMPETENCIES = [
+  { id: "stakeholder_collaboration", label: "Stakeholder collaboration" },
+  { id: "problem_solving", label: "Problem solving" },
+  { id: "requirements_gathering", label: "Requirements gathering" },
+  { id: "communication", label: "Communication" },
+  { id: "business_impact", label: "Business impact" },
+  { id: "analytical_thinking", label: "Analytical thinking" },
+  { id: "process_improvement", label: "Process improvement" },
+  { id: "cross_functional", label: "Cross-functional collaboration" },
+  { id: "tech_to_business", label: "Technical → business translation" },
+  { id: "ownership", label: "Ownership" },
+] as const;
+
+export type ConsultingCompetencyId =
+  (typeof CONSULTING_COMPETENCIES)[number]["id"];
 
 const SHARED_CLARITY: RubricCategory = {
   id: "clarity_formatting",
@@ -53,20 +110,20 @@ const SHARED_CLARITY: RubricCategory = {
 const SHARED_IMPACT: RubricCategory = {
   id: "impact_results",
   label: "Impact & quantified results",
-  weight: 25,
+  weight: 20,
   criteria: [
     "Bullets start with strong action verbs",
     "Measurable outcomes (%, time, cost, scale) where possible",
     "Avoids duty lists without results",
   ],
   scoringRules:
-    "Score high when most experience/project bullets include metrics or clear outcomes. Deduct for vague verbs (helped, worked on) without impact. Reference exact bullet ids.",
+    "Score high when most experience/project bullets include metrics or clear outcomes. Deduct for vague verbs (helped, worked on) without impact. Reference exact bullet ids. For each weak score, list bulletIds and a stronger rewrite example.",
 };
 
 const SHARED_COMPLETENESS: RubricCategory = {
   id: "completeness",
   label: "Completeness",
-  weight: 15,
+  weight: 10,
   criteria: [
     "Contact info present",
     "Skills section present",
@@ -78,15 +135,28 @@ const SHARED_COMPLETENESS: RubricCategory = {
 
 const SHARED_ATS: RubricCategory = {
   id: "ats_keywords",
-  label: "ATS & keywords",
-  weight: 20,
+  label: "ATS Compatibility",
+  weight: 15,
   criteria: [
     "Role-relevant tools and skills appear naturally",
     "Keywords match common job postings for the track",
     "Avoids keyword stuffing without evidence in experience",
   ],
   scoringRules:
-    "Score from evidenced skills in Skills + Experience/Projects. Do not reward keywords that appear only as claims with no supporting bullets.",
+    "Score from evidenced skills in Skills + Experience/Projects. Do not reward keywords that appear only as claims with no supporting bullets. This is the ATS score — keyword coverage and parseability.",
+};
+
+const SHARED_RECRUITER: RubricCategory = {
+  id: "recruiter_appeal",
+  label: "Recruiter Readability & Appeal (estimate)",
+  weight: 15,
+  criteria: [
+    "Bullets read as accomplishments, not task lists",
+    "Human-scannable story of impact in ~6 seconds",
+    "Avoids dense jargon walls and responsibility-only language",
+  ],
+  scoringRules:
+    "Estimate recruiter readability & appeal from clarity, prioritization, accomplishment density, positioning, and evidenced impact — NOT a prediction of real recruiter behavior. High ATS keywords with duty-list bullets should score lower. Cite bullet ids that feel like tasks vs outcomes.",
 };
 
 export const CAREER_RUBRICS: Record<CareerTrack, CareerRubric> = {
@@ -107,9 +177,10 @@ export const CAREER_RUBRICS: Record<CareerTrack, CareerRubric> = {
           "Shows systems thinking (reliability, deployment, troubleshooting)",
         ],
         scoringRules:
-          "Reward Linux, cloud (AWS/Azure/GCP), Docker/K8s, Terraform/Ansible, CI/CD, monitoring. Cite bullets that prove hands-on ops work.",
+          "Reward Linux, cloud (AWS/Azure/GCP), Docker/K8s, Terraform/Ansible, CI/CD, monitoring. Cite bullets that prove hands-on ops work. If a JD is provided, score against that JD; if not, score general track fit only — never invent a specific employer match.",
       },
       SHARED_ATS,
+      SHARED_RECRUITER,
       SHARED_COMPLETENESS,
       {
         id: "technical_depth",
@@ -140,9 +211,10 @@ export const CAREER_RUBRICS: Record<CareerTrack, CareerRubric> = {
           "Mentions languages, frameworks, testing, or collaboration",
         ],
         scoringRules:
-          "Reward languages/frameworks, shipped features, code quality, testing, Git collaboration. Cite project/experience bullets.",
+          "Reward languages/frameworks, shipped features, code quality, testing, Git collaboration. Cite project/experience bullets. If no JD, use general software fit only.",
       },
       SHARED_ATS,
+      SHARED_RECRUITER,
       SHARED_COMPLETENESS,
       {
         id: "technical_depth",
@@ -164,20 +236,16 @@ export const CAREER_RUBRICS: Record<CareerTrack, CareerRubric> = {
       {
         id: "role_relevance",
         label: "Role relevance (IT Support)",
-        weight: 22,
+        weight: 20,
         criteria: [
           "Troubleshooting, ticketing, hardware/software support evidence",
           "Customer service / communication signals",
         ],
         scoringRules:
-          "Reward ticket volume/SLAs, OS support, Active Directory, networking basics, customer outcomes. Cite bullets.",
+          "Reward ticket volume/SLAs, OS support, Active Directory, networking basics, customer outcomes. Cite bullets. If no JD, general IT support fit only.",
       },
-      {
-        ...SHARED_ATS,
-        weight: 18,
-        scoringRules:
-          "Reward evidenced support tools (ServiceNow, Windows/Mac, networking). Do not invent certifications.",
-      },
+      SHARED_ATS,
+      SHARED_RECRUITER,
       SHARED_COMPLETENESS,
       {
         id: "technical_depth",
@@ -204,9 +272,10 @@ export const CAREER_RUBRICS: Record<CareerTrack, CareerRubric> = {
           "Insights tied to decisions or outcomes",
         ],
         scoringRules:
-          "Reward SQL, Python/R, dashboards (Power BI/Tableau), cleaning/analysis, business impact. Cite evidence.",
+          "Reward SQL, Python/R, dashboards (Power BI/Tableau), cleaning/analysis, business impact. Cite evidence. If no JD, general data fit only.",
       },
       SHARED_ATS,
+      SHARED_RECRUITER,
       SHARED_COMPLETENESS,
       {
         id: "technical_depth",
@@ -227,19 +296,22 @@ export const CAREER_RUBRICS: Record<CareerTrack, CareerRubric> = {
       {
         id: "role_relevance",
         label: "Role relevance (Consulting)",
-        weight: 20,
+        weight: 18,
         criteria: [
-          "Client/stakeholder outcomes",
-          "Problem framing, recommendations, delivery",
+          "Client/stakeholder collaboration and outcomes",
+          "Problem solving, requirements, analytical thinking",
+          "Business impact and technical→business translation",
+          "Communication, process improvement, ownership",
         ],
         scoringRules:
-          "Reward stakeholder work, recommendations adopted, process improvement, clear communication. Cite bullets.",
+          "Score consulting fit via competencies (not keyword stuffing): stakeholder collaboration, problem solving, requirements gathering, communication, business impact, analytical thinking, process improvement, cross-functional collaboration, technical-to-business translation, ownership. Also return competencyScores 0–100 for each. Cite bullets. If JD provided, score against that JD; if not, general consulting fit — never claim readiness for a named firm.",
       },
       {
         ...SHARED_ATS,
-        weight: 15,
-        label: "Keywords & positioning",
+        weight: 12,
+        label: "ATS Compatibility",
       },
+      { ...SHARED_RECRUITER, weight: 15 },
       SHARED_COMPLETENESS,
       {
         id: "technical_depth",

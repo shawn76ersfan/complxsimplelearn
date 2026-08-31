@@ -87,6 +87,8 @@ export default function StarkPage() {
   const sendMessage = useAction(api.chat.sendMessage);
   const reviewResume = useAction(api.resumeCoach.reviewResume);
   const coachMessage = useAction(api.resumeCoach.coachMessage);
+  const diagnoseImprovement = useAction(api.resumeCoach.diagnoseImprovement);
+  const rewriteAffectedBullets = useAction(api.resumeCoach.rewriteAffectedBullets);
   const conversations = useQuery(api.conversations.list);
   const careerTracks = useQuery(api.resumeCoach.listCareerTracks);
   const deleteConvo = useMutation(api.conversations.deleteConversation);
@@ -97,6 +99,15 @@ export default function StarkPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [diagnosingKey, setDiagnosingKey] = useState<string | null>(null);
+  const [rewriting, setRewriting] = useState(false);
+  const [activeDiagnosis, setActiveDiagnosis] = useState<{
+    title: string;
+    holdingBack: string;
+    evidence: string[];
+    recommendations: string[];
+    bulletIds: string[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -208,6 +219,7 @@ export default function StarkPage() {
   async function handleReview(payload: {
     rawText: string;
     careerTrack: "devops" | "software" | "it_support" | "data" | "consulting";
+    jobLevel: "internship" | "entry" | "early_career" | "mid" | "senior";
     jobDescription?: string;
     fileKey?: string;
     fileName?: string;
@@ -220,17 +232,67 @@ export default function StarkPage() {
         conversationId: activeConvoId ?? undefined,
         rawText: payload.rawText,
         careerTrack: payload.careerTrack,
+        jobLevel: payload.jobLevel,
         jobDescription: payload.jobDescription,
         fileKey: payload.fileKey,
         fileName: payload.fileName,
       });
       // Messages are persisted server-side; hydrate via getMessages query + stream.
       setActiveConvoId(result.conversationId);
+      setActiveDiagnosis(null);
     } catch (err) {
       pendingStreamRef.current = false;
       setError(err instanceof Error ? err.message : "Resume review failed. Try again.");
     } finally {
       setReviewing(false);
+    }
+  }
+
+  async function handleDiagnose(milestone: {
+    title: string;
+    categoryId?: string;
+    bulletIds?: string[];
+  }) {
+    if (!activeConvoId || diagnosingKey || rewriting) return;
+    const key = milestone.categoryId ?? milestone.title;
+    setDiagnosingKey(key);
+    setError(null);
+    pendingStreamRef.current = true;
+    try {
+      const result = await diagnoseImprovement({
+        conversationId: activeConvoId,
+        categoryId: milestone.categoryId,
+        title: milestone.title,
+        bulletIds: milestone.bulletIds,
+      });
+      setActiveDiagnosis({
+        title: result.title,
+        holdingBack: result.holdingBack,
+        evidence: result.evidence,
+        recommendations: result.recommendations,
+        bulletIds: result.bulletIds,
+      });
+    } catch (err) {
+      pendingStreamRef.current = false;
+      setError(err instanceof Error ? err.message : "Could not diagnose that fix. Try again.");
+    } finally {
+      setDiagnosingKey(null);
+    }
+  }
+
+  async function handleRewriteAffected(bulletIds: string[]) {
+    if (!activeConvoId || rewriting || diagnosingKey) return;
+    setRewriting(true);
+    setError(null);
+    pendingStreamRef.current = true;
+    try {
+      await rewriteAffectedBullets({ conversationId: activeConvoId, bulletIds });
+      setActiveDiagnosis(null);
+    } catch (err) {
+      pendingStreamRef.current = false;
+      setError(err instanceof Error ? err.message : "Could not rewrite those bullets. Try again.");
+    } finally {
+      setRewriting(false);
     }
   }
 
@@ -302,15 +364,56 @@ export default function StarkPage() {
         strengthLabel: string;
         overallScore: number;
         readinessLabel: string;
-        milestones: Array<{ title: string; potentialGain: number }>;
-        categoryScores: Array<{ label: string; score: number }>;
+        positioningSummary?: string | null;
+        milestones: Array<{
+          title: string;
+          potentialGain: number;
+          why?: string;
+          bulletIds?: string[];
+          currentExample?: string;
+          strongerExample?: string;
+          categoryId?: string;
+          currentScore100?: number;
+          potentialScore100?: number;
+        }>;
+        categoryScores: Array<{
+          categoryId?: string;
+          label: string;
+          score: number;
+          weight?: number;
+          why?: string;
+          toReachNext?: string;
+          evidence?: Array<{ sectionId: string; quote: string; note: string }>;
+        }>;
         jdMatch?: {
           matchScore: number;
+          roleTitle?: string;
           evidenced: string[];
           missingRequired: string[];
         } | null;
+        redFlags?: Array<{
+          id: string;
+          severity: "low" | "medium" | "high";
+          message: string;
+          bulletIds?: string[];
+        }>;
+        keepAsIs?: Array<{ bulletId: string; reason: string }>;
+        competencies?: Array<{ id: string; label: string; score: number }>;
+        scoreExplanation?: {
+          narrative: string;
+          strengths: Array<{ label: string; score100: number; why?: string }>;
+          opportunities: Array<{ label: string; score100: number; why?: string }>;
+        } | null;
+        pathToTarget?: {
+          target: number;
+          current: number;
+          gap: number;
+          steps: Array<{ title: string; potentialGain: number; categoryId?: string }>;
+          estimatedResult: number;
+        } | null;
         scoreChangeSummary?: string;
         rubricVersion?: string;
+        jobLevel?: string | null;
       }
     | null
     | undefined;
@@ -318,6 +421,23 @@ export default function StarkPage() {
   const activeVersionNumber = progress?.versions.find(
     (v) => v._id === progress.activeVersionId,
   )?.versionNumber;
+
+  const careerTrackLabel =
+    careerTracks?.find((t) => t.id === progress?.careerTrack)?.label ??
+    progress?.careerTrack ??
+    null;
+
+  const JOB_LEVEL_LABELS: Record<string, string> = {
+    internship: "Internship",
+    entry: "Entry-level / full-time",
+    early_career: "Early career",
+    mid: "Mid-level",
+    senior: "Senior / leadership",
+  };
+  const jobLevelKey = latest?.jobLevel ?? progress?.jobLevel ?? null;
+  const jobLevelLabel = jobLevelKey
+    ? (JOB_LEVEL_LABELS[jobLevelKey] ?? jobLevelKey)
+    : null;
 
   const SidebarContent = (
     <>
@@ -595,13 +715,26 @@ export default function StarkPage() {
                     strengthLabel={latest.strengthLabel}
                     overallScore={latest.overallScore}
                     readinessLabel={latest.readinessLabel}
+                    positioningSummary={latest.positioningSummary}
+                    careerTrackLabel={careerTrackLabel}
+                    jobLevelLabel={jobLevelLabel}
                     milestones={latest.milestones ?? []}
                     categoryScores={latest.categoryScores ?? []}
                     improvementSummary={progress?.improvementSummary}
                     scoreChangeSummary={latest.scoreChangeSummary}
+                    scoreExplanation={latest.scoreExplanation}
+                    pathToTarget={latest.pathToTarget}
                     jdMatch={latest.jdMatch}
+                    redFlags={latest.redFlags}
+                    keepAsIs={latest.keepAsIs}
+                    competencies={latest.competencies}
                     versionNumber={activeVersionNumber}
                     rubricVersion={latest.rubricVersion}
+                    diagnosingKey={diagnosingKey}
+                    rewriting={rewriting}
+                    activeDiagnosis={activeDiagnosis}
+                    onDiagnose={handleDiagnose}
+                    onRewriteAffected={handleRewriteAffected}
                   />
                 )}
 

@@ -1,6 +1,8 @@
 import {
   type CareerRubric,
+  type JobLevel,
   type RubricCategoryId,
+  jobLevelLabel,
   RUBRIC_VERSION,
 } from "./resumeRubrics";
 
@@ -8,16 +10,68 @@ export type CategoryScore = {
   categoryId: RubricCategoryId;
   label: string;
   weight: number;
-  score: number; // 0–10
+  score: number; // 0–10 internal; UI shows ×10 as /100
   evidence: Array<{ sectionId: string; quote: string; note: string }>;
   notes: string;
+  why?: string;
+  toReachNext?: string;
 };
 
 export type Milestone = {
   title: string;
-  potentialGain: number; // points on 0–100 scale
+  potentialGain: number; // points on 0–100 overall scale
   categoryId: RubricCategoryId;
+  /** Category score on 0–100 display scale (current). */
+  currentScore100: number;
+  /** If this gap closed toward strong, estimated category display. */
+  potentialScore100: number;
   why: string;
+  bulletIds?: string[];
+  currentExample?: string;
+  strongerExample?: string;
+};
+
+export type RedFlag = {
+  id: string;
+  severity: "low" | "medium" | "high";
+  message: string;
+  bulletIds?: string[];
+};
+
+export type KeepAsIs = {
+  bulletId: string;
+  reason: string;
+};
+
+export type CompetencyScore = {
+  id: string;
+  label: string;
+  score: number; // 0–100
+};
+
+export type ScoreBreakdownRow = {
+  categoryId: RubricCategoryId;
+  label: string;
+  score100: number;
+  why?: string;
+};
+
+export type ScoreExplanation = {
+  narrative: string;
+  strengths: ScoreBreakdownRow[];
+  opportunities: ScoreBreakdownRow[];
+};
+
+export type PathToTarget = {
+  target: number;
+  current: number;
+  gap: number;
+  steps: Array<{
+    title: string;
+    potentialGain: number;
+    categoryId: RubricCategoryId;
+  }>;
+  estimatedResult: number;
 };
 
 export type ScoreResult = {
@@ -25,8 +79,15 @@ export type ScoreResult = {
   overallScore: number; // 0–100, derived from weights
   strengthLabel: "Needs work" | "Developing" | "Strong" | "Excellent";
   readinessLabel: string;
+  positioningSummary?: string;
+  jobLevel?: JobLevel;
   categoryScores: CategoryScore[];
   milestones: Milestone[];
+  redFlags?: RedFlag[];
+  keepAsIs?: KeepAsIs[];
+  scoreExplanation?: ScoreExplanation;
+  pathToTarget?: PathToTarget;
+  competencies?: CompetencyScore[];
 };
 
 export type ParsedResume = {
@@ -57,6 +118,11 @@ export type ParsedResume = {
   certifications: string[];
   otherSections: Array<{ id: string; title: string; raw: string }>;
 };
+
+/** Display category score on a 0–100 scale (matches overall). */
+export function categoryScore100(score0to10: number): number {
+  return Math.round(normalizeCategoryScore(score0to10) * 10);
+}
 
 /** Clamp and round a 0–10 category score. */
 export function normalizeCategoryScore(score: number): number {
@@ -92,11 +158,109 @@ export function strengthFromScore(
 export function readinessFromScore(
   overall: number,
   trackLabel: string,
+  jobLevel: JobLevel,
 ): string {
-  if (overall >= 85) return `Ready for ${trackLabel} interviews`;
-  if (overall >= 70) return "Ready for internships with light polish";
-  if (overall >= 55) return "Solid draft — focus on the milestones below";
-  return "Early draft — start with the top milestone";
+  const level = jobLevelLabel(jobLevel);
+  if (overall >= 85) {
+    return `Competitive for ${level} ${trackLabel} roles`;
+  }
+  if (overall >= 70) {
+    if (jobLevel === "internship") {
+      return "Ready for internships with light polish";
+    }
+    return `Competitive with targeted revisions for ${level} ${trackLabel} roles`;
+  }
+  if (overall >= 55) {
+    return `Solid draft for ${level} — focus on the Top 3 changes below`;
+  }
+  return `Early draft for ${level} — start with the highest-impact fix`;
+}
+
+/** Display label for role_relevance depending on whether a JD was supplied. */
+export function roleRelevanceDisplayLabel(
+  trackLabel: string,
+  hasJd: boolean,
+): string {
+  if (hasJd) return `Role relevance (${trackLabel})`;
+  return `General ${trackLabel} Fit`;
+}
+
+/** Short display name for recruiter category (avoid fake precision). */
+export function displayCategoryLabel(
+  label: string,
+  categoryId: RubricCategoryId,
+): string {
+  if (categoryId === "recruiter_appeal") {
+    return "Recruiter Readability & Appeal (estimate)";
+  }
+  return label;
+}
+
+export function buildScoreExplanation(
+  overall: number,
+  categoryScores: CategoryScore[],
+): ScoreExplanation {
+  const rows = [...categoryScores]
+    .map((c) => ({
+      categoryId: c.categoryId,
+      label: displayCategoryLabel(c.label, c.categoryId),
+      score100: categoryScore100(c.score),
+      why: c.why,
+    }))
+    .sort((a, b) => b.score100 - a.score100);
+
+  const strengths = rows.filter((r) => r.score100 >= 75).slice(0, 4);
+  const opportunities = [...rows]
+    .filter((r) => r.score100 < 75)
+    .sort((a, b) => a.score100 - b.score100)
+    .slice(0, 4);
+
+  const strengthList = strengths.length > 0 ? strengths : rows.slice(0, 3);
+  const opportunityList =
+    opportunities.length > 0
+      ? opportunities
+      : [...rows].reverse().slice(0, 3);
+
+  const strongNames = strengthList
+    .slice(0, 2)
+    .map((s) => s.label.replace(/ \(estimate\)$/i, "").toLowerCase())
+    .join(" and ");
+  const weakNames = opportunityList
+    .slice(0, 3)
+    .map((s) => s.label.replace(/ \(estimate\)$/i, "").toLowerCase())
+    .join(", ");
+
+  const narrative =
+    opportunityList.length === 0
+      ? `Your resume scores ${overall}/100 with balanced strength across categories.`
+      : `Your resume is stronger on ${strongNames}, but loses points in ${weakNames}.`;
+
+  return {
+    narrative,
+    strengths: strengthList,
+    opportunities: opportunityList,
+  };
+}
+
+export function buildPathToTarget(
+  overall: number,
+  milestones: Milestone[],
+  target = 80,
+): PathToTarget {
+  const steps = milestones.slice(0, 3).map((m) => ({
+    title: m.title,
+    potentialGain: m.potentialGain,
+    categoryId: m.categoryId,
+  }));
+  const sumGains = steps.reduce((s, x) => s + x.potentialGain, 0);
+  const estimatedResult = Math.min(100, overall + sumGains);
+  return {
+    target,
+    current: overall,
+    gap: Math.max(0, target - overall),
+    steps,
+    estimatedResult,
+  };
 }
 
 /** Heuristic baseline signals from parsed structure (keeps scores more consistent). */
@@ -142,6 +306,17 @@ export function heuristicCategoryHints(parsed: ParsedResume): Partial<
     3 + Math.min(6, Math.floor(parsed.skills.length / 2)),
   );
 
+  const dutyLike = allBullets.filter((t) =>
+    /responsible for|worked on|helped with|duties included/i.test(t),
+  ).length;
+  const recruiterBase =
+    allBullets.length === 0
+      ? 4
+      : 5 +
+        Math.min(3, Math.round((quantified / Math.max(1, allBullets.length)) * 4)) -
+        Math.min(2, Math.round((dutyLike / Math.max(1, allBullets.length)) * 3));
+  hints.recruiter_appeal = Math.max(3, Math.min(9, recruiterBase));
+
   return hints;
 }
 
@@ -166,8 +341,30 @@ export function buildScoreResult(
     score: number;
     evidence: CategoryScore["evidence"];
     notes: string;
+    why?: string;
+    toReachNext?: string;
+    milestoneTitle?: string;
+    bulletIds?: string[];
+    currentExample?: string;
+    strongerExample?: string;
   }>,
   parsed: ParsedResume,
+  opts: {
+    jobLevel: JobLevel;
+    hasJd: boolean;
+    positioningSummary?: string;
+    redFlags?: RedFlag[];
+    keepAsIs?: KeepAsIs[];
+    competencies?: CompetencyScore[];
+    milestoneOverrides?: Array<{
+      categoryId: RubricCategoryId;
+      title: string;
+      why: string;
+      bulletIds?: string[];
+      currentExample?: string;
+      strongerExample?: string;
+    }>;
+  },
 ): ScoreResult {
   const hints = heuristicCategoryHints(parsed);
   const byId = new Map(rawCategories.map((c) => [c.categoryId, c]));
@@ -175,42 +372,88 @@ export function buildScoreResult(
   const categoryScores: CategoryScore[] = rubric.categories.map((cat) => {
     const raw = byId.get(cat.id);
     const score = blendCategoryScore(raw?.score ?? hints[cat.id] ?? 5, hints[cat.id]);
+    const label =
+      cat.id === "role_relevance"
+        ? roleRelevanceDisplayLabel(rubric.label, opts.hasJd)
+        : displayCategoryLabel(cat.label, cat.id);
     return {
       categoryId: cat.id,
-      label: cat.label,
+      label,
       weight: cat.weight,
       score,
       evidence: raw?.evidence ?? [],
       notes: raw?.notes ?? "",
+      why: raw?.why || raw?.notes || undefined,
+      toReachNext: raw?.toReachNext,
     };
   });
 
   const overallScore = computeOverallScore(categoryScores);
   const strengthLabel = strengthFromScore(overallScore);
-  const readinessLabel = readinessFromScore(overallScore, rubric.label);
+  const readinessLabel = readinessFromScore(
+    overallScore,
+    rubric.label,
+    opts.jobLevel,
+  );
 
-  // Top milestones: lowest weighted gaps (how many points available to gain)
+  const totalWeight = rubric.categories.reduce((s, x) => s + x.weight, 0);
+  const overrideByCat = new Map(
+    (opts.milestoneOverrides ?? []).map((m) => [m.categoryId, m]),
+  );
+
   const milestones: Milestone[] = [...categoryScores]
     .map((c) => {
       const gap = 10 - c.score;
-      const potentialGain = Math.round((gap * c.weight) / rubric.categories.reduce((s, x) => s + x.weight, 0) * 10);
+      const potentialGain = Math.round((gap * c.weight) / totalWeight * 10);
+      const raw = byId.get(c.categoryId);
+      const ov = overrideByCat.get(c.categoryId);
+      const currentScore100 = categoryScore100(c.score);
+      const potentialScore100 = Math.min(
+        100,
+        currentScore100 + Math.max(1, potentialGain),
+      );
       return {
-        title: `Improve ${c.label.toLowerCase()}`,
+        title:
+          ov?.title ||
+          raw?.milestoneTitle ||
+          `Strengthen ${c.label.toLowerCase()}`,
         potentialGain: Math.max(1, potentialGain),
         categoryId: c.categoryId,
-        why: c.notes || `Raise ${c.label} with concrete, evidenced changes.`,
+        currentScore100,
+        potentialScore100,
+        why:
+          ov?.why ||
+          c.why ||
+          c.notes ||
+          `Raise ${c.label} with concrete, evidenced changes.`,
+        bulletIds:
+          ov?.bulletIds ||
+          raw?.bulletIds ||
+          c.evidence.map((e) => e.sectionId).filter(Boolean).slice(0, 4),
+        currentExample: ov?.currentExample || raw?.currentExample,
+        strongerExample: ov?.strongerExample || raw?.strongerExample,
       };
     })
     .sort((a, b) => b.potentialGain - a.potentialGain)
     .slice(0, 3);
+
+  const scoreExplanation = buildScoreExplanation(overallScore, categoryScores);
+  const pathToTarget = buildPathToTarget(overallScore, milestones, 80);
 
   return {
     rubricVersion: RUBRIC_VERSION,
     overallScore,
     strengthLabel,
     readinessLabel,
+    positioningSummary: opts.positioningSummary,
+    jobLevel: opts.jobLevel,
     categoryScores,
     milestones,
+    redFlags: opts.redFlags,
+    keepAsIs: opts.keepAsIs,
+    scoreExplanation,
+    pathToTarget,
+    competencies: opts.competencies,
   };
 }
 
@@ -253,10 +496,11 @@ export function explainScoreChange(
   } else if (movers.length === 0) {
     summary = `Overall ${delta > 0 ? "up" : "down"} ${Math.abs(delta)} points.`;
   } else {
-    const parts = movers.map(
-      (m) =>
-        `${m.label} ${m.delta > 0 ? "+" : ""}${m.delta} (was ${m.from}/10 → ${m.to}/10)`,
-    );
+    const parts = movers.map((m) => {
+      const from100 = categoryScore100(m.from);
+      const to100 = categoryScore100(m.to);
+      return `${m.label} ${from100} → ${to100}`;
+    });
     summary = `Overall ${delta > 0 ? "+" : ""}${delta} points because: ${parts.join("; ")}.`;
   }
 

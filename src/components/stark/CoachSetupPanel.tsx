@@ -8,6 +8,7 @@ import { FileUp, X } from "lucide-react";
 import { extractPdfTextFromFile } from "@/lib/extractPdfText";
 
 type Track = { id: string; label: string };
+type JobLevel = "internship" | "entry" | "early_career" | "mid" | "senior";
 
 type Props = {
   tracks: Track[] | undefined;
@@ -15,12 +16,21 @@ type Props = {
   onReview: (payload: {
     rawText: string;
     careerTrack: "devops" | "software" | "it_support" | "data" | "consulting";
+    jobLevel: JobLevel;
     jobDescription?: string;
     fileKey?: string;
     fileName?: string;
   }) => Promise<void>;
   hasActiveVersion: boolean;
 };
+
+const JOB_LEVELS: Array<{ id: JobLevel; label: string }> = [
+  { id: "internship", label: "Internship" },
+  { id: "entry", label: "Entry-level / full-time" },
+  { id: "early_career", label: "Early career" },
+  { id: "mid", label: "Mid-level" },
+  { id: "senior", label: "Senior / leadership" },
+];
 
 const inputStyle = {
   background: "var(--stark-bg)",
@@ -38,6 +48,7 @@ export function CoachSetupPanel({ tracks, busy, onReview, hasActiveVersion }: Pr
   const [careerTrack, setCareerTrack] = useState<
     "devops" | "software" | "it_support" | "data" | "consulting"
   >("devops");
+  const [jobLevel, setJobLevel] = useState<JobLevel>("entry");
   const [rawText, setRawText] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [open, setOpen] = useState(true);
@@ -80,11 +91,9 @@ export function CoachSetupPanel({ tracks, busy, onReview, hasActiveVersion }: Pr
         }
         setRawText(text);
         setFileName(file.name);
-        // Still store a copy in R2 for version history
         const key = await uploadFile(file);
         setFileKey(key);
       } else {
-        // Prefer client extraction; fall back to server if needed
         let text = "";
         try {
           text = await extractPdfTextFromFile(file);
@@ -116,6 +125,7 @@ export function CoachSetupPanel({ tracks, busy, onReview, hasActiveVersion }: Pr
     await onReview({
       rawText: rawText.trim(),
       careerTrack,
+      jobLevel,
       jobDescription: jobDescription.trim() || undefined,
       fileKey,
       fileName: fileName ?? undefined,
@@ -143,24 +153,43 @@ export function CoachSetupPanel({ tracks, busy, onReview, hasActiveVersion }: Pr
 
       {open && (
         <div className="px-4 pb-4 space-y-3">
-          <div>
-            <label className="block text-xs mb-1" style={{ color: "var(--stark-muted)" }}>
-              Career rubric
-            </label>
-            <select
-              value={careerTrack}
-              onChange={(e) =>
-                setCareerTrack(e.target.value as typeof careerTrack)
-              }
-              className="w-full px-3 py-2 rounded-xl text-sm outline-none"
-              style={inputStyle}
-            >
-              {(tracks ?? [{ id: "devops", label: "DevOps / IT / Cloud" }]).map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--stark-muted)" }}>
+                Career rubric
+              </label>
+              <select
+                value={careerTrack}
+                onChange={(e) =>
+                  setCareerTrack(e.target.value as typeof careerTrack)
+                }
+                className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                style={inputStyle}
+              >
+                {(tracks ?? [{ id: "devops", label: "DevOps / IT / Cloud" }]).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--stark-muted)" }}>
+                Target job level *
+              </label>
+              <select
+                value={jobLevel}
+                onChange={(e) => setJobLevel(e.target.value as JobLevel)}
+                className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                style={inputStyle}
+              >
+                {JOB_LEVELS.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -245,7 +274,7 @@ export function CoachSetupPanel({ tracks, busy, onReview, hasActiveVersion }: Pr
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
               rows={4}
-              placeholder="Paste a JD for keyword gap analysis. Stark only counts skills you have evidence for."
+              placeholder="Paste a JD for named role match. Without a JD, Stark scores general track fit only."
               className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
               style={inputStyle}
             />
@@ -267,7 +296,7 @@ export function CoachSetupPanel({ tracks, busy, onReview, hasActiveVersion }: Pr
                   : "Parse, score & start coaching"}
           </button>
           <p className="text-[11px] leading-relaxed" style={{ color: "var(--stark-muted)" }}>
-            PDFs are stored with your resume version. Scanned image-only PDFs may need a text paste.
+            Job level is required so readiness advice matches internship vs full-time goals.
           </p>
         </div>
       )}

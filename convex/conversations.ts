@@ -41,6 +41,7 @@ export const create = mutation({
     title: v.string(),
     mode: v.optional(v.union(v.literal("default"), v.literal("coach"))),
     careerTrack: v.optional(v.string()),
+    jobLevel: v.optional(v.string()),
   },
   returns: v.id("starkConversations"),
   handler: async (ctx, args) => {
@@ -53,6 +54,7 @@ export const create = mutation({
       updatedAt: now,
       mode: args.mode,
       careerTrack: args.careerTrack,
+      jobLevel: args.jobLevel,
     });
   },
 });
@@ -63,6 +65,7 @@ export const setCoachMeta = mutation({
     conversationId: v.id("starkConversations"),
     mode: v.optional(v.union(v.literal("default"), v.literal("coach"))),
     careerTrack: v.optional(v.string()),
+    jobLevel: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -72,10 +75,12 @@ export const setCoachMeta = mutation({
     const patch: {
       mode?: "default" | "coach";
       careerTrack?: string;
+      jobLevel?: string;
       updatedAt: number;
     } = { updatedAt: Date.now() };
     if (args.mode !== undefined) patch.mode = args.mode;
     if (args.careerTrack !== undefined) patch.careerTrack = args.careerTrack;
+    if (args.jobLevel !== undefined) patch.jobLevel = args.jobLevel;
     await ctx.db.patch(args.conversationId, patch);
     return null;
   },

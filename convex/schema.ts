@@ -219,6 +219,7 @@ export default defineSchema({
     updatedAt: v.number(),
     mode: v.optional(v.union(v.literal("default"), v.literal("coach"))),
     careerTrack: v.optional(v.string()),
+    jobLevel: v.optional(v.string()),
     activeResumeVersionId: v.optional(v.id("resumeVersions")),
   })
     .index("by_user", ["userId"])
@@ -240,6 +241,7 @@ export default defineSchema({
     rawText: v.string(),
     parsedJson: v.string(), // JSON.stringify(ParsedResume)
     careerTrack: v.string(),
+    jobLevel: v.optional(v.string()),
     jobDescription: v.optional(v.string()),
     fileKey: v.optional(v.string()),
     fileName: v.optional(v.string()),
@@ -255,13 +257,18 @@ export default defineSchema({
     versionId: v.id("resumeVersions"),
     rubricVersion: v.string(),
     careerTrack: v.string(),
+    jobLevel: v.optional(v.string()),
     overallScore: v.number(),
     strengthLabel: v.string(),
     readinessLabel: v.string(),
+    positioningSummary: v.optional(v.string()),
     categoryScoresJson: v.string(),
     milestonesJson: v.string(),
     feedbackMarkdown: v.string(),
     jdMatchJson: v.optional(v.string()),
+    redFlagsJson: v.optional(v.string()),
+    keepAsIsJson: v.optional(v.string()),
+    competenciesJson: v.optional(v.string()),
     scoreChangeSummary: v.optional(v.string()),
     createdAt: v.number(),
   })
