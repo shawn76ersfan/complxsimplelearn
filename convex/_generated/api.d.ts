@@ -29,6 +29,7 @@ import type * as knowledge from "../knowledge.js";
 import type * as lessons from "../lessons.js";
 import type * as lib_enrollmentAccess from "../lib/enrollmentAccess.js";
 import type * as lib_llmChat from "../lib/llmChat.js";
+import type * as lib_platformFacts from "../lib/platformFacts.js";
 import type * as lib_resumeRubrics from "../lib/resumeRubrics.js";
 import type * as lib_resumeScore from "../lib/resumeScore.js";
 import type * as lib_teacherEmails from "../lib/teacherEmails.js";
@@ -70,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   lessons: typeof lessons;
   "lib/enrollmentAccess": typeof lib_enrollmentAccess;
   "lib/llmChat": typeof lib_llmChat;
+  "lib/platformFacts": typeof lib_platformFacts;
   "lib/resumeRubrics": typeof lib_resumeRubrics;
   "lib/resumeScore": typeof lib_resumeScore;
   "lib/teacherEmails": typeof lib_teacherEmails;

@@ -3,30 +3,28 @@ import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { chatComplete, type ChatMessage } from "./lib/llmChat";
+import { PLATFORM_FACTS } from "./lib/platformFacts";
 
 const EMBEDDING_MODEL = "jina-embeddings-v3";
 const EMBEDDING_URL = "https://api.jina.ai/v1/embeddings";
 const EMBEDDING_DIMENSIONS = 1024;
-
-// Primary: Groq (free, fast). Fallback automatically to OpenAI if Groq fails.
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
-const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_CHAT_MODEL = "gpt-4o-mini";
 
 const SYSTEM_PERSONA = `You are Stark, the friendly AI assistant for ComplxSimple — an interactive tech education platform created by Cassandra Carter.
 
 You are a helpful general-purpose AI assistant (like ChatGPT or Claude). You can answer questions on ANY topic and help with writing, explanations, code, study help, and more. You are not limited to tech or the course.
 
 Grounding rules:
-- For anything specific to ComplxSimple (its tracks, lessons, schedules, policies, who Cassandra is, how the site works), rely on the COURSE CONTEXT provided below and do NOT invent platform-specific details. If that info isn't in the context, say you don't have it and suggest asking Cassandra.
+- For anything specific to ComplxSimple (its tracks, lessons, schedules, policies, who Cassandra is, how the site works), rely on the PLATFORM SNAPSHOT and COURSE CONTEXT provided below and do NOT invent platform-specific details. If that info isn't there, say you don't have it and suggest asking Cassandra.
 - For general knowledge and tech questions, use your own knowledge freely. Treat the course context as helpful reference, not a hard limit.
 - You still know the full course: when asked about course topics, answer accurately using the context.
 
 Style:
 - Be warm, encouraging, and clear. You're often talking to students who are learning.
 - Keep responses concise unless asked to explain in depth.
+- Write ONE complete answer. Do not repeat yourself, restate, add a second version, or finish with a summary that repeats the same points.
 - When showing code or commands, always use markdown fenced code blocks with the language tag (e.g. \`\`\`bash, \`\`\`js).
+- If the PLATFORM SNAPSHOT or COURSE CONTEXT already has a ComplxSimple fact (tracks, lessons, pages, pricing, homework), answer from it. Do not say you don't know or send the student to another page for facts that are listed.
 
 ASSESSMENT INTEGRITY (absolute rule):
 - Never provide, confirm, reveal, list, encode, transform, or imply an answer to any ComplxSimple quiz, test, exam, crossword, mandatory work, fill-in-the-blank, matching activity, or graded question.
@@ -319,52 +317,6 @@ async function embedQuery(text: string): Promise<number[]> {
   return json.data[0].embedding;
 }
 
-// ── Chat completion (Groq first, OpenAI fallback) ───────────────────────────
-
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
-
-async function chatComplete(
-  messages: ChatMessage[],
-  options?: { maxTokens?: number; temperature?: number }
-): Promise<string> {
-  const maxTokens = options?.maxTokens ?? 700;
-  const temperature = options?.temperature ?? 0.4;
-  const groqKey = process.env.GROQ_API_KEY;
-
-  if (groqKey) {
-    try {
-      const res = await fetch(GROQ_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
-        body: JSON.stringify({ model: GROQ_MODEL, messages, temperature, max_tokens: maxTokens }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const content = json.choices?.[0]?.message?.content;
-        if (content) return content;
-      } else {
-        console.warn(`Groq chat completion failed (${res.status}): ${await res.text()}`);
-      }
-    } catch (error) {
-      console.warn("Groq chat completion request failed:", error);
-      // fall through to OpenAI
-    }
-  }
-
-  // Fallback: OpenAI
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) throw new Error("No working chat API key (Groq failed, OPENAI_API_KEY missing)");
-
-  const res = await fetch(OPENAI_CHAT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-    body: JSON.stringify({ model: OPENAI_CHAT_MODEL, messages, temperature, max_tokens: maxTokens }),
-  });
-  if (!res.ok) throw new Error(`Chat completion failed (${res.status}): ${await res.text()}`);
-  const json = await res.json();
-  return json.choices?.[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
-}
-
 async function generateTitle(userText: string): Promise<string> {
   const title = await chatComplete(
     [
@@ -472,6 +424,57 @@ export const redactHistoricalAssessmentAnswers = internalMutation({
   },
 });
 
+export const getPlatformSnapshot = internalQuery({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    const tracks = await ctx.db
+      .query("tracks")
+      .withIndex("by_published", (q) => q.eq("published", true))
+      .collect();
+    tracks.sort((a, b) => a.order - b.order);
+
+    const catalog: string[] = [];
+    for (const track of tracks) {
+      const lessons = await ctx.db
+        .query("lessons")
+        .withIndex("by_track_published", (q) =>
+          q.eq("trackId", track._id).eq("published", true),
+        )
+        .collect();
+      lessons.sort((a, b) => a.order - b.order);
+      const lessonList =
+        lessons.length > 0
+          ? lessons.map((lesson) => `${lesson.order}. ${lesson.title}`).join("; ")
+          : "(no published lessons yet)";
+      catalog.push(
+        `${track.order}. ${track.name} (/${track.slug}): ${track.description} Lessons: ${lessonList}`,
+      );
+    }
+
+    const assignments = await ctx.db.query("assignments").collect();
+    const homework =
+      assignments.length > 0
+        ? assignments
+            .map((assignment) => {
+              const due = new Date(assignment.dueDate).toISOString().slice(0, 10);
+              return `- ${assignment.title} (due ${due})${assignment.description ? `: ${assignment.description}` : ""}`;
+            })
+            .join("\n")
+        : "- No homework assignments are posted right now.";
+
+    return [
+      PLATFORM_FACTS,
+      "",
+      "LIVE LEARNING CATALOG (published tracks and lessons right now):",
+      catalog.length > 0 ? catalog.join("\n") : "No published tracks yet.",
+      "",
+      "CURRENT HOMEWORK:",
+      homework,
+    ].join("\n");
+  },
+});
+
 export const getChunksByIds = internalQuery({
   args: { ids: v.array(v.id("lessonEmbeddings")) },
   handler: async (ctx, args) => {
@@ -574,7 +577,9 @@ export const sendMessage = action({
 
     const context = chunks.length
       ? chunks.map((c, i) => `[${i + 1}] ${c.title}\n${c.chunkText}`).join("\n\n")
-      : "No course content has been indexed yet.";
+      : "No extra lesson snippets matched this question.";
+
+    const platformSnapshot = await ctx.runQuery(internal.chat.getPlatformSnapshot, {});
 
     // 4. Build prompt (inject today's real date so Stark isn't stuck in its training year)
     const today = new Date().toLocaleDateString("en-US", {
@@ -584,7 +589,7 @@ export const sendMessage = action({
       day: "numeric",
     });
     const dateNote = `Today's date is ${today}. Treat this as the current date. Your training data has a cutoff in the past, so for very recent events you may not have information — if so, say honestly that it may be beyond your knowledge rather than guessing or assuming it's an earlier year.`;
-    const systemPrompt = `${SYSTEM_PERSONA}\n\n${dateNote}\n\n=== COURSE CONTEXT ===\n${context}\n=== END CONTEXT ===`;
+    const systemPrompt = `${SYSTEM_PERSONA}\n\n${dateNote}\n\n=== PLATFORM SNAPSHOT ===\n${platformSnapshot}\n=== END SNAPSHOT ===\n\n=== COURSE CONTEXT ===\n${context}\n=== END CONTEXT ===`;
 
     // Do not let an answer leaked in an older exchange re-enter the model's
     // context. Drop both sides of any detected assessment-answer exchange.

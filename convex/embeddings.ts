@@ -3,6 +3,7 @@ import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
+import { PLATFORM_FACTS } from "./lib/platformFacts";
 
 const EMBEDDING_MODEL = "jina-embeddings-v3";
 const EMBEDDING_URL = "https://api.jina.ai/v1/embeddings";
@@ -202,11 +203,23 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
     const FAQ: Array<{ title: string; text: string }> = [
       {
         title: "About ComplxSimple",
-        text: "ComplxSimple is an interactive DevOps and cloud engineering learning platform created by Cassandra Carter. Its core program covers Linux Administration, AWS, Microsoft Azure, Git and GitHub, Docker, Kubernetes, Terraform, Ansible, CI/CD with Jenkins and GitHub Actions, and monitoring with Prometheus and Grafana. Hardware, AI, and cybersecurity remain available as supplementary foundations. HTML is not part of the current program.",
+        text: "ComplxSimple is an interactive DevOps and cloud engineering learning platform created by Cassandra Carter. Enrollment is invite-only. The core bootcamp covers Linux Administration, AWS, Microsoft Azure, Git and GitHub, Docker, Kubernetes, Terraform, Ansible, CI/CD with Jenkins and GitHub Actions, and monitoring with Prometheus and Grafana. Hardware, AI, and cybersecurity may appear as supplementary published tracks. HTML is not part of the current program.",
+      },
+      {
+        title: "DevOps learning roadmap",
+        text: "The advertised bootcamp roadmap on the website is: 1 Linux Administration, 2 AWS Cloud, 3 Microsoft Azure, 4 Version Control (Git/GitHub), 5 Containerization (Docker), 6 Kubernetes, 7 Infrastructure as Code (Terraform), 8 Configuration Management (Ansible), 9 CI/CD (Jenkins and GitHub Actions), 10 Monitoring (Prometheus and Grafana). Students see the live published catalog on the Learn page and dashboard. Beginners are welcome.",
       },
       {
         title: "How learning works",
-        text: "Students follow a structured DevOps and cloud roadmap on the Learn page, complete lessons in order, take quizzes, finish Mandatory Work crosswords, submit homework, and build production-style portfolio projects. Completing each homework assignment raises their level by one, and lessons count toward track progress and daily streaks.",
+        text: "Students follow a structured DevOps and cloud roadmap on the Learn page, complete lessons in order, take quizzes, finish Mandatory Work crosswords, submit homework, and build production-style portfolio projects. Completing each homework assignment raises their level by one, and lessons count toward track progress and daily streaks. Recorded sessions live on the Videos page.",
+      },
+      {
+        title: "Programs and pricing",
+        text: "The DevOps bootcamp and the instructor course are separate. The bootcamp includes live classes, recordings, labs, projects, mentorship, career support, Stark, AWS SAA-C03 prep, and a free AWS Solutions Architect Associate voucher. Bootcamp tuition is by cohort — schedule a consultation for current pricing. The instructor course is Cassandra's separate instructor-focused program at $1,600+ one-time with installments available. It is not the bootcamp.",
+      },
+      {
+        title: "Stark AI",
+        text: "Stark is included with enrollment. Ask Stark answers course and tech questions. Coach Mode (beta) scores a pasted or uploaded resume with Cassandra's rubric and coaches bullet-by-bullet. Optional job-description keyword analysis.",
       },
       {
         title: "Mandatory Work / Crosswords",
@@ -215,6 +228,10 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
       {
         title: "Homework and assignments",
         text: "Teachers assign DevOps and cloud homework with due dates on the Teacher Hub. Students see homework status (pending, complete, or late) on the Homework page. Assignments include Linux administration reports, Bash automation, cloud architecture designs, GitHub pull requests, Docker builds, Kubernetes deployments, Terraform infrastructure, Ansible playbooks, CI/CD pipelines, and Prometheus/Grafana dashboards.",
+      },
+      {
+        title: "Student app pages",
+        text: "Dashboard is home. Learn lists tracks. Videos holds recordings. Homework is assignments. Messages/Feedback is Cassandra's notes and warnings. Profile is the student account. Stark is the AI assistant. Teacher Hub is for Cassandra.",
       },
       {
         title: "Teacher feedback",
@@ -226,12 +243,19 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
       },
       {
         title: "Who is Cassandra Carter",
-        text: "Cassandra Carter is the instructor and creator of ComplxSimple. She mentors students in IT and tech careers. Students can contact her through the platform for help.",
+        text: "Cassandra Carter is the instructor and creator of ComplxSimple. She mentors students in IT and tech careers. Visitors can meet her at info sessions. Students can contact her through the platform for help.",
       },
     ];
     for (const f of FAQ) {
       chunks.push({ source: "faq", title: f.title, chunkText: `${f.title}. ${f.text}` });
     }
+    chunkText(PLATFORM_FACTS).forEach((piece, idx) => {
+      chunks.push({
+        source: "faq",
+        title: idx === 0 ? "Website facts" : `Website facts (part ${idx + 1})`,
+        chunkText: piece,
+      });
+    });
 
     // Homework is searchable so Stark can explain current assignments.
     for (const assignment of assignments) {
