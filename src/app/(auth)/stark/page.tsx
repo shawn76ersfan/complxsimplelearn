@@ -139,12 +139,25 @@ export default function StarkPage() {
       return;
     }
     const mapped = dbMessages.map((m) => ({ role: m.role, content: m.content }));
-    setMessages(mapped);
+    setMessages((prev) => {
+      const prevLast = prev[prev.length - 1];
+      const nextLast = mapped[mapped.length - 1];
+      if (
+        prevLast?.role === "assistant" &&
+        nextLast?.role === "assistant" &&
+        prevLast.content === nextLast.content &&
+        prev.length === mapped.length + 1 &&
+        prev[0]?.content === greetingContent
+      ) {
+        return prev;
+      }
+      return mapped;
+    });
     if (pendingStreamRef.current) {
       pendingStreamRef.current = false;
       const last = dbMessages[dbMessages.length - 1];
       if (last?.role === "assistant") {
-        setStreamKey(`${last._id}`);
+        setStreamKey((prev) => prev ?? `${last._id}`);
       }
     }
   }, [dbMessages, greetingContent]);
@@ -324,7 +337,7 @@ export default function StarkPage() {
           history,
         });
         if (!activeConvoId) setActiveConvoId(conversationId);
-        setStreamKey(`local-${Date.now()}`);
+        setStreamKey((prev) => prev ?? `local-${conversationId}`);
         setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
         pendingStreamRef.current = false;
       } else {
@@ -334,7 +347,7 @@ export default function StarkPage() {
           history,
         });
         if (!activeConvoId) setActiveConvoId(conversationId);
-        setStreamKey(`local-${Date.now()}`);
+        setStreamKey((prev) => prev ?? `local-${conversationId}`);
         setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
         pendingStreamRef.current = false;
       }
@@ -779,11 +792,12 @@ export default function StarkPage() {
 
               return (
                 <StarkMessage
-                  key={shouldStream ? streamKey : `${i}-${msg.role}`}
+                  key={isLast && msg.role === "assistant" ? "latest-assistant" : `${msg.role}-${i}`}
                   role={msg.role}
                   content={msg.content}
                   stream={shouldStream}
                   showCopy={msg.role === "assistant" && !isGreeting}
+                  onStreamEnd={() => setStreamKey(null)}
                 />
               );
             })}

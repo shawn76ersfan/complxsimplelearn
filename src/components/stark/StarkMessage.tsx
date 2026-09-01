@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Copy } from "lucide-react";
 import toast from "react-hot-toast";
@@ -10,13 +10,24 @@ type Props = {
   role: "user" | "assistant";
   content: string;
   showCopy?: boolean;
-  /** Typewriter-style reveal for fresh assistant replies */
   stream?: boolean;
+  onStreamEnd?: () => void;
 };
 
-export function StarkMessage({ role, content, showCopy = true, stream = false }: Props) {
+export function StarkMessage({
+  role,
+  content,
+  showCopy = true,
+  stream = false,
+  onStreamEnd,
+}: Props) {
   const [copied, setCopied] = useState(false);
   const [streamDone, setStreamDone] = useState(!stream);
+
+  const handleStreamDone = useCallback(() => {
+    setStreamDone(true);
+    onStreamEnd?.();
+  }, [onStreamEnd]);
 
   async function handleCopyMessage() {
     try {
@@ -52,7 +63,7 @@ export function StarkMessage({ role, content, showCopy = true, stream = false }:
       <StreamingText
         content={content}
         animate={stream}
-        onDone={() => setStreamDone(true)}
+        onDone={handleStreamDone}
       />
 
       {showCopy && streamDone && (
