@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { StarkCodeBlock } from "./StarkCodeBlock";
+import {
+  StarkMarkdownTable,
+  StarkTableCell,
+  StarkTableHead,
+  StarkTableHeaderCell,
+} from "./StarkMarkdownTable";
 
 type Props = {
   content: string;
@@ -14,11 +20,15 @@ type Props = {
 };
 
 export function StreamingText({ content, animate = false, onDone }: Props) {
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  const finishedFor = useRef<string | null>(animate ? null : content);
   const [visibleLen, setVisibleLen] = useState(animate ? 0 : content.length);
-  const done = !animate || visibleLen >= content.length;
+  const done = !animate || visibleLen >= content.length || finishedFor.current === content;
 
   useEffect(() => {
-    if (!animate) {
+    if (!animate || finishedFor.current === content) {
       setVisibleLen(content.length);
       return;
     }
@@ -41,19 +51,20 @@ export function StreamingText({ content, animate = false, onDone }: Props) {
       if (i < content.length) {
         raf = requestAnimationFrame(tick);
       } else {
-        onDone?.();
+        finishedFor.current = content;
+        onDoneRef.current?.();
       }
     };
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [animate, content, onDone]);
+  }, [animate, content]);
 
   const visible = content.slice(0, visibleLen);
 
   return (
     <motion.div
-      initial={animate ? { opacity: 0, y: 10 } : false}
+      initial={animate && finishedFor.current !== content ? { opacity: 0, y: 10 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className="stark-markdown text-sm leading-relaxed max-w-none"
@@ -90,6 +101,12 @@ export function StreamingText({ content, animate = false, onDone }: Props) {
               {children}
             </blockquote>
           ),
+          table: ({ children }) => <StarkMarkdownTable>{children}</StarkMarkdownTable>,
+          thead: ({ children }) => <StarkTableHead>{children}</StarkTableHead>,
+          th: ({ children }) => <StarkTableHeaderCell>{children}</StarkTableHeaderCell>,
+          td: ({ children }) => <StarkTableCell>{children}</StarkTableCell>,
+          tr: ({ children }) => <tr>{children}</tr>,
+          tbody: ({ children }) => <tbody>{children}</tbody>,
           code: ({ className, children, ...props }) => {
             const match = /language-(\w+)/.exec(className ?? "");
             const codeString = String(children).replace(/\n$/, "");
@@ -102,9 +119,10 @@ export function StreamingText({ content, animate = false, onDone }: Props) {
             }
             return (
               <code
-                className="px-1.5 py-0.5 rounded text-[0.8125rem]"
+                className="px-1.5 py-0.5 rounded text-[0.75rem] inline-block my-0.5"
                 style={{
-                  background: "var(--stark-surface)",
+                  background: "color-mix(in srgb, var(--stark-text) 8%, transparent)",
+                  border: "1px solid var(--stark-border)",
                   fontFamily: "var(--font-mono), ui-monospace, monospace",
                 }}
                 {...props}
