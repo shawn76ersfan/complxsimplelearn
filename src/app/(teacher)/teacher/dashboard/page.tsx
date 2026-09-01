@@ -333,7 +333,7 @@ export default function TeacherDashboard() {
           <div className="mb-6">
             <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Curriculum CMS</h2>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Create and edit learning tracks and lessons — publish when ready for students.
+              Create and edit learning tracks and lessons. New content appears on the student dashboard immediately. Use Draft to hide something.
             </p>
           </div>
           <CurriculumManager />

@@ -178,7 +178,7 @@ function LessonEditor({
 
   const [title, setTitle] = useState("");
   const [type, setType] = useState<(typeof LESSON_TYPES)[number]>("content");
-  const [published, setPublished] = useState(false);
+  const [published, setPublished] = useState(true);
   const [blocks, setBlocks] = useState<EditableBlock[]>([]);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -538,11 +538,11 @@ function TrackLessons({
       trackId,
       title: newTitle.trim(),
       type: "content",
-      published: false,
+      published: true,
     });
     setNewTitle("");
     setCreating(false);
-    toast.success("Lesson created");
+    toast.success("Lesson created — visible to students");
     setEditingLesson(id);
   }
 
@@ -704,9 +704,9 @@ export function CurriculumManager() {
       description: description.trim(),
       color,
       icon: "book",
-      published: false,
+      published: true,
     });
-    toast.success("Track created as draft");
+    toast.success("Track created — visible to students");
     setCreating(false);
     setName("");
     setDescription("");

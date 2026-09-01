@@ -1,6 +1,8 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { requireTeacher } from "./_lib/auth";
+import type { Id } from "./_generated/dataModel";
 
 const lessonType = v.union(
   v.literal("content"),
@@ -40,6 +42,22 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 64);
+}
+
+async function scheduleKnowledgeRebuild(ctx: MutationCtx) {
+  await ctx.scheduler.runAfter(0, internal.embeddings.rebuildAll, {});
+}
+
+async function publishLessonsForTrack(ctx: MutationCtx, trackId: Id<"tracks">) {
+  const lessons = await ctx.db
+    .query("lessons")
+    .withIndex("by_track", (q) => q.eq("trackId", trackId))
+    .collect();
+  for (const lesson of lessons) {
+    if (!lesson.published) {
+      await ctx.db.patch(lesson._id, { published: true });
+    }
+  }
 }
 
 function validateBlocksJson(content: string): string {
@@ -133,15 +151,19 @@ export const createTrack = mutation({
     const all = await ctx.db.query("tracks").collect();
     const order = all.reduce((max, t) => Math.max(max, t.order), 0) + 1;
 
-    return await ctx.db.insert("tracks", {
+    const trackId = await ctx.db.insert("tracks", {
       name,
       slug,
       description: args.description.trim(),
       color: args.color.trim() || "#2563EB",
       icon: args.icon.trim() || "book",
       order,
-      published: args.published ?? false,
+      published: args.published ?? true,
     });
+    if (args.published ?? true) {
+      await scheduleKnowledgeRebuild(ctx);
+    }
+    return trackId;
   },
 });
 
@@ -174,6 +196,10 @@ export const updateTrack = mutation({
     if (args.order !== undefined) patch.order = args.order;
 
     await ctx.db.patch(args.trackId, patch);
+    if (args.published === true) {
+      await publishLessonsForTrack(ctx, args.trackId);
+    }
+    await scheduleKnowledgeRebuild(ctx);
     return null;
   },
 });
@@ -196,6 +222,7 @@ export const removeTrack = mutation({
       await ctx.db.delete(lesson._id);
     }
     await ctx.db.delete(args.trackId);
+    await scheduleKnowledgeRebuild(ctx);
     return null;
   },
 });
@@ -223,14 +250,18 @@ export const createLesson = mutation({
       .collect();
     const order = siblings.reduce((max, l) => Math.max(max, l.order), 0) + 1;
 
-    return await ctx.db.insert("lessons", {
+    const lessonId = await ctx.db.insert("lessons", {
       trackId: args.trackId,
       title,
       content: validateBlocksJson(args.content ?? ""),
       type: args.type,
       order,
-      published: args.published ?? false,
+      published: args.published ?? true,
     });
+    if (args.published ?? true) {
+      await scheduleKnowledgeRebuild(ctx);
+    }
+    return lessonId;
   },
 });
 
@@ -268,6 +299,7 @@ export const updateLesson = mutation({
     if (args.order !== undefined) patch.order = args.order;
 
     await ctx.db.patch(args.lessonId, patch);
+    await scheduleKnowledgeRebuild(ctx);
     return null;
   },
 });
@@ -285,6 +317,7 @@ export const removeLesson = mutation({
       .collect();
     for (const q of questions) await ctx.db.delete(q._id);
     await ctx.db.delete(args.lessonId);
+    await scheduleKnowledgeRebuild(ctx);
     return null;
   },
 });
@@ -303,5 +336,44 @@ export const reorderLessons = mutation({
       await ctx.db.patch(args.lessonIds[i], { order: i + 1 });
     }
     return null;
+  },
+});
+
+/** Publish teacher-created drafts so they appear on the student catalog. Skips the legacy HTML track. */
+export const publishCustomDrafts = internalMutation({
+  args: {},
+  returns: v.object({
+    tracksPublished: v.number(),
+    lessonsPublished: v.number(),
+  }),
+  handler: async (ctx) => {
+    const tracks = await ctx.db.query("tracks").collect();
+    let tracksPublished = 0;
+    let lessonsPublished = 0;
+
+    for (const track of tracks) {
+      if (track.slug === "html") continue;
+
+      if (!track.published) {
+        await ctx.db.patch(track._id, { published: true });
+        tracksPublished += 1;
+      }
+
+      const lessons = await ctx.db
+        .query("lessons")
+        .withIndex("by_track", (q) => q.eq("trackId", track._id))
+        .collect();
+      for (const lesson of lessons) {
+        if (!lesson.published) {
+          await ctx.db.patch(lesson._id, { published: true });
+          lessonsPublished += 1;
+        }
+      }
+    }
+
+    if (tracksPublished > 0 || lessonsPublished > 0) {
+      await scheduleKnowledgeRebuild(ctx);
+    }
+    return { tracksPublished, lessonsPublished };
   },
 });
