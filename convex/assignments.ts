@@ -1,8 +1,18 @@
 import { mutation, query, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { requireTeacher } from "./_lib/auth";
+import { getCurrentUserOrNull, requireStaff } from "./_lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import { activeStudentIds, formatDueDate, notifyUsers } from "./lib/notify";
+import {
+  assertContentAccess,
+  assertStudentAccess,
+  cohortIdsForUser,
+  resolveCohortFilter,
+  visibleStudents,
+  visibleToStaff,
+  visibleToStudent,
+} from "./lib/cohortAccess";
+import { isStaffRole } from "./lib/roles";
 
 type AssignmentStatus =
   | "complete"
@@ -12,6 +22,20 @@ type AssignmentStatus =
   | "no-track"
   | "submitted"
   | "graded";
+
+const assignmentDoc = v.object({
+  _id: v.id("assignments"),
+  _creationTime: v.number(),
+  title: v.string(),
+  description: v.optional(v.string()),
+  trackId: v.optional(v.id("tracks")),
+  dueDate: v.number(),
+  createdBy: v.id("users"),
+  assignedToAll: v.boolean(),
+  requiresSubmission: v.optional(v.boolean()),
+  allowFileUpload: v.optional(v.boolean()),
+  cohortId: v.optional(v.id("cohorts")),
+});
 
 async function getSubmission(
   ctx: QueryCtx,
@@ -89,6 +113,15 @@ const progressReturn = v.object({
   level: v.number(),
 });
 
+/** Assignments a given student should see: their cohorts' plus school-wide. */
+async function assignmentsForStudent(
+  ctx: QueryCtx,
+  studentId: Id<"users">,
+): Promise<Doc<"assignments">[]> {
+  const all = await ctx.db.query("assignments").order("desc").collect();
+  return visibleToStudent(all, await cohortIdsForUser(ctx, studentId));
+}
+
 export const create = mutation({
   args: {
     title: v.string(),
@@ -98,10 +131,12 @@ export const create = mutation({
     assignedToAll: v.boolean(),
     requiresSubmission: v.optional(v.boolean()),
     allowFileUpload: v.optional(v.boolean()),
+    cohortId: v.optional(v.id("cohorts")),
   },
   returns: v.id("assignments"),
   handler: async (ctx, args) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireStaff(ctx);
+    await assertContentAccess(ctx, teacher, args.cohortId);
     const requiresSubmission = args.requiresSubmission ?? false;
     const title = args.title.trim();
     const id = await ctx.db.insert("assignments", {
@@ -115,9 +150,10 @@ export const create = mutation({
       allowFileUpload: requiresSubmission
         ? (args.allowFileUpload ?? true)
         : false,
+      cohortId: args.cohortId,
     });
 
-    await notifyUsers(ctx, await activeStudentIds(ctx), {
+    await notifyUsers(ctx, await activeStudentIds(ctx, args.cohortId), {
       type: "assignment_posted",
       title: `New assignment: ${title}`,
       body: `Due ${formatDueDate(args.dueDate)}.${args.description?.trim() ? ` ${args.description.trim()}` : ""}`,
@@ -134,7 +170,10 @@ export const remove = mutation({
   args: { id: v.id("assignments") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    const staff = await requireStaff(ctx);
+    const assignment = await ctx.db.get(args.id);
+    if (!assignment) return null;
+    await assertContentAccess(ctx, staff, assignment.cohortId);
     const subs = await ctx.db
       .query("assignmentSubmissions")
       .withIndex("by_assignment", (q) => q.eq("assignmentId", args.id))
@@ -147,59 +186,26 @@ export const remove = mutation({
   },
 });
 
+/** Staff view: assignments in scope, optionally narrowed to one cohort. */
 export const listAll = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id("assignments"),
-      _creationTime: v.number(),
-      title: v.string(),
-      description: v.optional(v.string()),
-      trackId: v.optional(v.id("tracks")),
-      dueDate: v.number(),
-      createdBy: v.id("users"),
-      assignedToAll: v.boolean(),
-      requiresSubmission: v.optional(v.boolean()),
-      allowFileUpload: v.optional(v.boolean()),
-    }),
-  ),
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const teacher = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!teacher || teacher.role !== "teacher") return [];
-    return await ctx.db.query("assignments").order("desc").collect();
+  args: { cohortId: v.optional(v.id("cohorts")) },
+  returns: v.array(assignmentDoc),
+  handler: async (ctx, args) => {
+    const staff = await getCurrentUserOrNull(ctx);
+    if (!staff || !isStaffRole(staff.role)) return [];
+    const { scope, cohortId } = await resolveCohortFilter(ctx, staff, args.cohortId);
+    const all = await ctx.db.query("assignments").order("desc").collect();
+    return visibleToStaff(all, scope, cohortId);
   },
 });
 
 export const listForStudent = query({
   args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id("assignments"),
-      _creationTime: v.number(),
-      title: v.string(),
-      description: v.optional(v.string()),
-      trackId: v.optional(v.id("tracks")),
-      dueDate: v.number(),
-      createdBy: v.id("users"),
-      assignedToAll: v.boolean(),
-      requiresSubmission: v.optional(v.boolean()),
-      allowFileUpload: v.optional(v.boolean()),
-    }),
-  ),
+  returns: v.array(assignmentDoc),
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return [];
-    return await ctx.db.query("assignments").order("desc").collect();
+    return await assignmentsForStudent(ctx, user._id);
   },
 });
 
@@ -207,15 +213,11 @@ export const getStatusForStudent = query({
   args: { studentId: v.id("users") },
   returns: v.array(v.any()),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const teacher = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!teacher || teacher.role !== "teacher") return [];
+    const staff = await getCurrentUserOrNull(ctx);
+    if (!staff || !isStaffRole(staff.role)) return [];
+    await assertStudentAccess(ctx, staff, args.studentId);
 
-    const assignments = await ctx.db.query("assignments").order("desc").collect();
+    const assignments = await assignmentsForStudent(ctx, args.studentId);
     const now = Date.now();
 
     return await Promise.all(
@@ -246,8 +248,9 @@ export const getProgressForStudent = query({
   args: { studentId: v.id("users") },
   returns: progressReturn,
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
-    const assignments = await ctx.db.query("assignments").order("desc").collect();
+    const staff = await requireStaff(ctx);
+    await assertStudentAccess(ctx, staff, args.studentId);
+    const assignments = await assignmentsForStudent(ctx, args.studentId);
     const now = Date.now();
     const statuses = await Promise.all(
       assignments.map((a) => statusForAssignment(ctx, args.studentId, a, now)),
@@ -260,15 +263,10 @@ export const getMyStatus = query({
   args: {},
   returns: v.array(v.any()),
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return [];
 
-    const assignments = await ctx.db.query("assignments").order("desc").collect();
+    const assignments = await assignmentsForStudent(ctx, user._id);
     const now = Date.now();
     const tracks = await ctx.db.query("tracks").collect();
 
@@ -316,15 +314,10 @@ export const getMyProgress = query({
   args: {},
   returns: progressReturn,
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return { completedCount: 0, totalCount: 0, level: 0 };
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return { completedCount: 0, totalCount: 0, level: 0 };
 
-    const assignments = await ctx.db.query("assignments").order("desc").collect();
+    const assignments = await assignmentsForStudent(ctx, user._id);
     const now = Date.now();
     const statuses = await Promise.all(
       assignments.map((a) => statusForAssignment(ctx, user._id, a, now)),
@@ -333,23 +326,25 @@ export const getMyProgress = query({
   },
 });
 
+/**
+ * Grading grid for the Teacher Hub. Each assignment lists only the students it
+ * actually applies to (its cohort, or everyone visible when school-wide).
+ */
 export const getAllStudentStatuses = query({
-  args: {},
+  args: { cohortId: v.optional(v.id("cohorts")) },
   returns: v.array(v.any()),
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const teacher = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!teacher || teacher.role !== "teacher") return [];
+  handler: async (ctx, args) => {
+    const staff = await getCurrentUserOrNull(ctx);
+    if (!staff || !isStaffRole(staff.role)) return [];
+    const { scope, cohortId } = await resolveCohortFilter(ctx, staff, args.cohortId);
 
-    const assignments = await ctx.db.query("assignments").order("desc").collect();
-    const students = await ctx.db
-      .query("users")
-      .withIndex("by_role", (q) => q.eq("role", "student"))
-      .collect();
+    const all = await ctx.db.query("assignments").order("desc").collect();
+    const assignments = visibleToStaff(all, scope, cohortId);
+    const students = (await visibleStudents(ctx, staff, cohortId)).filter((s) => s.status !== "dropped");
+    const membership = new Map<Id<"users">, Set<Id<"cohorts">>>();
+    for (const s of students) {
+      membership.set(s._id, new Set(await cohortIdsForUser(ctx, s._id)));
+    }
     const tracks = await ctx.db.query("tracks").collect();
     const now = Date.now();
 
@@ -358,31 +353,32 @@ export const getAllStudentStatuses = query({
         const track = a.trackId
           ? tracks.find((t) => t._id === a.trackId) ?? null
           : null;
+        const applicable = students.filter(
+          (s) => a.cohortId === undefined || membership.get(s._id)?.has(a.cohortId),
+        );
         const studentStatuses = await Promise.all(
-          students
-            .filter((s) => s.status !== "dropped")
-            .map(async (s) => {
-              const status = await statusForAssignment(ctx, s._id, a, now);
-              const submission = a.requiresSubmission
-                ? await getSubmission(ctx, a._id, s._id)
-                : null;
-              return {
-                student: s,
-                status,
-                submission: submission
-                  ? {
-                      _id: submission._id,
-                      status: submission.status,
-                      grade: submission.grade,
-                      feedback: submission.feedback,
-                      submittedAt: submission.submittedAt,
-                      textContent: submission.textContent,
-                      fileName: submission.fileName,
-                      fileKey: submission.fileKey,
-                    }
-                  : null,
-              };
-            }),
+          applicable.map(async (s) => {
+            const status = await statusForAssignment(ctx, s._id, a, now);
+            const submission = a.requiresSubmission
+              ? await getSubmission(ctx, a._id, s._id)
+              : null;
+            return {
+              student: s,
+              status,
+              submission: submission
+                ? {
+                    _id: submission._id,
+                    status: submission.status,
+                    grade: submission.grade,
+                    feedback: submission.feedback,
+                    submittedAt: submission.submittedAt,
+                    textContent: submission.textContent,
+                    fileName: submission.fileName,
+                    fileKey: submission.fileKey,
+                  }
+                : null,
+            };
+          }),
         );
         return { assignment: { ...a, track }, studentStatuses };
       }),

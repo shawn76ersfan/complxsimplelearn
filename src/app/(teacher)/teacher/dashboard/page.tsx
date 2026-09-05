@@ -10,29 +10,40 @@ import { KnowledgeManager } from "@/components/teacher/KnowledgeManager";
 import { VideoManager } from "@/components/teacher/VideoManager";
 import { InfoSessionManager } from "@/components/teacher/InfoSessionManager";
 import { InviteStudentPanel } from "@/components/teacher/InviteStudentPanel";
-import { BarChart3, Calendar, CalendarClock, Mail, GraduationCap, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown } from "lucide-react";
+import { CohortsManager } from "@/components/teacher/CohortsManager";
+import { AnnouncementsPanel } from "@/components/teacher/AnnouncementsPanel";
+import { CohortSwitcher } from "@/components/teacher/CohortSwitcher";
+import { CohortScopeProvider, useCohortScope } from "@/components/teacher/CohortContext";
+import { BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 
+type Tab = { id: string; label: string; icon: React.ElementType; adminOnly?: boolean };
+
 const PRIMARY_TABS = [
   { id: "scores", label: "Scores", icon: BarChart3 },
   { id: "students", label: "Students", icon: Users },
-  { id: "curriculum", label: "Curriculum", icon: Library },
   { id: "homework", label: "Homework", icon: BookMarked },
-] as const;
+  { id: "announcements", label: "Announcements", icon: Megaphone },
+  { id: "cohorts", label: "Cohorts", icon: Layers, adminOnly: true },
+] as const satisfies readonly Tab[];
 
 const MORE_TABS = [
   { id: "calendar", label: "Calendar", icon: Calendar },
-  { id: "info-sessions", label: "Info Sessions", icon: CalendarClock },
   { id: "videos", label: "Videos", icon: Video },
   { id: "email", label: "Email Students", icon: Mail },
-  { id: "quote", label: "Quote", icon: Quote },
-  { id: "knowledge", label: "Stark Knowledge", icon: Sparkles },
-] as const;
+  { id: "curriculum", label: "Curriculum", icon: Library, adminOnly: true },
+  { id: "info-sessions", label: "Info Sessions", icon: CalendarClock, adminOnly: true },
+  { id: "quote", label: "Quote", icon: Quote, adminOnly: true },
+  { id: "knowledge", label: "Stark Knowledge", icon: Sparkles, adminOnly: true },
+] as const satisfies readonly Tab[];
 
 type TabId = (typeof PRIMARY_TABS)[number]["id"] | (typeof MORE_TABS)[number]["id"];
+
+/** Tabs whose content depends on the selected cohort (shown with the switcher). */
+const SCOPED_TABS: ReadonlySet<string> = new Set(["scores", "students", "homework", "announcements", "calendar", "videos", "email"]);
 
 function QuoteEditor() {
   const current = useQuery(api.quotes.getCurrent);
@@ -116,8 +127,9 @@ function QuoteEditor() {
 }
 
 function StudentManagementTab() {
-  const activeStudents = useQuery(api.users.listActive);
-  const droppedStudents = useQuery(api.users.listDropped);
+  const { cohortId, selected, isAdmin } = useCohortScope();
+  const activeStudents = useQuery(api.users.listActive, { cohortId });
+  const droppedStudents = useQuery(api.users.listDropped, { cohortId });
   const reactivate = useMutation(api.users.reactivateStudent);
 
   return (
@@ -126,7 +138,9 @@ function StudentManagementTab() {
 
       {/* Active students */}
       <div>
-        <h2 className="text-xl font-bold mb-1" style={{ color: "var(--text)" }}>Active Students</h2>
+        <h2 className="text-xl font-bold mb-1" style={{ color: "var(--text)" }}>
+          {selected ? `${selected.cohort.name} roster` : "Active Students"}
+        </h2>
         <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Click any student to view their progress and send feedback.</p>
         {!activeStudents ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -190,13 +204,15 @@ function StudentManagementTab() {
                   >
                     View
                   </Link>
-                  <button
-                    onClick={() => reactivate({ studentId: s._id })}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
-                    style={{ background: "#10B981" }}
-                  >
-                    <UserCheck size={12} /> Reactivate
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => reactivate({ studentId: s._id })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
+                      style={{ background: "#10B981" }}
+                    >
+                      <UserCheck size={12} /> Reactivate
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -208,12 +224,43 @@ function StudentManagementTab() {
 }
 
 export default function TeacherDashboard() {
-  const [activeTab, setActiveTab] = useState<TabId>("scores");
+  return (
+    <CohortScopeProvider>
+      <TeacherHub />
+    </CohortScopeProvider>
+  );
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function TeacherHub() {
+  const { isAdmin, profile, selected, cohortId, cohorts } = useCohortScope();
+  const [requestedTab, setActiveTab] = useState<TabId>("scores");
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const [hello] = useState(greeting);
 
-  const activeMoreTab = MORE_TABS.find((tab) => tab.id === activeTab);
+  const primaryTabs = PRIMARY_TABS.filter((t) => !("adminOnly" in t && t.adminOnly) || isAdmin);
+  const moreTabs = MORE_TABS.filter((t) => !("adminOnly" in t && t.adminOnly) || isAdmin);
+
+  // A teacher who lands on an admin-only tab (e.g. after a role change) sees Scores instead.
+  const activeTab: TabId = [...primaryTabs, ...moreTabs].some((t) => t.id === requestedTab) ? requestedTab : "scores";
+
+  const activeMoreTab = moreTabs.find((tab) => tab.id === activeTab);
   const moreActive = Boolean(activeMoreTab);
+  const showSwitcher = SCOPED_TABS.has(activeTab);
+  const scopeLabel = selected
+    ? selected.cohort.name
+    : isAdmin
+      ? "the whole school"
+      : (cohorts?.length ?? 0) > 1
+        ? "all your cohorts"
+        : "your cohort";
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -236,23 +283,50 @@ export default function TeacherDashboard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}>
-            <GraduationCap size={20} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black" style={{ color: "var(--text)" }}>Teacher Hub</h1>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>Welcome back, Cassandra</p>
-          </div>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] mb-1 flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
+            Teacher Hub
+            {isAdmin && (
+              <span className="inline-flex items-center gap-1 normal-case tracking-normal px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: "#2563EB15", color: "#2563EB" }}>
+                <ShieldCheck size={10} /> Admin
+              </span>
+            )}
+          </p>
+          <h1 className="text-3xl font-black leading-tight" style={{ color: "var(--text)" }}>
+            {hello}{profile?.name ? `, ${profile.name.split(" ")[0]}` : ""}
+          </h1>
+          {showSwitcher && (
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              You&apos;re looking at <strong style={{ color: "var(--text)" }}>{scopeLabel}</strong>
+              {selected?.cohort.schedule ? ` · ${selected.cohort.schedule}` : ""}
+            </p>
+          )}
         </div>
+        {selected?.cohort.meetingUrl && showSwitcher && (
+          <a
+            href={selected.cohort.meetingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+            style={{ background: selected.cohort.color }}
+          >
+            <Video size={14} /> Open class link
+          </a>
+        )}
       </div>
+
+      {showSwitcher && (
+        <div className="mb-6">
+          <CohortSwitcher />
+        </div>
+      )}
 
       {/* Tabs: primary + More */}
       <div className="flex gap-2 mb-8 flex-wrap items-center">
-        {PRIMARY_TABS.map((tab) => (
+        {primaryTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -290,7 +364,7 @@ export default function TeacherDashboard() {
               className="absolute left-0 top-full mt-2 z-30 min-w-[220px] rounded-xl py-1 shadow-lg"
               style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
             >
-              {MORE_TABS.map((tab) => (
+              {moreTabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
@@ -321,14 +395,30 @@ export default function TeacherDashboard() {
       {activeTab === "scores" && (
         <div>
           <div className="mb-6">
-            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Student Scores</h2>
-            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>View individual and track-based performance for all students</p>
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>
+              {selected ? `${selected.cohort.name} scores` : "Student Scores"}
+            </h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>Individual and track-based performance for {scopeLabel}</p>
           </div>
           <ScoresDashboard />
         </div>
       )}
 
-      {activeTab === "curriculum" && (
+      {activeTab === "cohorts" && isAdmin && <CohortsManager />}
+
+      {activeTab === "announcements" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Announcements</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Posts land on students&apos; dashboards and in their notification bell. Pin the important ones.
+            </p>
+          </div>
+          <AnnouncementsPanel />
+        </div>
+      )}
+
+      {activeTab === "curriculum" && isAdmin && (
         <div>
           <div className="mb-6">
             <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Curriculum CMS</h2>
@@ -358,11 +448,11 @@ export default function TeacherDashboard() {
             <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Class Calendar</h2>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>Add events, quiz dates, and announcements for students to see</p>
           </div>
-          <div className="card p-6"><CalendarWidget isTeacher={true} /></div>
+          <div className="card p-6"><CalendarWidget isTeacher={true} cohortId={cohortId} /></div>
         </div>
       )}
 
-      {activeTab === "info-sessions" && (
+      {activeTab === "info-sessions" && isAdmin && (
         <div>
           <div className="mb-6">
             <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Info Sessions</h2>
@@ -396,7 +486,7 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {activeTab === "quote" && (
+      {activeTab === "quote" && isAdmin && (
         <div>
           <div className="mb-6">
             <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Quote of the Week</h2>
@@ -408,7 +498,7 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {activeTab === "knowledge" && (
+      {activeTab === "knowledge" && isAdmin && (
         <div>
           <div className="mb-6">
             <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Stark Knowledge</h2>

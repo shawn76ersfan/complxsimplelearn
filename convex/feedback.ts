@@ -1,6 +1,9 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, QueryCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import { getCurrentUser, requireTeacher } from "./_lib/auth";
+import { getCurrentUser, getCurrentUserOrNull, requireStaff } from "./_lib/auth";
+import { assertStudentAccess, canAccessStudent } from "./lib/cohortAccess";
+import { isStaffRole } from "./lib/roles";
 
 export const send = mutation({
   args: {
@@ -15,7 +18,8 @@ export const send = mutation({
     )),
   },
   handler: async (ctx, args) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireStaff(ctx);
+    await assertStudentAccess(ctx, teacher, args.studentId);
     await ctx.db.insert("feedback", {
       studentId: args.studentId,
       teacherId: teacher._id,
@@ -29,6 +33,23 @@ export const send = mutation({
   },
 });
 
+/** Attach the sending staff member's name so students see who wrote to them. */
+async function withAuthorNames<T extends { teacherId: Id<"users"> }>(
+  ctx: QueryCtx,
+  rows: T[],
+): Promise<Array<T & { authorName: string }>> {
+  const cache = new Map<Id<"users">, string>();
+  const out = [];
+  for (const row of rows) {
+    if (!cache.has(row.teacherId)) {
+      const t = await ctx.db.get(row.teacherId);
+      cache.set(row.teacherId, t?.name ?? "Your instructor");
+    }
+    out.push({ ...row, authorName: cache.get(row.teacherId)! });
+  }
+  return out;
+}
+
 export const getMyFeedback = query({
   args: {},
   handler: async (ctx) => {
@@ -39,11 +60,12 @@ export const getMyFeedback = query({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
     if (!user) return [];
-    return await ctx.db
+    const rows = await ctx.db
       .query("feedback")
       .withIndex("by_student", (q) => q.eq("studentId", user._id))
       .order("desc")
       .collect();
+    return await withAuthorNames(ctx, rows);
   },
 });
 
@@ -125,22 +147,19 @@ export const getActiveWarnings = query({
       .query("feedback")
       .withIndex("by_student", (q) => q.eq("studentId", user._id))
       .collect();
-    return all
+    const warnings = all
       .filter((f) => f.type === "warning" && f.acknowledgedAt === undefined)
       .sort((a, b) => b.createdAt - a.createdAt);
+    return await withAuthorNames(ctx, warnings);
   },
 });
 
 export const getForStudent = query({
   args: { studentId: v.id("users") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const teacher = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!teacher || teacher.role !== "teacher") return [];
+    const teacher = await getCurrentUserOrNull(ctx);
+    if (!teacher || !isStaffRole(teacher.role)) return [];
+    if (!(await canAccessStudent(ctx, teacher, args.studentId))) return [];
     return await ctx.db
       .query("feedback")
       .withIndex("by_student", (q) => q.eq("studentId", args.studentId))

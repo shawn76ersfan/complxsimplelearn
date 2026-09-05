@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
+import { isAdmin, isStaff } from "@/lib/roles";
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoaded } = useUser();
@@ -26,7 +27,8 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   }, [isLoaded, user, storeUser, ensureSeeded]);
 
   useEffect(() => {
-    if (profile?.role !== "teacher") return;
+    // Curriculum sync is a school-wide write; only admins trigger it.
+    if (!isAdmin(profile?.role)) return;
     void syncDevOpsCurriculum();
   }, [profile?.role, syncDevOpsCurriculum]);
 
@@ -38,7 +40,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     );
   }
 
-  if (profile?.role !== "teacher") {
+  if (!isStaff(profile?.role)) {
     return (
       <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)" }}>
         <Navbar />
@@ -46,7 +48,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
           <div className="text-center">
             <div className="text-6xl mb-4">🔒</div>
             <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>Access Denied</h1>
-            <p style={{ color: "var(--text-muted)" }}>This area is for teachers only.</p>
+            <p style={{ color: "var(--text-muted)" }}>This area is for instructors only.</p>
           </div>
         </div>
       </div>

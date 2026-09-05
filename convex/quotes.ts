@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { requireTeacher } from "./_lib/auth";
+import { requireAdmin } from "./_lib/auth";
 
 export const getCurrent = query({
   args: {},
@@ -16,7 +16,7 @@ export const upsert = mutation({
     author: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireAdmin(ctx);
     const existing = await ctx.db.query("quoteOfWeek").first();
     if (existing) {
       await ctx.db.patch(existing._id, {

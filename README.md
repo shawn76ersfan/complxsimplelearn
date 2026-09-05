@@ -47,7 +47,7 @@ Copy the `NEXT_PUBLIC_CONVEX_URL` it prints into `.env.local`.
 4. Copy the **Issuer URL** (e.g. `https://xxx.clerk.accounts.dev`)
 5. In your **Convex dashboard** → Settings → Environment Variables, add:
    - `CLERK_JWT_ISSUER_DOMAIN` = the Issuer URL from step 4
-   - `TEACHER_EMAIL` = Cassandra's exact sign-up email
+   - `ADMIN_EMAILS` = Cassandra's and the developer's exact sign-up emails, comma-separated (see [Roles & cohorts](#roles--cohorts))
    - **Email (pick one):**
      - **Gmail:** `EMAIL_PROVIDER=gmail`, `GMAIL_USER`, `GMAIL_APP_PASSWORD` (Google [App Password](https://myaccount.google.com/apppasswords))
      - **Resend:** `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `FROM_EMAIL` on a verified domain
@@ -117,9 +117,19 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Teacher Access
+## Roles & cohorts
 
-Whoever signs up with the email set in `TEACHER_EMAIL` (env var) automatically gets the teacher role and can access `/teacher/dashboard`.
+There are three roles:
+
+| Role | Who | Can |
+|------|-----|-----|
+| **admin** | Cassandra + the developer (`ADMIN_EMAILS`) | Everything: create cohorts, assign instructors, invite teachers, edit curriculum, Stark knowledge, info sessions, quote of the week. Sees every cohort ("Whole school"). |
+| **teacher** | Invited from Teacher Hub → Cohorts → Staff, or listed in `TEACHER_EMAILS` | Only the cohorts an admin assigns them to: roster, scores, homework, grading, videos, calendar, announcements, feedback, email. |
+| **student** | Invited into a cohort | Their cohort's content plus anything posted school-wide. |
+
+Set `ADMIN_EMAILS` on the Convex deployment (`npx convex env set ADMIN_EMAILS "a@x.com,b@x.com"`, and again with `--prod`). If it is unset, everyone in `TEACHER_EMAILS` (or the legacy `TEACHER_EMAIL`) is treated as an admin, so an existing deployment keeps working.
+
+Students belong to **cohorts** (a class with a start/end date, schedule and meeting link). Assignments, videos, calendar events and announcements can be posted to one cohort or school-wide. Students see their class on the dashboard and at `/cohort`; staff switch cohorts from the strip at the top of the Teacher Hub.
 
 ---
 

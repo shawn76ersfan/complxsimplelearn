@@ -6,7 +6,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { requireTeacher } from "./_lib/auth";
+import { requireAdmin } from "./_lib/auth";
 
 const publicSessionValidator = v.object({
   _id: v.id("infoSessions"),
@@ -123,7 +123,7 @@ export const listForTeacher = query({
   args: {},
   returns: v.array(teacherSessionValidator),
   handler: async (ctx) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const sessions = await ctx.db
       .query("infoSessions")
       .withIndex("by_start")
@@ -164,7 +164,7 @@ export const create = mutation({
   },
   returns: v.id("infoSessions"),
   handler: async (ctx, args) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireAdmin(ctx);
     if (!Number.isFinite(args.startsAt) || args.startsAt <= Date.now()) {
       throw new Error("Info session must be scheduled in the future");
     }
@@ -195,7 +195,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const session = await ctx.db.get(args.id);
     if (!session) throw new Error("Info session not found");
     if (!Number.isFinite(args.startsAt) || args.startsAt <= Date.now()) {

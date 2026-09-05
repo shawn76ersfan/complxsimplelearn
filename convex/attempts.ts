@@ -1,15 +1,16 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { getCurrentUser } from "./_lib/auth";
+import { getCurrentUser, getCurrentUserOrNull } from "./_lib/auth";
+import { canAccessStudent, visibleStudents } from "./lib/cohortAccess";
+import { isStaffRole } from "./lib/roles";
 
 export const getStudentQuizDetail = query({
   args: { studentId: v.id("users"), lessonId: v.id("lessons") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const teacher = await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject)).unique();
-    if (!teacher || teacher.role !== "teacher") return null;
+    const teacher = await getCurrentUserOrNull(ctx);
+    if (!teacher || !isStaffRole(teacher.role)) return null;
+    if (!(await canAccessStudent(ctx, teacher, args.studentId))) return null;
 
     const questions = await ctx.db
       .query("quizQuestions")
@@ -277,13 +278,9 @@ export const getContinueLearning = query({
 export const getStudentDetailForTeacher = query({
   args: { studentId: v.id("users") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const teacher = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!teacher || teacher.role !== "teacher") return null;
+    const teacher = await getCurrentUserOrNull(ctx);
+    if (!teacher || !isStaffRole(teacher.role)) return null;
+    if (!(await canAccessStudent(ctx, teacher, args.studentId))) return null;
 
     const student = await ctx.db.get(args.studentId);
     if (!student) return null;
@@ -356,20 +353,12 @@ export const getStudentDetailForTeacher = query({
 });
 
 export const getAllStudentScores = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const teacher = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!teacher || teacher.role !== "teacher") return [];
+  args: { cohortId: v.optional(v.id("cohorts")) },
+  handler: async (ctx, args) => {
+    const teacher = await getCurrentUserOrNull(ctx);
+    if (!teacher || !isStaffRole(teacher.role)) return [];
 
-    const students = await ctx.db
-      .query("users")
-      .withIndex("by_role", (q) => q.eq("role", "student"))
-      .collect();
+    const students = await visibleStudents(ctx, teacher, args.cohortId);
 
     const tracks = await ctx.db.query("tracks").collect();
 

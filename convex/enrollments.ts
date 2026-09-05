@@ -1,7 +1,9 @@
 import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { requireTeacher } from "./_lib/auth";
-import { isTeacherEmail, normalizeEmail } from "./lib/teacherEmails";
+import { getCurrentUserOrNull, requireStaff } from "./_lib/auth";
+import { isStaffEmail, normalizeEmail } from "./lib/teacherEmails";
+import { resolveCohortFilter, visibleToStaff } from "./lib/cohortAccess";
+import { isStaffRole } from "./lib/roles";
 
 const enrollmentDoc = v.object({
   _id: v.id("enrollments"),
@@ -18,18 +20,29 @@ const enrollmentDoc = v.object({
   acceptedAt: v.optional(v.number()),
   clerkInvitationId: v.optional(v.string()),
   displayName: v.optional(v.string()),
+  cohortId: v.optional(v.id("cohorts")),
 });
 
+/**
+ * Pending invites the staff member can see. Teachers only see invites into
+ * cohorts they teach; admins see everything (including un-cohorted invites).
+ */
 export const listPendingInvites = query({
-  args: {},
+  args: { cohortId: v.optional(v.id("cohorts")) },
   returns: v.array(enrollmentDoc),
-  handler: async (ctx) => {
-    await requireTeacher(ctx);
+  handler: async (ctx, args) => {
+    const me = await getCurrentUserOrNull(ctx);
+    if (!me || !isStaffRole(me.role)) return [];
+    const { scope, cohortId } = await resolveCohortFilter(ctx, me, args.cohortId);
     const invited = await ctx.db
       .query("enrollments")
       .withIndex("by_status", (q) => q.eq("status", "invited"))
       .collect();
-    return invited.sort((a, b) => b.invitedAt - a.invitedAt);
+    const visible =
+      scope === "all"
+        ? visibleToStaff(invited, scope, cohortId)
+        : invited.filter((i) => i.cohortId !== undefined && (cohortId ? i.cohortId === cohortId : scope.has(i.cohortId)));
+    return visible.sort((a, b) => b.invitedAt - a.invitedAt);
   },
 });
 
@@ -37,7 +50,7 @@ export const getById = query({
   args: { enrollmentId: v.id("enrollments") },
   returns: v.union(enrollmentDoc, v.null()),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireStaff(ctx);
     return await ctx.db.get(args.enrollmentId);
   },
 });
@@ -48,12 +61,15 @@ export const upsertInviteRecord = internalMutation({
     displayName: v.optional(v.string()),
     invitedBy: v.id("users"),
     clerkInvitationId: v.optional(v.string()),
+    cohortId: v.optional(v.id("cohorts")),
+    role: v.optional(v.union(v.literal("student"), v.literal("teacher"))),
   },
   returns: v.id("enrollments"),
   handler: async (ctx, args) => {
     const email = normalizeEmail(args.email);
-    if (isTeacherEmail(email)) {
-      throw new Error("Teacher accounts are configured via TEACHER_EMAIL, not invitations.");
+    const role = args.role ?? "student";
+    if (isStaffEmail(email)) {
+      throw new Error("This email is already configured as staff via ADMIN_EMAILS / TEACHER_EMAILS.");
     }
 
     const existingUser = await ctx.db
@@ -78,19 +94,21 @@ export const upsertInviteRecord = internalMutation({
         acceptedAt: undefined,
         clerkInvitationId: args.clerkInvitationId,
         displayName: args.displayName,
-        role: "student",
+        role,
+        cohortId: args.cohortId,
       });
       return existingEnrollment._id;
     }
 
     return await ctx.db.insert("enrollments", {
       email,
-      role: "student",
+      role,
       status: "invited",
       invitedBy: args.invitedBy,
       invitedAt: now,
       clerkInvitationId: args.clerkInvitationId,
       displayName: args.displayName,
+      cohortId: args.cohortId,
     });
   },
 });

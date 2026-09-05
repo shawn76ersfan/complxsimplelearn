@@ -7,16 +7,20 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { Send, Users, Check, Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { useCohortScope } from "./CohortContext";
 
 interface Student {
   _id: Id<"users">;
   name: string;
   email: string;
   imageUrl?: string;
+  status?: "active" | "dropped";
 }
 
 export function EmailComposer() {
-  const students = useQuery(api.users.listStudents) as Student[] | undefined;
+  const { cohortId, selected } = useCohortScope();
+  const allVisible = useQuery(api.users.listStudents, { cohortId }) as Student[] | undefined;
+  const students = allVisible?.filter((s) => s.status !== "dropped");
   const sendEmail = useAction(api.email.sendEmail);
   const sendTestEmail = useAction(api.email.sendTestEmail);
 
@@ -53,7 +57,7 @@ export function EmailComposer() {
 
     setSending(true);
     try {
-      const result = await sendEmail({ subject: subject.trim(), body: body.trim(), recipientIds });
+      const result = await sendEmail({ subject: subject.trim(), body: body.trim(), recipientIds, cohortId });
       toast.success(`Email sent to ${(result as { sent: number }).sent} student${(result as { sent: number }).sent !== 1 ? "s" : ""}!`);
       setSent(true);
       setSubject("");
@@ -97,7 +101,7 @@ export function EmailComposer() {
               border: `1px solid ${sendToAll ? "#2563EB" : "var(--border)"}`,
             }}
           >
-            <Users size={14} /> All Students ({students?.length ?? 0})
+            <Users size={14} /> {selected ? `All of ${selected.cohort.name}` : "All Students"} ({students?.length ?? 0})
           </button>
           <button
             onClick={() => setSendToAll(false)}

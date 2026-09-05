@@ -1,7 +1,8 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUserOrNull } from "./_lib/auth";
-import { isTeacherEmail } from "./lib/teacherEmails";
+import { isStaffEmail } from "./lib/teacherEmails";
+import { isStaffRole } from "./lib/roles";
 
 export const listByTrack = query({
   args: { trackId: v.id("tracks") },
@@ -60,7 +61,7 @@ export const getById = query({
     // Draft lessons: teachers only
     const user = await getCurrentUserOrNull(ctx);
     if (!user) return null;
-    if (user.role === "teacher" || isTeacherEmail(user.email)) return lesson;
+    if (isStaffRole(user.role) || isStaffEmail(user.email)) return lesson;
     return null;
   },
 });

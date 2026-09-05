@@ -1,6 +1,6 @@
 "use node";
 
-import { action } from "./_generated/server";
+import { action, ActionCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -120,10 +120,30 @@ async function createClerkInvitation(email: string): Promise<string | undefined>
   throw new Error(`Could not send Clerk invitation: ${result.bodyText}`);
 }
 
+type Role = "admin" | "teacher" | "student";
+
+async function requireStaffProfile(ctx: ActionCtx): Promise<{ _id: Id<"users">; role: Role }> {
+  const profile = (await ctx.runQuery(api.users.getMyProfile)) as {
+    _id: Id<"users">;
+    role: Role;
+  } | null;
+  if (!profile) throw new Error("Not authenticated");
+  if (profile.role !== "admin" && profile.role !== "teacher") {
+    throw new Error("Instructor access required");
+  }
+  return profile;
+}
+
+/**
+ * Invite a student (or, for admins, a new teacher). Teachers must invite into
+ * one of their own cohorts; admins may invite school-wide.
+ */
 export const inviteStudent = action({
   args: {
     email: v.string(),
     displayName: v.optional(v.string()),
+    cohortId: v.optional(v.id("cohorts")),
+    role: v.optional(v.union(v.literal("student"), v.literal("teacher"))),
   },
   returns: v.object({
     success: v.literal(true),
@@ -134,12 +154,22 @@ export const inviteStudent = action({
     ctx,
     args,
   ): Promise<{ success: true; email: string; enrollmentId: Id<"enrollments"> }> => {
-    const profile = (await ctx.runQuery(api.users.getMyProfile)) as {
-      _id: Id<"users">;
-      role: "teacher" | "student";
-    } | null;
-    if (!profile) throw new Error("Not authenticated");
-    if (profile.role !== "teacher") throw new Error("Teacher access required");
+    const profile = await requireStaffProfile(ctx);
+    const role = args.role ?? "student";
+
+    const allowed: boolean = await ctx.runQuery(api.cohorts.canInviteTo, {
+      cohortId: args.cohortId,
+      role,
+    });
+    if (!allowed) {
+      throw new Error(
+        role === "teacher"
+          ? "Only admins can invite instructors."
+          : args.cohortId
+            ? "You can only invite students into cohorts you teach."
+            : "Pick a cohort to invite this student into.",
+      );
+    }
 
     const email = normalizeEmail(args.email);
     if (!email.includes("@")) throw new Error("Enter a valid email address.");
@@ -153,6 +183,8 @@ export const inviteStudent = action({
         displayName: args.displayName?.trim() || undefined,
         invitedBy: profile._id,
         clerkInvitationId,
+        cohortId: role === "teacher" ? undefined : args.cohortId,
+        role,
       },
     );
 
@@ -164,11 +196,7 @@ export const resendInvite = action({
   args: { enrollmentId: v.id("enrollments") },
   returns: v.object({ success: v.literal(true), email: v.string() }),
   handler: async (ctx, args) => {
-    const profile = (await ctx.runQuery(api.users.getMyProfile)) as {
-      role: "teacher" | "student";
-    } | null;
-    if (!profile) throw new Error("Not authenticated");
-    if (profile.role !== "teacher") throw new Error("Teacher access required");
+    await requireStaffProfile(ctx);
 
     const enrollment = (await ctx.runQuery(api.enrollments.getById, {
       enrollmentId: args.enrollmentId,
@@ -192,11 +220,7 @@ export const revokeInvite = action({
   args: { enrollmentId: v.id("enrollments") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const profile = (await ctx.runQuery(api.users.getMyProfile)) as {
-      role: "teacher" | "student";
-    } | null;
-    if (!profile) throw new Error("Not authenticated");
-    if (profile.role !== "teacher") throw new Error("Teacher access required");
+    await requireStaffProfile(ctx);
 
     const enrollment = (await ctx.runQuery(api.enrollments.getById, {
       enrollmentId: args.enrollmentId,

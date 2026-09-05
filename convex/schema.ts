@@ -7,7 +7,9 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     imageUrl: v.optional(v.string()),
-    role: v.union(v.literal("teacher"), v.literal("student")),
+    // admin = runs the school (Cassandra + dev); teacher = instructor scoped to
+    // their cohorts; student = learner. See convex/lib/roles.ts.
+    role: v.union(v.literal("admin"), v.literal("teacher"), v.literal("student")),
     createdAt: v.number(),
     xp: v.optional(v.number()),
     streak: v.optional(v.number()),
@@ -63,9 +65,61 @@ export default defineSchema({
     acceptedAt: v.optional(v.number()),
     clerkInvitationId: v.optional(v.string()),
     displayName: v.optional(v.string()),
+    // Cohort the invitee joins the moment they finish signing up.
+    cohortId: v.optional(v.id("cohorts")),
   })
     .index("by_email", ["email"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_cohort", ["cohortId"]),
+
+  // A cohort is one run of the program: a named group of students with
+  // assigned instructors, a start/end date, and a weekly schedule. Content
+  // rows carry an optional cohortId; undefined means school-wide.
+  cohorts: defineTable({
+    name: v.string(),               // "Cohort 4", "Fall 2026 Evening"
+    code: v.optional(v.string()),   // short tag shown on badges, e.g. "C4"
+    description: v.optional(v.string()),
+    startDate: v.string(),          // "YYYY-MM-DD"
+    endDate: v.optional(v.string()),// "YYYY-MM-DD"
+    schedule: v.optional(v.string()),   // "Tue & Thu · 6–8pm ET"
+    meetingUrl: v.optional(v.string()),
+    color: v.string(),
+    status: v.union(
+      v.literal("upcoming"),
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("archived"),
+    ),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_start", ["startDate"]),
+
+  cohortMembers: defineTable({
+    cohortId: v.id("cohorts"),
+    userId: v.id("users"),
+    role: v.union(v.literal("student"), v.literal("teacher")),
+    addedBy: v.id("users"),
+    addedAt: v.number(),
+  })
+    .index("by_cohort", ["cohortId"])
+    .index("by_user", ["userId"])
+    .index("by_cohort_role", ["cohortId", "role"])
+    .index("by_cohort_user", ["cohortId", "userId"]),
+
+  // Posts from instructors to a cohort (or school-wide when cohortId is unset).
+  announcements: defineTable({
+    cohortId: v.optional(v.id("cohorts")),
+    title: v.string(),
+    body: v.string(),
+    pinned: v.optional(v.boolean()),
+    authorId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_cohort", ["cohortId", "createdAt"])
+    .index("by_created", ["createdAt"]),
 
   tracks: defineTable({
     name: v.string(),
@@ -135,7 +189,10 @@ export default defineSchema({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     createdBy: v.id("users"),
-  }).index("by_date", ["date"]),
+    cohortId: v.optional(v.id("cohorts")), // undefined = school-wide
+  })
+    .index("by_date", ["date"])
+    .index("by_cohort", ["cohortId"]),
 
   infoSessions: defineTable({
     title: v.string(),
@@ -174,6 +231,7 @@ export default defineSchema({
     sentBy: v.id("users"),
     sentAt: v.number(),
     recipientCount: v.number(),
+    cohortId: v.optional(v.id("cohorts")),
   }).index("by_sent_at", ["sentAt"]),
 
   feedback: defineTable({
@@ -212,10 +270,12 @@ export default defineSchema({
     // When false/undefined, status is inferred from track lesson attempts (legacy).
     requiresSubmission: v.optional(v.boolean()),
     allowFileUpload: v.optional(v.boolean()),
+    cohortId: v.optional(v.id("cohorts")), // undefined = every cohort
   })
     .index("by_created_by", ["createdBy"])
     .index("by_title", ["title"])
-    .index("by_due_date", ["dueDate"]),
+    .index("by_due_date", ["dueDate"])
+    .index("by_cohort", ["cohortId"]),
 
   assignmentSubmissions: defineTable({
     assignmentId: v.id("assignments"),
@@ -327,7 +387,9 @@ export default defineSchema({
     fileSize: v.optional(v.number()),
     uploadedBy: v.id("users"),
     createdAt: v.number(),
+    cohortId: v.optional(v.id("cohorts")), // undefined = every cohort
   })
     .index("by_recorded_date", ["recordedDate"])
-    .index("by_created_at", ["createdAt"]),
+    .index("by_created_at", ["createdAt"])
+    .index("by_cohort", ["cohortId"]),
 });

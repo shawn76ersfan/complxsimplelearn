@@ -6,6 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { MessageSquare, CheckCheck, AlertTriangle, Bell, ChevronDown, ChevronUp } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { useInstructorName } from "@/components/cohort/useInstructorName";
 
 type FeedbackType = "feedback" | "warning" | "notice" | undefined;
 
@@ -22,6 +23,7 @@ export function FeedbackInbox() {
   const markRead   = useMutation(api.feedback.markRead);
   const markAllRead = useMutation(api.feedback.markAllRead);
   const acknowledgeWarning = useMutation(api.feedback.acknowledgeWarning);
+  const instructor = useInstructorName();
 
   const [expanded, setExpanded] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -44,7 +46,7 @@ export function FeedbackInbox() {
         <MessageSquare size={32} className="mx-auto mb-3 opacity-20" style={{ color: "var(--text-muted)" }} />
         <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>No messages yet</p>
         <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-          Cassandra will send feedback, notices, and warnings here.
+          {instructor.sentence} will send feedback, notices, and warnings here.
         </p>
       </div>
     );
@@ -160,6 +162,7 @@ function FeedbackCard({
     createdAt: number;
     message: string;
     acknowledgedAt?: number;
+    authorName?: string;
   };
   onRead: () => void;
   onAcknowledge?: () => void | Promise<void>;
@@ -189,7 +192,7 @@ function FeedbackCard({
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold" style={{ color: accent }}>{label}</span>
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>from Cassandra</span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>from {item.authorName ?? "your instructor"}</span>
           </div>
         </div>
 

@@ -7,6 +7,9 @@ import { api } from "../../../convex/_generated/api";
 import { VideoLibrary } from "@/components/videos/VideoLibrary";
 import { UploadCloud, Film, X } from "lucide-react";
 import toast from "react-hot-toast";
+import { Id } from "../../../convex/_generated/dataModel";
+import { useCohortScope } from "./CohortContext";
+import { CohortPicker } from "./CohortPicker";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -15,6 +18,9 @@ function todayISO(): string {
 export function VideoManager() {
   const uploadFile = useUploadFile(api.videos);
   const createVideo = useMutation(api.videos.create);
+  const { cohortId: scopeCohortId, isAdmin, cohorts } = useCohortScope();
+  const [cohortId, setCohortId] = useState<Id<"cohorts"> | undefined>(scopeCohortId);
+  const needsCohort = !isAdmin && !cohortId;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -58,6 +64,10 @@ export function VideoManager() {
       toast.error("Add the class date.");
       return;
     }
+    if (needsCohort) {
+      toast.error("Pick which cohort this recording is for.");
+      return;
+    }
 
     setUploading(true);
     setProgress(0);
@@ -75,8 +85,10 @@ export function VideoManager() {
         description: description.trim() || undefined,
         contentType: file.type,
         fileSize: file.size,
+        cohortId,
       });
-      toast.success("Video published! Students can watch it now.");
+      const target = cohorts?.find((c) => c.cohort._id === cohortId)?.cohort.name;
+      toast.success(target ? `Published to ${target}. Students can watch it now.` : "Video published! Students can watch it now.");
       reset();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed. Please try again.");
@@ -196,6 +208,8 @@ export function VideoManager() {
           />
         </div>
 
+        <CohortPicker value={cohortId} onChange={setCohortId} label="Publish to" required />
+
         {/* Progress bar */}
         {uploading && (
           <div>
@@ -214,7 +228,7 @@ export function VideoManager() {
 
         <button
           onClick={handleUpload}
-          disabled={uploading || !file}
+          disabled={uploading || !file || needsCohort}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white text-sm transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
         >
@@ -226,7 +240,14 @@ export function VideoManager() {
       {/* Existing videos */}
       <div>
         <h3 className="font-bold text-sm mb-4" style={{ color: "var(--text)" }}>Uploaded recordings</h3>
-        <VideoLibrary canManage />
+        <VideoLibrary
+          canManage
+          cohortId={scopeCohortId}
+          cohortBadge={(id) => {
+            const c = cohorts?.find((x) => x.cohort._id === id)?.cohort;
+            return c ? { name: c.name, color: c.color } : { name: "Whole school", color: "#6B7280" };
+          }}
+        />
       </div>
     </div>
   );

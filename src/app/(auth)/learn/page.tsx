@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import Link from "next/link";
 import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Tv, ExternalLink, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge } from "lucide-react";
+import { useInstructorName } from "@/components/cohort/useInstructorName";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
   hardware:     Cpu,
@@ -23,6 +24,7 @@ const TRACK_ICONS: Record<string, React.ElementType> = {
 
 export default function LearnPage() {
   const tracks = useQuery(api.tracks.list);
+  const instructor = useInstructorName();
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
@@ -75,7 +77,7 @@ export default function LearnPage() {
         <div className="mb-6">
           <h2 className="text-2xl font-black mb-1" style={{ color: "var(--text)" }}>Watch Party</h2>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Join a live watch party with your class — watch videos together, chat in real time, and discuss with Cassandra and your peers.
+            Join a live watch party with your class — watch videos together, chat in real time, and discuss with {instructor.short} and your peers.
           </p>
         </div>
 
@@ -107,7 +109,7 @@ export default function LearnPage() {
               </span>
             </div>
             <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>
-              Watch curated tech content alongside your class, discuss concepts in real time, and get live guidance from Cassandra — all in one shared room.
+              Watch curated tech content alongside your class, discuss concepts in real time, and get live guidance from {instructor.short} — all in one shared room.
             </p>
             <a
               href="https://www.watchparty.me/"

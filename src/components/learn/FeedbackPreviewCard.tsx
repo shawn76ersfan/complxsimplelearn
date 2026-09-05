@@ -5,10 +5,12 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { ArrowRight, MessageSquare } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { useInstructorName } from "@/components/cohort/useInstructorName";
 
 export function FeedbackPreviewCard() {
   const feedback = useQuery(api.feedback.getMyFeedback);
   const unread = useQuery(api.feedback.getUnreadCount);
+  const instructor = useInstructorName();
 
   const messages = feedback
     ? [...feedback].sort((a, b) => b.createdAt - a.createdAt)
@@ -52,7 +54,7 @@ export function FeedbackPreviewCard() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-3 mb-1">
             <h2 className="font-bold text-sm" style={{ color: "var(--text)" }}>
-              Messages from Cassandra
+              Messages from {instructor.short}
             </h2>
             <span
               className="flex items-center gap-1 text-xs font-semibold flex-shrink-0 group-hover:gap-1.5 transition-all"
