@@ -19,6 +19,7 @@ Built with Next.js 16, Convex, Clerk, Tailwind CSS, and Resend.
 
 - [Stark RAG implementation guide](docs/rag/README.md)
 - [Public Stark RAG architecture case study](https://github.com/shawn76ersfan/stark-rag-docs)
+- [Branching workflow](docs/BRANCHING.md) — `main` is production; work happens on `feature/*` branches and lands via PR
 
 ---
 
