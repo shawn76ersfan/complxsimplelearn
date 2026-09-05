@@ -7,19 +7,21 @@ import { ThemeToggle } from "./ThemeToggle";
 import { NotificationBell } from "./NotificationBell";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { BookOpen, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare } from "lucide-react";
+import { BookOpen, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare, Users } from "lucide-react";
 import { useState } from "react";
+import { isStaff } from "@/lib/roles";
 
 export function Navbar() {
   const profile = useQuery(api.users.getMyProfile);
   const unreadFeedback = useQuery(api.feedback.getUnreadCount);
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isTeacher = profile?.role === "teacher";
+  const isTeacher = isStaff(profile?.role);
   const unreadCount = !isTeacher ? (unreadFeedback ?? 0) : 0;
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    ...(!isTeacher ? [{ href: "/cohort", label: "My Class", icon: Users }] : []),
     { href: "/learn",     label: "Learn",     icon: BookOpen },
     { href: "/videos",    label: "Videos",    icon: Video },
     ...(!isTeacher

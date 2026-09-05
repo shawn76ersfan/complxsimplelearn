@@ -3,8 +3,16 @@ import { components } from "./_generated/api";
 import { v } from "convex/values";
 import { R2 } from "@convex-dev/r2";
 import type { DataModel } from "./_generated/dataModel";
-import { getCurrentUser, requireTeacher } from "./_lib/auth";
+import { getCurrentUser, requireStaff } from "./_lib/auth";
 import { activeStudentIds, notifyUsers } from "./lib/notify";
+import {
+  assertContentAccess,
+  cohortIdsForUser,
+  resolveCohortFilter,
+  visibleToStaff,
+  visibleToStudent,
+} from "./lib/cohortAccess";
+import { isStaffRole } from "./lib/roles";
 
 export const r2 = new R2(components.r2);
 
@@ -17,7 +25,7 @@ export const r2 = new R2(components.r2);
  */
 export const { generateUploadUrl, syncMetadata } = r2.clientApi<DataModel>({
   checkUpload: async (ctx) => {
-    await requireTeacher(ctx);
+    await requireStaff(ctx);
   },
 });
 
@@ -33,10 +41,12 @@ export const create = mutation({
     description: v.optional(v.string()),
     contentType: v.optional(v.string()),
     fileSize: v.optional(v.number()),
+    cohortId: v.optional(v.id("cohorts")),
   },
   returns: v.id("videos"),
   handler: async (ctx, args) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireStaff(ctx);
+    await assertContentAccess(ctx, teacher, args.cohortId);
 
     const title = args.title.trim();
     if (!title) throw new Error("Title is required");
@@ -51,9 +61,10 @@ export const create = mutation({
       fileSize: args.fileSize,
       uploadedBy: teacher._id,
       createdAt: Date.now(),
+      cohortId: args.cohortId,
     });
 
-    await notifyUsers(ctx, await activeStudentIds(ctx), {
+    await notifyUsers(ctx, await activeStudentIds(ctx, args.cohortId), {
       type: "video_posted",
       title: `New class recording: ${title}`,
       body: `Recorded ${args.recordedDate}. Watch it any time from Videos.`,
@@ -67,11 +78,12 @@ export const create = mutation({
 });
 
 /**
- * List all videos with playable URLs, newest recording first.
- * Available to any authenticated user (students and teachers).
+ * List videos with playable URLs, newest recording first. Students see their
+ * cohorts' recordings plus school-wide ones; staff see their scope, optionally
+ * narrowed by the hub switcher.
  */
 export const list = query({
-  args: {},
+  args: { cohortId: v.optional(v.id("cohorts")) },
   returns: v.array(
     v.object({
       _id: v.id("videos"),
@@ -84,16 +96,25 @@ export const list = query({
       fileSize: v.optional(v.number()),
       uploadedBy: v.id("users"),
       createdAt: v.number(),
+      cohortId: v.optional(v.id("cohorts")),
       url: v.union(v.string(), v.null()),
     })
   ),
-  handler: async (ctx) => {
-    await getCurrentUser(ctx);
-    const videos = await ctx.db
+  handler: async (ctx, args) => {
+    const me = await getCurrentUser(ctx);
+    const all = await ctx.db
       .query("videos")
       .withIndex("by_recorded_date")
       .order("desc")
       .collect();
+
+    let videos;
+    if (isStaffRole(me.role)) {
+      const { scope, cohortId } = await resolveCohortFilter(ctx, me, args.cohortId);
+      videos = visibleToStaff(all, scope, cohortId);
+    } else {
+      videos = visibleToStudent(all, await cohortIdsForUser(ctx, me._id));
+    }
 
     return await Promise.all(
       videos.map(async (video) => {
@@ -118,9 +139,10 @@ export const remove = mutation({
   args: { id: v.id("videos") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    const staff = await requireStaff(ctx);
     const video = await ctx.db.get(args.id);
     if (!video) return null;
+    await assertContentAccess(ctx, staff, video.cohortId);
     try {
       await r2.deleteObject(ctx, video.key);
     } catch {

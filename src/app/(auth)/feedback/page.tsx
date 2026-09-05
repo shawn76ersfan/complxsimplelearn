@@ -4,9 +4,11 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { FeedbackInbox } from "@/components/teacher/FeedbackInbox";
 import { MessageSquare } from "lucide-react";
+import { useInstructorName } from "@/components/cohort/useInstructorName";
 
 export default function FeedbackPage() {
   const unread = useQuery(api.feedback.getUnreadCount);
+  const instructor = useInstructorName();
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -20,10 +22,10 @@ export default function FeedbackPage() {
           </div>
           <div>
             <h1 className="text-3xl font-black" style={{ color: "var(--text)" }}>
-              Messages from Cassandra
+              Messages from {instructor.short}
             </h1>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Feedback, notices, and warnings from your instructor.
+              Feedback, notices, and warnings from {instructor.plural ? "your instructors" : "your instructor"}.
             </p>
           </div>
         </div>

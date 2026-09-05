@@ -6,9 +6,11 @@ import { cn, percentageColor, percentageBg, getInitials } from "@/lib/utils";
 import { Trophy, Users, TrendingUp, ArrowRight, Flame } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
+import { useCohortScope } from "./CohortContext";
 
 export function ScoresDashboard() {
-  const scores = useQuery(api.attempts.getAllStudentScores);
+  const { cohortId } = useCohortScope();
+  const scores = useQuery(api.attempts.getAllStudentScores, { cohortId });
   const [selectedTrack, setSelectedTrack] = useState<string>("all");
 
   if (!scores) {
@@ -33,12 +35,14 @@ export function ScoresDashboard() {
     );
   }
 
-  const allTracks = scores[0]?.trackSummaries.map((t) => ({ id: t.trackId, name: t.trackName, color: t.trackColor })) ?? [];
-  const classAvg = Math.round(scores.reduce((s, r) => s + r.overall, 0) / scores.length);
+  const active = scores.filter((r) => r.student.status !== "dropped");
+  const roster = active.length > 0 ? active : scores;
+  const allTracks = roster[0]?.trackSummaries.map((t) => ({ id: t.trackId, name: t.trackName, color: t.trackColor })) ?? [];
+  const classAvg = Math.round(roster.reduce((s, r) => s + r.overall, 0) / roster.length);
   const avgStreak = Math.round(
-    scores.reduce((s, r) => s + (r.student.streak ?? 0), 0) / scores.length
+    roster.reduce((s, r) => s + (r.student.streak ?? 0), 0) / roster.length
   );
-  const sorted = [...scores].sort((a, b) => b.overall - a.overall);
+  const sorted = [...roster].sort((a, b) => b.overall - a.overall);
 
   return (
     <div className="space-y-6">
@@ -49,7 +53,7 @@ export function ScoresDashboard() {
             <Users size={16} style={{ color: "#2563EB" }} />
           </div>
           <div>
-            <p className="text-xl font-black" style={{ color: "var(--text)" }}>{scores.length}</p>
+            <p className="text-xl font-black" style={{ color: "var(--text)" }}>{roster.length}</p>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>Students</p>
           </div>
         </div>

@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { useInstructorName } from "@/components/cohort/useInstructorName";
 
 const STATUS_STYLES = {
   complete: { bg: "#0EA5E920", color: "#0EA5E9", label: "Complete", icon: CheckCircle },
@@ -152,6 +153,8 @@ function SubmissionForm({
 
 export default function HomeworkPage() {
   const assignments = useQuery(api.assignments.getMyStatus);
+  const instructor = useInstructorName();
+  const [now] = useState(() => Date.now());
 
   const sorted = assignments
     ? [...assignments].sort(
@@ -189,7 +192,7 @@ export default function HomeworkPage() {
           <BookOpen size={32} className="mx-auto mb-3 opacity-25" />
           <p className="font-semibold" style={{ color: "var(--text)" }}>No assignments yet</p>
           <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-            Cassandra will post assignments here.
+            {instructor.sentence} will post assignments here.
           </p>
         </div>
       ) : (
@@ -197,7 +200,6 @@ export default function HomeworkPage() {
           {sorted.map((a) => {
             const s = STATUS_STYLES[a.status as AssignmentStatus] ?? STATUS_STYLES.pending;
             const Icon = s.icon;
-            const now = Date.now();
             const isPast = now > a.dueDate;
             const daysLeft = Math.ceil((a.dueDate - now) / (1000 * 60 * 60 * 24));
             const track = (a as { track?: { name: string; slug: string } }).track;

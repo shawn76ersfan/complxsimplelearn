@@ -1,6 +1,7 @@
 import { MutationCtx } from "../_generated/server";
 import { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
+import { staffRecipients, studentRecipients } from "./cohortAccess";
 
 export type NotificationType = Doc<"notifications">["type"];
 
@@ -78,22 +79,26 @@ export async function notifyUsers(
   return inserted;
 }
 
-/** Every non-dropped student, for school-wide notifications. */
-export async function activeStudentIds(ctx: MutationCtx): Promise<Id<"users">[]> {
-  const students = await ctx.db
-    .query("users")
-    .withIndex("by_role", (q) => q.eq("role", "student"))
-    .collect();
-  return students.filter((s) => s.status !== "dropped").map((s) => s._id);
+/**
+ * Non-dropped students who should hear about a piece of content: the cohort's
+ * students, or every student when the content is school-wide.
+ */
+export async function activeStudentIds(
+  ctx: MutationCtx,
+  cohortId?: Id<"cohorts">,
+): Promise<Id<"users">[]> {
+  return await studentRecipients(ctx, cohortId);
 }
 
-/** Every teacher account, for "a student did something" notifications. */
-export async function teacherIds(ctx: MutationCtx): Promise<Id<"users">[]> {
-  const teachers = await ctx.db
-    .query("users")
-    .withIndex("by_role", (q) => q.eq("role", "teacher"))
-    .collect();
-  return teachers.map((t) => t._id);
+/**
+ * Staff who should hear that a student did something: admins always, plus
+ * the cohort's teachers (or every teacher when no cohort applies).
+ */
+export async function teacherIds(
+  ctx: MutationCtx,
+  cohortId?: Id<"cohorts">,
+): Promise<Id<"users">[]> {
+  return await staffRecipients(ctx, cohortId);
 }
 
 export function formatDueDate(ts: number): string {

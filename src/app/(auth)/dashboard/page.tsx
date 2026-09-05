@@ -7,6 +7,8 @@ import Link from "next/link";
 import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Calendar, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge, Play } from "lucide-react";
 import { StudentHomework } from "@/components/learn/StudentHomework";
 import { FeedbackPreviewCard } from "@/components/learn/FeedbackPreviewCard";
+import { MyCohortCard } from "@/components/cohort/MyCohortCard";
+import { useInstructorName } from "@/components/cohort/useInstructorName";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
   hardware: Cpu,
@@ -225,6 +227,7 @@ export default function StudentDashboard() {
   const progress = useQuery(api.assignments.getMyProgress);
   const activeWarnings = useQuery(api.feedback.getActiveWarnings);
   const acknowledgeWarning = useMutation(api.feedback.acknowledgeWarning);
+  const instructor = useInstructorName();
 
   const totalScore = myAttempts?.reduce((s, a) => s + a.score, 0) ?? 0;
   const totalMax   = myAttempts?.reduce((s, a) => s + a.maxScore, 0) ?? 0;
@@ -255,7 +258,9 @@ export default function StudentDashboard() {
               <div className="flex items-start gap-3">
                 <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" style={{ color: "var(--warning-text)" }} />
                 <div className="flex-1">
-                  <p className="font-semibold text-sm mb-1" style={{ color: "var(--warning-text)" }}>Warning from Cassandra</p>
+                  <p className="font-semibold text-sm mb-1" style={{ color: "var(--warning-text)" }}>
+                    Warning from {w.authorName ?? instructor.short}
+                  </p>
                   <p className="text-sm leading-relaxed" style={{ color: "var(--text)" }}>{w.message}</p>
                 </div>
               </div>
@@ -267,7 +272,7 @@ export default function StudentDashboard() {
                   className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold transition-all hover:opacity-80"
                   style={{ border: "1px solid var(--primary)", color: "var(--primary)", borderRadius: "8px", background: "transparent" }}
                 >
-                  <Calendar size={13} /> Schedule a meeting with Cassandra
+                  <Calendar size={13} /> Schedule a meeting with {w.authorName ?? instructor.short}
                 </a>
                 <button
                   onClick={() => acknowledgeWarning({ feedbackId: w._id })}
@@ -281,6 +286,8 @@ export default function StudentDashboard() {
           ))}
         </div>
       )}
+
+      <MyCohortCard className="mb-6" />
 
       <div className="mb-6">
         <QuoteCard />
@@ -334,7 +341,9 @@ export default function StudentDashboard() {
 
       <div className="mb-8">
         <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text)" }}>Homework & Assignments</h2>
-        <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Assignments from Cassandra — complete them before the deadline.</p>
+        <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
+          Assignments from {instructor.short} — complete them before the deadline.
+        </p>
         <StudentHomework />
       </div>
 

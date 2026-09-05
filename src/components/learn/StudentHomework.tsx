@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CheckCircle, Clock, AlertTriangle, X, BookOpen, ArrowRight, FileText, Star } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
+import { useInstructorName } from "@/components/cohort/useInstructorName";
 
 const STATUS_STYLES = {
   complete:    { bg: "#0EA5E920", color: "#0EA5E9", label: "Complete ✓", icon: CheckCircle },
@@ -20,6 +22,8 @@ type AssignmentStatus = keyof typeof STATUS_STYLES;
 
 export function StudentHomework() {
   const assignments = useQuery(api.assignments.getMyStatus);
+  const instructor = useInstructorName();
+  const [now] = useState(() => Date.now());
 
   if (!assignments) {
     return (
@@ -36,7 +40,7 @@ export function StudentHomework() {
       <div className="card p-8 text-center">
         <BookOpen size={28} className="mx-auto mb-2 opacity-25" />
         <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>No assignments yet</p>
-        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Cassandra will post assignments here.</p>
+        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{instructor.sentence} will post assignments here.</p>
       </div>
     );
   }
@@ -54,7 +58,6 @@ export function StudentHomework() {
         {sorted.map((a) => {
           const s = STATUS_STYLES[a.status as AssignmentStatus] ?? STATUS_STYLES.pending;
           const Icon = s.icon;
-          const now = Date.now();
           const isPast = now > a.dueDate;
           const daysLeft = Math.ceil((a.dueDate - now) / (1000 * 60 * 60 * 24));
           const track = (a as { track?: { name: string; slug: string } }).track;

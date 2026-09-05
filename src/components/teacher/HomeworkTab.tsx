@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { useCohortScope } from "./CohortContext";
+import { CohortPicker } from "./CohortPicker";
 
 const STATUS_STYLES = {
   complete: { bg: "#0EA5E920", color: "#0EA5E9", label: "Complete", icon: CheckCircle },
@@ -36,6 +38,8 @@ const inputStyle = {
 function CreateForm({ onClose }: { onClose: () => void }) {
   const tracks = useQuery(api.curriculumAdmin.listTracks);
   const create = useMutation(api.assignments.create);
+  const { cohortId: scopeCohortId, isAdmin, cohorts } = useCohortScope();
+  const [cohortId, setCohortId] = useState<Id<"cohorts"> | undefined>(scopeCohortId);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [trackId, setTrackId] = useState("");
@@ -43,9 +47,14 @@ function CreateForm({ onClose }: { onClose: () => void }) {
   const [requiresSubmission, setRequiresSubmission] = useState(true);
   const [allowFileUpload, setAllowFileUpload] = useState(true);
   const [saving, setSaving] = useState(false);
+  const needsCohort = !isAdmin && !cohortId;
 
   async function handleCreate() {
     if (!title.trim() || !dueDate) return;
+    if (needsCohort) {
+      toast.error("Pick which cohort this assignment is for.");
+      return;
+    }
     setSaving(true);
     try {
       await create({
@@ -56,8 +65,10 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         assignedToAll: true,
         requiresSubmission,
         allowFileUpload: requiresSubmission ? allowFileUpload : false,
+        cohortId,
       });
-      toast.success("Assignment created!");
+      const target = cohorts?.find((c) => c.cohort._id === cohortId)?.cohort.name;
+      toast.success(target ? `Assigned to ${target}` : "Assignment created for the whole school");
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create");
@@ -69,6 +80,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
   return (
     <div className="card p-5 space-y-4">
       <h3 className="font-bold" style={{ color: "var(--text)" }}>New Assignment</h3>
+      <CohortPicker value={cohortId} onChange={setCohortId} label="Assign to" required />
       <div>
         <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-muted)" }}>Title *</label>
         <input
@@ -152,7 +164,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         </button>
         <button
           onClick={handleCreate}
-          disabled={!title.trim() || !dueDate || saving}
+          disabled={!title.trim() || !dueDate || saving || needsCohort}
           className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-40"
           style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
         >
@@ -296,12 +308,16 @@ function GradePanel({
 }
 
 export function HomeworkTab() {
-  const data = useQuery(api.assignments.getAllStudentStatuses);
+  const { cohortId, cohorts } = useCohortScope();
+  const data = useQuery(api.assignments.getAllStudentStatuses, { cohortId });
   const remove = useMutation(api.assignments.remove);
+  const cohortOf = (id: Id<"cohorts"> | undefined) => cohorts?.find((c) => c.cohort._id === id)?.cohort;
   const [creating, setCreating] = useState(false);
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
   const [gradingAssignment, setGradingAssignment] = useState<Id<"assignments"> | null>(null);
   const [showAll, setShowAll] = useState(false);
+  // Snapshot the clock once per mount so "past due" is stable across renders.
+  const [now] = useState(() => Date.now());
 
   const VISIBLE_LIMIT = 5;
 
@@ -350,21 +366,27 @@ export function HomeworkTab() {
       {visible.map(({ assignment, studentStatuses }) => {
         const isExpanded = expandedAssignment === assignment._id;
         const isGrading = gradingAssignment === assignment._id;
-        const now = Date.now();
         const isPast = now > assignment.dueDate;
         const doneCount = studentStatuses.filter((s) =>
           ["complete", "graded", "submitted", "late"].includes(s.status),
         ).length;
         const total = studentStatuses.length;
         const requiresSubmission = !!(assignment as { requiresSubmission?: boolean }).requiresSubmission;
+        const cohort = cohortOf((assignment as { cohortId?: Id<"cohorts"> }).cohortId);
 
         return (
-          <div key={assignment._id} className="card overflow-hidden">
+          <div key={assignment._id} className="card overflow-hidden" style={cohort ? { borderLeft: `4px solid ${cohort.color}` } : undefined}>
             <div className="p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <h3 className="font-bold" style={{ color: "var(--text)" }}>{assignment.title}</h3>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                      style={{ background: `${cohort?.color ?? "#6B7280"}20`, color: cohort?.color ?? "var(--text-muted)" }}
+                    >
+                      {cohort?.name ?? "Whole school"}
+                    </span>
                     {requiresSubmission && (
                       <span
                         className="text-xs px-2 py-0.5 rounded-full font-semibold"

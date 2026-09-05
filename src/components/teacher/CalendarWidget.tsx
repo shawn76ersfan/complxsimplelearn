@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday } from "date-fns";
 import toast from "react-hot-toast";
+import { CohortPicker } from "./CohortPicker";
 
 const EVENT_COLORS = ["#2563EB", "#0EA5E9", "#10B981", "#F59E0B", "#E11D48", "#8B5CF6"];
 
@@ -24,6 +25,8 @@ interface CalendarEvent {
   title: string;
   description?: string;
   color?: string;
+  cohortId?: Id<"cohorts">;
+  cohortName?: string;
 }
 
 function EventModal({
@@ -31,15 +34,18 @@ function EventModal({
   onClose,
   onSave,
   isTeacher,
+  defaultCohortId,
 }: {
   date: string;
   onClose: () => void;
-  onSave: (data: { title: string; description?: string; color: string }) => void;
+  onSave: (data: { title: string; description?: string; color: string; cohortId?: Id<"cohorts"> }) => void;
   isTeacher: boolean;
+  defaultCohortId?: Id<"cohorts">;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#2563EB");
+  const [cohortId, setCohortId] = useState<Id<"cohorts"> | undefined>(defaultCohortId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -52,6 +58,7 @@ function EventModal({
           </button>
         </div>
         <div className="space-y-4">
+          {isTeacher && <CohortPicker value={cohortId} onChange={setCohortId} label="For" required />}
           <div>
             <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--text-muted)" }}>Title *</label>
             <input
@@ -95,7 +102,7 @@ function EventModal({
             </div>
           </div>
           <button
-            onClick={() => title.trim() && onSave({ title: title.trim(), description: description.trim() || undefined, color })}
+            onClick={() => title.trim() && onSave({ title: title.trim(), description: description.trim() || undefined, color, cohortId })}
             disabled={!title.trim()}
             className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-500 to-pink-500 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
@@ -107,7 +114,14 @@ function EventModal({
   );
 }
 
-export function CalendarWidget({ isTeacher = false }: { isTeacher?: boolean }) {
+export function CalendarWidget({
+  isTeacher = false,
+  cohortId,
+}: {
+  isTeacher?: boolean;
+  /** Teacher Hub switcher value; students never pass this. */
+  cohortId?: Id<"cohorts">;
+}) {
   const [current, setCurrent] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -115,7 +129,8 @@ export function CalendarWidget({ isTeacher = false }: { isTeacher?: boolean }) {
 
   const yearMonth = format(current, "yyyy-MM");
   const monthLabel = format(current, "MMMM yyyy");
-  const events = useQuery(api.calendar.listByMonth, { yearMonth }) as CalendarEvent[] | undefined;
+  const events = useQuery(api.calendar.listByMonth, { yearMonth, cohortId }) as CalendarEvent[] | undefined;
+  const profile = useQuery(api.users.getMyProfile, isTeacher ? {} : "skip");
   const createEvent = useMutation(api.calendar.create);
   const removeEvent = useMutation(api.calendar.remove);
   const sendEmail = useAction(api.email.sendEmail);
@@ -126,12 +141,18 @@ export function CalendarWidget({ isTeacher = false }: { isTeacher?: boolean }) {
       return;
     }
     setSendingSchedule(true);
-    const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date));
-    const lines = sorted.map((e) => `📅 ${e.date} — ${e.title}${e.description ? `: ${e.description}` : ""}`).join("\n");
-    const body = `Hi,\n\nHere is your schedule for ${monthLabel}:\n\n${lines}\n\nSee you soon!\n— Cassandra Carter`;
-    await sendEmail({ subject: `Your Schedule for ${monthLabel}`, body, recipientIds: [] });
-    toast.success(`Schedule for ${monthLabel} sent to all students!`);
-    setSendingSchedule(false);
+    try {
+      const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date));
+      const lines = sorted.map((e) => `📅 ${e.date} — ${e.title}${e.description ? `: ${e.description}` : ""}`).join("\n");
+      const signature = profile?.name ?? "Your instructors";
+      const body = `Hi,\n\nHere is your schedule for ${monthLabel}:\n\n${lines}\n\nSee you soon!\n— ${signature}`;
+      const result = await sendEmail({ subject: `Your Schedule for ${monthLabel}`, body, recipientIds: [], cohortId });
+      toast.success(`Schedule for ${monthLabel} sent to ${result.sent} student${result.sent === 1 ? "" : "s"}!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send schedule");
+    } finally {
+      setSendingSchedule(false);
+    }
   }
 
   const monthStart = startOfMonth(current);
@@ -144,12 +165,16 @@ export function CalendarWidget({ isTeacher = false }: { isTeacher?: boolean }) {
     return events?.filter((e) => e.date === dateStr) ?? [];
   }
 
-  async function handleSave(data: { title: string; description?: string; color: string }) {
+  async function handleSave(data: { title: string; description?: string; color: string; cohortId?: Id<"cohorts"> }) {
     if (!selectedDate) return;
-    await createEvent({ date: selectedDate, ...data });
-    toast.success("Event added!");
-    setShowModal(false);
-    setSelectedDate(null);
+    try {
+      await createEvent({ date: selectedDate, ...data });
+      toast.success("Event added!");
+      setShowModal(false);
+      setSelectedDate(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not add event");
+    }
   }
 
   async function handleDelete(id: Id<"calendarEvents">) {
@@ -277,7 +302,14 @@ export function CalendarWidget({ isTeacher = false }: { isTeacher?: boolean }) {
                 >
                   <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: event.color ?? "#2563EB" }} />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>{event.title}</p>
+                    <p className="font-semibold text-sm flex items-center gap-2 flex-wrap" style={{ color: "var(--text)" }}>
+                      {event.title}
+                      {event.cohortName && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: `${event.color ?? "#2563EB"}22`, color: event.color ?? "#2563EB" }}>
+                          {event.cohortName}
+                        </span>
+                      )}
+                    </p>
                     {event.description && <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{event.description}</p>}
                   </div>
                   {isTeacher && (
@@ -302,6 +334,7 @@ export function CalendarWidget({ isTeacher = false }: { isTeacher?: boolean }) {
           onClose={() => setShowModal(false)}
           onSave={handleSave}
           isTeacher={isTeacher}
+          defaultCohortId={cohortId}
         />
       )}
     </div>

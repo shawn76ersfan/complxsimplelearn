@@ -15,8 +15,18 @@ function formatFileSize(bytes?: number): string | null {
   return `${(mb / 1024).toFixed(1)} GB`;
 }
 
-export function VideoLibrary({ canManage = false }: { canManage?: boolean }) {
-  const videos = useQuery(api.videos.list);
+export function VideoLibrary({
+  canManage = false,
+  cohortId,
+  cohortBadge,
+}: {
+  canManage?: boolean;
+  /** Staff-only: restrict to one cohort (undefined = everything the viewer can see). */
+  cohortId?: Id<"cohorts">;
+  /** Staff-only: render a cohort label for a video. */
+  cohortBadge?: (cohortId: Id<"cohorts"> | undefined) => { name: string; color: string } | null;
+}) {
+  const videos = useQuery(api.videos.list, { cohortId });
   const removeVideo = useMutation(api.videos.remove);
   const [deletingId, setDeletingId] = useState<Id<"videos"> | null>(null);
   const [playingId, setPlayingId] = useState<Id<"videos"> | null>(null);
@@ -64,6 +74,7 @@ export function VideoLibrary({ canManage = false }: { canManage?: boolean }) {
       {videos.map((video) => {
         const isPlaying = playingId === video._id;
         const size = formatFileSize(video.fileSize);
+        const badge = cohortBadge ? cohortBadge(video.cohortId) : null;
         return (
           <div key={video._id} className="card p-0 overflow-hidden flex flex-col">
             {/* Player / thumbnail area */}
@@ -106,6 +117,14 @@ export function VideoLibrary({ canManage = false }: { canManage?: boolean }) {
 
             {/* Meta */}
             <div className="p-4 flex flex-col gap-2 flex-1">
+              {badge && (
+                <span
+                  className="self-start text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: `${badge.color}20`, color: badge.color }}
+                >
+                  {badge.name}
+                </span>
+              )}
               <h3 className="font-bold text-sm leading-snug" style={{ color: "var(--text)" }}>
                 {video.title}
               </h3>

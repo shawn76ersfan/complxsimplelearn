@@ -2,7 +2,7 @@ import { action, mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { getCurrentUser, requireTeacher } from "./_lib/auth";
+import { getCurrentUser, requireAdmin } from "./_lib/auth";
 import {
   CAREER_TRACK_OPTIONS,
   CONSULTING_COMPETENCIES,
@@ -1873,7 +1873,7 @@ export const seedResumeGuidance = mutation({
   args: {},
   returns: v.object({ inserted: v.number() }),
   handler: async (ctx) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireAdmin(ctx);
     const existing = await ctx.db.query("knowledgeDocs").collect();
     const titles = new Set(existing.map((d) => d.title));
     let inserted = 0;

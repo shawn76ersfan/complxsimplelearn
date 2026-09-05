@@ -168,27 +168,41 @@ async function sendConfiguredEmail(args: {
   return provider;
 }
 
+/**
+ * Staff email. `listStudents` is already scoped to the sender (teachers only
+ * see their cohorts), so recipients can never leak outside their scope.
+ * Pass `cohortId` to restrict to one cohort when no explicit ids are given.
+ */
 export const sendEmail = action({
   args: {
     subject: v.string(),
     body: v.string(),
     recipientIds: v.array(v.id("users")),
+    cohortId: v.optional(v.id("cohorts")),
   },
   returns: v.object({ success: v.literal(true), sent: v.number() }),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const sender = (await ctx.runQuery(api.users.getMyProfile)) as {
+      _id: Id<"users">;
+      role: "admin" | "teacher" | "student";
+    } | null;
+    if (!sender) throw new Error("Not authenticated");
+    if (sender.role !== "admin" && sender.role !== "teacher") {
+      throw new Error("Instructor access required");
+    }
 
-    const allStudents = (await ctx.runQuery(api.users.listStudents)) as Array<{
+    const visible = (await ctx.runQuery(api.users.listStudents, { cohortId: args.cohortId })) as Array<{
       _id: Id<"users">;
       email: string;
       name: string;
+      status?: "active" | "dropped";
     }>;
+    const active = visible.filter((s) => s.status !== "dropped");
 
     const recipients =
       args.recipientIds.length > 0
-        ? allStudents.filter((s) => (args.recipientIds as string[]).includes(s._id as string))
-        : allStudents;
+        ? active.filter((s) => (args.recipientIds as string[]).includes(s._id as string))
+        : active;
 
     if (recipients.length === 0) throw new Error("No recipients found");
 
@@ -196,15 +210,13 @@ export const sendEmail = action({
     const to = recipients.map((r) => r.email);
     await sendConfiguredEmail({ subject: args.subject, html, to });
 
-    const sender = (await ctx.runQuery(api.users.getMyProfile)) as { _id: Id<"users"> } | null;
-    if (!sender) throw new Error("Sender not found");
-
     await ctx.runMutation(internal.emailMutations.insertLog, {
       subject: args.subject,
       body: args.body,
       recipientIds: recipients.map((r) => r._id),
       recipientCount: recipients.length,
       sentBy: sender._id,
+      cohortId: args.cohortId,
     });
 
     return { success: true as const, sent: recipients.length };
@@ -222,10 +234,12 @@ export const sendTestEmail = action({
     const profile = (await ctx.runQuery(api.users.getMyProfile)) as {
       _id: Id<"users">;
       email: string;
-      role: "teacher" | "student";
+      role: "admin" | "teacher" | "student";
     } | null;
     if (!profile) throw new Error("Not authenticated");
-    if (profile.role !== "teacher") throw new Error("Teacher access required");
+    if (profile.role !== "admin" && profile.role !== "teacher") {
+      throw new Error("Instructor access required");
+    }
 
     const subject = "ComplxSimple email test";
     const body =

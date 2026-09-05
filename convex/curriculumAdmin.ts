@@ -1,7 +1,7 @@
 import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { requireTeacher } from "./_lib/auth";
+import { requireAdmin } from "./_lib/auth";
 import type { Id } from "./_generated/dataModel";
 
 const lessonType = v.union(
@@ -84,7 +84,7 @@ export const listTracks = query({
   args: {},
   returns: v.array(trackReturn),
   handler: async (ctx) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const tracks = await ctx.db.query("tracks").collect();
     tracks.sort((a, b) => a.order - b.order);
     return await Promise.all(
@@ -104,7 +104,7 @@ export const listLessons = query({
   args: { trackId: v.id("tracks") },
   returns: v.array(lessonReturn),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const lessons = await ctx.db
       .query("lessons")
       .withIndex("by_track", (q) => q.eq("trackId", args.trackId))
@@ -118,7 +118,7 @@ export const getLesson = query({
   args: { lessonId: v.id("lessons") },
   returns: v.union(lessonReturn, v.null()),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     return await ctx.db.get(args.lessonId);
   },
 });
@@ -133,7 +133,7 @@ export const createTrack = mutation({
   },
   returns: v.id("tracks"),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const name = args.name.trim();
     if (!name) throw new Error("Name is required");
 
@@ -179,7 +179,7 @@ export const updateTrack = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const track = await ctx.db.get(args.trackId);
     if (!track) throw new Error("Track not found");
 
@@ -208,7 +208,7 @@ export const removeTrack = mutation({
   args: { trackId: v.id("tracks") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const lessons = await ctx.db
       .query("lessons")
       .withIndex("by_track", (q) => q.eq("trackId", args.trackId))
@@ -237,7 +237,7 @@ export const createLesson = mutation({
   },
   returns: v.id("lessons"),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const track = await ctx.db.get(args.trackId);
     if (!track) throw new Error("Track not found");
 
@@ -276,7 +276,7 @@ export const updateLesson = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson) throw new Error("Lesson not found");
 
@@ -308,7 +308,7 @@ export const removeLesson = mutation({
   args: { lessonId: v.id("lessons") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson) return null;
     const questions = await ctx.db
@@ -329,7 +329,7 @@ export const reorderLessons = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     for (let i = 0; i < args.lessonIds.length; i++) {
       const lesson = await ctx.db.get(args.lessonIds[i]);
       if (!lesson || lesson.trackId !== args.trackId) continue;

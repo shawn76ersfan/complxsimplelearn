@@ -9,10 +9,12 @@
  */
 
 import type * as _lib_auth from "../_lib/auth.js";
+import type * as announcements from "../announcements.js";
 import type * as assignments from "../assignments.js";
 import type * as attempts from "../attempts.js";
 import type * as calendar from "../calendar.js";
 import type * as chat from "../chat.js";
+import type * as cohorts from "../cohorts.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
 import type * as curriculum from "../curriculum.js";
@@ -28,12 +30,14 @@ import type * as init from "../init.js";
 import type * as invitations from "../invitations.js";
 import type * as knowledge from "../knowledge.js";
 import type * as lessons from "../lessons.js";
+import type * as lib_cohortAccess from "../lib/cohortAccess.js";
 import type * as lib_enrollmentAccess from "../lib/enrollmentAccess.js";
 import type * as lib_llmChat from "../lib/llmChat.js";
 import type * as lib_notify from "../lib/notify.js";
 import type * as lib_platformFacts from "../lib/platformFacts.js";
 import type * as lib_resumeRubrics from "../lib/resumeRubrics.js";
 import type * as lib_resumeScore from "../lib/resumeScore.js";
+import type * as lib_roles from "../lib/roles.js";
 import type * as lib_teacherEmails from "../lib/teacherEmails.js";
 import type * as notifications from "../notifications.js";
 import type * as quotes from "../quotes.js";
@@ -54,10 +58,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "_lib/auth": typeof _lib_auth;
+  announcements: typeof announcements;
   assignments: typeof assignments;
   attempts: typeof attempts;
   calendar: typeof calendar;
   chat: typeof chat;
+  cohorts: typeof cohorts;
   conversations: typeof conversations;
   crons: typeof crons;
   curriculum: typeof curriculum;
@@ -73,12 +79,14 @@ declare const fullApi: ApiFromModules<{
   invitations: typeof invitations;
   knowledge: typeof knowledge;
   lessons: typeof lessons;
+  "lib/cohortAccess": typeof lib_cohortAccess;
   "lib/enrollmentAccess": typeof lib_enrollmentAccess;
   "lib/llmChat": typeof lib_llmChat;
   "lib/notify": typeof lib_notify;
   "lib/platformFacts": typeof lib_platformFacts;
   "lib/resumeRubrics": typeof lib_resumeRubrics;
   "lib/resumeScore": typeof lib_resumeScore;
+  "lib/roles": typeof lib_roles;
   "lib/teacherEmails": typeof lib_teacherEmails;
   notifications: typeof notifications;
   quotes: typeof quotes;

@@ -3,8 +3,10 @@ import { components } from "./_generated/api";
 import { v } from "convex/values";
 import { R2 } from "@convex-dev/r2";
 import type { DataModel } from "./_generated/dataModel";
-import { getCurrentUser, requireTeacher } from "./_lib/auth";
+import { getCurrentUser, requireStaff } from "./_lib/auth";
 import { notifyUsers, teacherIds } from "./lib/notify";
+import { assertStudentAccess, contentInScope, teachingScope } from "./lib/cohortAccess";
+import { isStaffRole } from "./lib/roles";
 
 export const r2 = new R2(components.r2);
 
@@ -64,7 +66,7 @@ export const submit = mutation({
   returns: v.id("assignmentSubmissions"),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
-    if (user.role !== "student" && user.role !== "teacher") {
+    if (user.role !== "student" && !isStaffRole(user.role)) {
       throw new Error("Not authorized");
     }
     if (user.status === "dropped") throw new Error("Account is inactive");
@@ -95,8 +97,8 @@ export const submit = mutation({
 
     const now = Date.now();
 
-    // In-app only: teachers see it in the bell, without an email per submission.
-    await notifyUsers(ctx, await teacherIds(ctx), {
+    // In-app only: the cohort's teachers (and admins) see it in the bell.
+    await notifyUsers(ctx, await teacherIds(ctx, assignment.cohortId), {
       type: "submission_received",
       title: `${user.name} ${existing ? "resubmitted" : "submitted"} “${assignment.title}”`,
       body: now > assignment.dueDate ? "Turned in after the due date." : undefined,
@@ -169,9 +171,10 @@ export const grade = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireStaff(ctx);
     const submission = await ctx.db.get(args.submissionId);
     if (!submission) throw new Error("Submission not found");
+    await assertStudentAccess(ctx, teacher, submission.studentId);
 
     if (args.grade < 0 || args.grade > 100 || !Number.isFinite(args.grade)) {
       throw new Error("Grade must be between 0 and 100");
@@ -231,7 +234,11 @@ export const listForAssignment = query({
     }),
   ),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    const staff = await requireStaff(ctx);
+    const assignment = await ctx.db.get(args.assignmentId);
+    if (!assignment) return [];
+    const scope = await teachingScope(ctx, staff);
+    if (!contentInScope(scope, assignment.cohortId)) return [];
     const rows = await ctx.db
       .query("assignmentSubmissions")
       .withIndex("by_assignment", (q) =>

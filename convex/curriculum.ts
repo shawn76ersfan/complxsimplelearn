@@ -3,7 +3,7 @@ import type { MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import { requireTeacher } from "./_lib/auth";
+import { requireAdmin } from "./_lib/auth";
 
 type LessonBlock =
   | { type: "heading" | "paragraph" | "list" | "code"; content: string }
@@ -974,7 +974,7 @@ export const syncDevOpsCurriculum = mutation({
     ragRefreshScheduled: v.boolean(),
   }),
   handler: async (ctx) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireAdmin(ctx);
     const result = await syncCurriculum(ctx, teacher._id);
     const changed =
       result.tracks > 0 ||

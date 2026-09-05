@@ -1,13 +1,13 @@
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { getCurrentUser, requireTeacher } from "./_lib/auth";
+import { getCurrentUser, requireAdmin } from "./_lib/auth";
 
 /** List all knowledge docs, newest-updated first. Teacher-only. */
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     return await ctx.db.query("knowledgeDocs").withIndex("by_updated").order("desc").collect();
   },
 });
@@ -50,7 +50,7 @@ export const create = mutation({
   },
   returns: v.id("knowledgeDocs"),
   handler: async (ctx, args) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireAdmin(ctx);
     const now = Date.now();
     const id = await ctx.db.insert("knowledgeDocs", {
       title: args.title.trim(),
@@ -75,7 +75,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const teacher = await requireTeacher(ctx);
+    const teacher = await requireAdmin(ctx);
     const existing = await ctx.db.get(args.id);
     if (!existing) throw new Error("Knowledge doc not found");
     await ctx.db.patch(args.id, {
@@ -95,7 +95,7 @@ export const remove = mutation({
   args: { id: v.id("knowledgeDocs") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireTeacher(ctx);
+    await requireAdmin(ctx);
     const existing = await ctx.db.get(args.id);
     if (!existing) return null;
     await ctx.db.delete(args.id);
