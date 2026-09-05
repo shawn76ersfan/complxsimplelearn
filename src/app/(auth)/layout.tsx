@@ -4,6 +4,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { LogOut, AlertTriangle, Mail } from "lucide-react";
 
@@ -182,6 +183,8 @@ function NameSetupPage({ initialName }: { initialName?: string }) {
 type SyncState = "idle" | "syncing" | "ok" | "not_enrolled" | "error";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isStark = pathname.startsWith("/stark");
   const { user, isLoaded } = useUser();
   const storeUser = useMutation(api.users.store);
   const ensureSeeded = useMutation(api.init.ensureSeeded);
@@ -248,9 +251,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)" }}>
+    <div
+      className={isStark ? "h-dvh overflow-hidden" : "min-h-screen flex flex-col"}
+      style={{ background: "var(--bg)" }}
+    >
       <Navbar />
-      <main className="flex-1">{children}</main>
+      <main className={isStark ? "" : "flex-1"}>{children}</main>
     </div>
   );
 }

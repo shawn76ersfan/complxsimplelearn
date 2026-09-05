@@ -1,12 +1,13 @@
 import type { NextConfig } from "next";
 import path from "path";
-import { fileURLToPath } from "url";
 
-const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = process.cwd();
 
 const nextConfig: NextConfig = {
   // Keep Turbopack rooted on this app so a parent-folder lockfile cannot
   // steal module resolution (which 404s routes and breaks tailwindcss).
+  // process.cwd() is more reliable on Windows than import.meta.url.
+  outputFileTracingRoot: projectRoot,
   turbopack: {
     root: projectRoot,
   },

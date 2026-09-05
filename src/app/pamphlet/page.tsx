@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+
 import { Printer } from "lucide-react";
 
 const TRACKS = [

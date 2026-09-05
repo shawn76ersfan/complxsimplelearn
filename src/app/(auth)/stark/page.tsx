@@ -127,6 +127,7 @@ export default function StarkPage() {
   );
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollBoxRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const greetingContent = mode === "coach" ? COACH_GREETING.content : GREETING.content;
@@ -164,7 +165,25 @@ export default function StarkPage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevHtmlOverscroll = html.style.overscrollBehavior;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      html.style.overscrollBehavior = prevHtmlOverscroll;
+    };
+  }, []);
+
+  useEffect(() => {
+    const box = scrollBoxRef.current;
+    if (!box) return;
+    box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
   }, [messages, loading, reviewing]);
 
   useEffect(() => {
@@ -557,11 +576,15 @@ export default function StarkPage() {
 
   return (
     <div
-      className="stark-chat flex"
+      className="stark-chat flex overflow-hidden"
       style={{
         ...vars,
-        height: "calc(100vh - 56px)",
-        overflow: "hidden",
+        position: "fixed",
+        top: "3.5rem",
+        right: 0,
+        bottom: 0,
+        left: 0,
+        zIndex: 1,
         background: "var(--stark-bg)",
         color: "var(--stark-text)",
       } as React.CSSProperties}
@@ -610,7 +633,7 @@ export default function StarkPage() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--stark-bg)" }}>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0" style={{ background: "var(--stark-bg)" }}>
         <div
           className="flex-shrink-0 px-4 py-3 flex items-center gap-3 flex-wrap"
           style={{ borderBottom: "1px solid var(--stark-border)" }}
@@ -687,7 +710,7 @@ export default function StarkPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollBoxRef} className="flex-1 min-h-0 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
             {mode === "coach" && (
               <>
