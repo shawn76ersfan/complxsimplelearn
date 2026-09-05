@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
+import { NotificationBell } from "./NotificationBell";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { BookOpen, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare } from "lucide-react";
@@ -114,6 +115,7 @@ export function Navbar() {
 
           {/* Right: theme + profile */}
           <div className="flex items-center gap-2.5">
+            <NotificationBell />
             <ThemeToggle />
             <Link
               href="/profile"

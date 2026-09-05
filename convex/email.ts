@@ -248,6 +248,91 @@ export const sendTestEmail = action({
   },
 });
 
+function appBaseUrl(): string {
+  const url =
+    process.env.SITE_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.VERCEL_URL;
+  if (!url) return "http://localhost:3000";
+  if (url.startsWith("http")) return url.replace(/\/$/, "");
+  return `https://${url.replace(/\/$/, "")}`;
+}
+
+function buildNotificationBody(args: {
+  name: string;
+  title: string;
+  body?: string;
+  href?: string;
+}): string {
+  const link = args.href
+    ? `<p style="margin-top:24px;"><a href="${escapeHtml(`${appBaseUrl()}${args.href}`)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2563EB;color:#fff;text-decoration:none;font-weight:700;">Open in ComplxSimple</a></p>`
+    : "";
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#111111;padding:20px 24px;border-radius:8px 8px 0 0;">
+        <p style="color:#fff;margin:0;font-size:13px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;">ComplxSimple</p>
+      </div>
+      <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;color:#111827;">
+        <p style="margin:0 0 12px;">Hi ${escapeHtml(args.name.split(" ")[0] || args.name)},</p>
+        <h2 style="margin:0 0 8px;font-size:20px;">${escapeHtml(args.title)}</h2>
+        ${args.body ? `<p style="margin:0;color:#374151;line-height:1.5;">${escapeHtml(args.body).replace(/\n/g, "<br/>")}</p>` : ""}
+        ${link}
+        <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;" />
+        <p style="color:#6b7280;font-size:12px;margin:0;">You get these because notification emails are on for your account. Turn them off any time from your profile.</p>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Scheduled by `notifyUsers`. Groups recipients that share identical content
+ * into one BCC send so a cohort-wide post is one SMTP call, not thirty.
+ */
+export const sendNotificationEmails = internalAction({
+  args: { notificationIds: v.array(v.id("notifications")) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const batch = await ctx.runQuery(internal.notifications.getEmailBatch, {
+      notificationIds: args.notificationIds,
+    });
+    if (batch.length === 0) return null;
+
+    // Same title+body+href => same email body (greeting is generic in groups).
+    const groups = new Map<string, typeof batch>();
+    for (const item of batch) {
+      const key = `${item.title}\u0000${item.body ?? ""}\u0000${item.href ?? ""}`;
+      const list = groups.get(key) ?? [];
+      list.push(item);
+      groups.set(key, list);
+    }
+
+    const sentIds: Id<"notifications">[] = [];
+    for (const items of groups.values()) {
+      const first = items[0]!;
+      const name = items.length === 1 ? first.name : "there";
+      try {
+        await sendConfiguredEmail({
+          subject: first.title,
+          html: buildNotificationBody({ name, title: first.title, body: first.body, href: first.href }),
+          to: items.map((i) => i.email),
+        });
+        sentIds.push(...items.map((i) => i.notificationId));
+      } catch (error) {
+        console.error("Notification email failed:", {
+          title: first.title,
+          recipients: items.length,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (sentIds.length > 0) {
+      await ctx.runMutation(internal.notifications.markEmailed, { notificationIds: sentIds });
+    }
+    return null;
+  },
+});
+
 export const sendInfoSessionConfirmation = internalAction({
   args: { registrationId: v.id("infoSessionRegistrations") },
   returns: v.null(),

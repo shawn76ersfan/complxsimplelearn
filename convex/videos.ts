@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { R2 } from "@convex-dev/r2";
 import type { DataModel } from "./_generated/dataModel";
 import { getCurrentUser, requireTeacher } from "./_lib/auth";
+import { activeStudentIds, notifyUsers } from "./lib/notify";
 
 export const r2 = new R2(components.r2);
 
@@ -41,7 +42,7 @@ export const create = mutation({
     if (!title) throw new Error("Title is required");
     if (!args.recordedDate) throw new Error("Date is required");
 
-    return await ctx.db.insert("videos", {
+    const id = await ctx.db.insert("videos", {
       key: args.key,
       title,
       recordedDate: args.recordedDate,
@@ -51,6 +52,17 @@ export const create = mutation({
       uploadedBy: teacher._id,
       createdAt: Date.now(),
     });
+
+    await notifyUsers(ctx, await activeStudentIds(ctx), {
+      type: "video_posted",
+      title: `New class recording: ${title}`,
+      body: `Recorded ${args.recordedDate}. Watch it any time from Videos.`,
+      href: "/videos",
+      actorId: teacher._id,
+      dedupeKey: `video_posted:${id}`,
+    });
+
+    return id;
   },
 });
 

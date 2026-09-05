@@ -16,10 +16,39 @@ export default defineSchema({
     droppedReason: v.optional(v.string()),
     droppedAt: v.optional(v.number()),
     droppedBy: v.optional(v.id("users")),
+    // Email a copy of in-app notifications. Undefined = on.
+    notifyByEmail: v.optional(v.boolean()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"])
     .index("by_role", ["role"]),
+
+  // In-app notifications (bell in the navbar + /notifications). One row per
+  // recipient so read state is per user. `dedupeKey` prevents the daily
+  // due-soon cron from nagging twice about the same assignment.
+  notifications: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("assignment_posted"),
+      v.literal("assignment_due_soon"),
+      v.literal("submission_graded"),
+      v.literal("submission_received"),
+      v.literal("video_posted"),
+      v.literal("calendar_event"),
+      v.literal("announcement"),
+    ),
+    title: v.string(),
+    body: v.optional(v.string()),
+    href: v.optional(v.string()),
+    isRead: v.boolean(),
+    createdAt: v.number(),
+    dedupeKey: v.optional(v.string()),
+    actorId: v.optional(v.id("users")),
+    emailedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_user_read", ["userId", "isRead"])
+    .index("by_user_dedupe", ["userId", "dedupeKey"]),
 
   enrollments: defineTable({
     email: v.string(),
