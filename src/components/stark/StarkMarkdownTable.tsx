@@ -13,20 +13,25 @@ type ParsedTable = {
   rows: ReactNode[][];
 };
 
-function tagName(el: ReactElement): string {
-  const fromNode = (el.props as { node?: { tagName?: string } }).node?.tagName;
+// react-markdown hands us plain HTML elements; React 19 types `ReactElement`
+// props as `unknown`, so name the shape we actually read.
+type MarkdownProps = { children?: ReactNode; node?: { tagName?: string } };
+type MarkdownElement = ReactElement<MarkdownProps>;
+
+function tagName(el: MarkdownElement): string {
+  const fromNode = el.props.node?.tagName;
   if (fromNode) return String(fromNode).toLowerCase();
   return typeof el.type === "string" ? el.type.toLowerCase() : "";
 }
 
-function rowCells(row: ReactElement): ReactNode[] {
+function rowCells(row: MarkdownElement): ReactNode[] {
   return Children.toArray(row.props.children)
-    .filter(isValidElement)
+    .filter((cell): cell is MarkdownElement => isValidElement<MarkdownProps>(cell))
     .filter((cell) => {
-      const tag = tagName(cell as ReactElement);
+      const tag = tagName(cell);
       return tag === "th" || tag === "td";
     })
-    .map((cell) => (cell as ReactElement).props.children as ReactNode);
+    .map((cell) => cell.props.children);
 }
 
 function parseMarkdownTable(children: ReactNode): ParsedTable | null {
@@ -34,12 +39,12 @@ function parseMarkdownTable(children: ReactNode): ParsedTable | null {
   const rows: ReactNode[][] = [];
 
   Children.forEach(children, (section) => {
-    if (!isValidElement(section)) return;
+    if (!isValidElement<MarkdownProps>(section)) return;
     const tag = tagName(section);
     if (tag !== "thead" && tag !== "tbody") return;
 
     Children.forEach(section.props.children, (row) => {
-      if (!isValidElement(row) || tagName(row) !== "tr") return;
+      if (!isValidElement<MarkdownProps>(row) || tagName(row) !== "tr") return;
       const cells = rowCells(row);
       if (cells.length === 0) return;
       if (tag === "thead") headers.push(...cells);
@@ -54,8 +59,8 @@ function parseMarkdownTable(children: ReactNode): ParsedTable | null {
 function cellText(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(cellText).join("");
-  if (isValidElement(node) && "children" in node.props) {
-    return cellText(node.props.children as ReactNode);
+  if (isValidElement<MarkdownProps>(node) && node.props.children !== undefined) {
+    return cellText(node.props.children);
   }
   return "";
 }
