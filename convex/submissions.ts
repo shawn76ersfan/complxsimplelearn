@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { R2 } from "@convex-dev/r2";
 import type { DataModel } from "./_generated/dataModel";
 import { getCurrentUser, requireTeacher } from "./_lib/auth";
+import { notifyUsers, teacherIds } from "./lib/notify";
 
 export const r2 = new R2(components.r2);
 
@@ -94,6 +95,16 @@ export const submit = mutation({
 
     const now = Date.now();
 
+    // In-app only: teachers see it in the bell, without an email per submission.
+    await notifyUsers(ctx, await teacherIds(ctx), {
+      type: "submission_received",
+      title: `${user.name} ${existing ? "resubmitted" : "submitted"} “${assignment.title}”`,
+      body: now > assignment.dueDate ? "Turned in after the due date." : undefined,
+      href: "/teacher/dashboard",
+      actorId: user._id,
+      skipEmail: true,
+    });
+
     if (existing) {
       // Replace prior file if a new one was uploaded
       if (
@@ -166,12 +177,23 @@ export const grade = mutation({
       throw new Error("Grade must be between 0 and 100");
     }
 
+    const grade = Math.round(args.grade);
+    const feedback = args.feedback?.trim() || undefined;
     await ctx.db.patch(args.submissionId, {
-      grade: Math.round(args.grade),
-      feedback: args.feedback?.trim() || undefined,
+      grade,
+      feedback,
       gradedBy: teacher._id,
       gradedAt: Date.now(),
       status: args.returnToStudent ? "returned" : "graded",
+    });
+
+    const assignment = await ctx.db.get(submission.assignmentId);
+    await notifyUsers(ctx, [submission.studentId], {
+      type: "submission_graded",
+      title: `Graded: ${assignment?.title ?? "your assignment"} — ${grade}%`,
+      body: feedback ? `${teacher.name}: “${feedback}”` : `Graded by ${teacher.name}.`,
+      href: "/homework",
+      actorId: teacher._id,
     });
     return null;
   },

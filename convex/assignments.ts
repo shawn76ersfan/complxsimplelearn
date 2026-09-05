@@ -2,6 +2,7 @@ import { mutation, query, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { requireTeacher } from "./_lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
+import { activeStudentIds, formatDueDate, notifyUsers } from "./lib/notify";
 
 type AssignmentStatus =
   | "complete"
@@ -102,8 +103,9 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const teacher = await requireTeacher(ctx);
     const requiresSubmission = args.requiresSubmission ?? false;
-    return await ctx.db.insert("assignments", {
-      title: args.title.trim(),
+    const title = args.title.trim();
+    const id = await ctx.db.insert("assignments", {
+      title,
       description: args.description?.trim() || undefined,
       trackId: args.trackId,
       dueDate: args.dueDate,
@@ -114,6 +116,17 @@ export const create = mutation({
         ? (args.allowFileUpload ?? true)
         : false,
     });
+
+    await notifyUsers(ctx, await activeStudentIds(ctx), {
+      type: "assignment_posted",
+      title: `New assignment: ${title}`,
+      body: `Due ${formatDueDate(args.dueDate)}.${args.description?.trim() ? ` ${args.description.trim()}` : ""}`,
+      href: "/homework",
+      actorId: teacher._id,
+      dedupeKey: `assignment_posted:${id}`,
+    });
+
+    return id;
   },
 });
 
