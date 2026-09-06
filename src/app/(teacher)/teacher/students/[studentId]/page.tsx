@@ -5,15 +5,19 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { Id } from "../../../../../../convex/_generated/dataModel";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import {
   ArrowLeft, BookOpen, CheckCircle, Clock, Flame,
   Star, Trophy, Cpu, Brain, Shield, TrendingUp,
   Terminal, Send, MessageSquare, AlertTriangle, UserX,
   UserCheck, Bell, AlertCircle, RotateCcw, Cloud, Container,
   Boxes, GitBranch, Layers, Wrench, Workflow, Gauge,
+  GraduationCap,
 } from "lucide-react";
 import { cn, percentageColor, percentageBg, getInitials, formatDate } from "@/lib/utils";
 import { QuizDetailAccordion } from "@/components/teacher/QuizDetailAccordion";
+import { isAdminRole } from "@/lib/roles";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
   hardware: Cpu,
@@ -65,8 +69,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
   const sendFeedback = useMutation(api.feedback.send);
   const previousFeedback = useQuery(api.feedback.getForStudent, { studentId: studentId as Id<"users"> });
 
+  const profile = useQuery(api.users.getMyProfile);
   const dropStudent = useMutation(api.users.dropStudent);
   const reactivateStudent = useMutation(api.users.reactivateStudent);
+  const setRole = useMutation(api.users.setRole);
+  const router = useRouter();
+  const [promoting, setPromoting] = useState(false);
 
   const [dropReason, setDropReason] = useState("");
   const [showDropForm, setShowDropForm] = useState(false);
@@ -93,6 +101,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
 
   async function handleReactivate() {
     await reactivateStudent({ studentId: studentId as Id<"users"> });
+  }
+
+  async function handleMakeInstructor() {
+    if (promoting) return;
+    setPromoting(true);
+    try {
+      await setRole({ userId: studentId as Id<"users">, role: "teacher" });
+      toast.success("They're an instructor again. Assign them to a cohort under Cohorts → Instructors.");
+      router.push("/teacher/dashboard");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not change their role");
+    } finally {
+      setPromoting(false);
+    }
   }
 
   async function handleSendWarning() {
@@ -245,6 +267,26 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
         <h2 className="text-base font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
           <AlertCircle size={16} style={{ color: "#2563EB" }} /> Student Actions
         </h2>
+
+        {isAdminRole(profile?.role) && student.role === "student" && !isDropped && (
+          <div className="rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3" style={{ background: "#2563EB10", border: "1px solid #2563EB33" }}>
+            <div className="flex-1">
+              <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>This person should be an instructor</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                Turns their account back into staff. They leave any student roster seats and show up under Staff. Re-assign them to a cohort afterwards.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleMakeInstructor}
+              disabled={promoting}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
+            >
+              <GraduationCap size={14} /> {promoting ? "Updating…" : "Make instructor"}
+            </button>
+          </div>
+        )}
 
         {/* Drop / Reactivate */}
         <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>

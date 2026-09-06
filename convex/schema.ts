@@ -109,6 +109,21 @@ export default defineSchema({
     .index("by_cohort_role", ["cohortId", "role"])
     .index("by_cohort_user", ["cohortId", "userId"]),
 
+  // Who was released from a cohort and why. The membership row is deleted;
+  // this is the lasting record (the "reason for release").
+  cohortDepartures: defineTable({
+    cohortId: v.id("cohorts"),
+    userId: v.id("users"),
+    email: v.string(),
+    name: v.string(),
+    role: v.union(v.literal("student"), v.literal("teacher")),
+    reason: v.string(),
+    removedBy: v.id("users"),
+    removedAt: v.number(),
+  })
+    .index("by_cohort", ["cohortId", "removedAt"])
+    .index("by_user", ["userId"]),
+
   // Posts from instructors to a cohort (or school-wide when cohortId is unset).
   announcements: defineTable({
     cohortId: v.optional(v.id("cohorts")),

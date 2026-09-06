@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import toast from "react-hot-toast";
-import { Mail, Shield, ShieldCheck, UserCog } from "lucide-react";
+import { Mail, RefreshCw, Shield, ShieldCheck, UserCog, XCircle } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
-import { getInitials } from "@/lib/utils";
+import { formatDate, getInitials } from "@/lib/utils";
 import { useCohortScope } from "./CohortContext";
+import { CohortPicker } from "./CohortPicker";
 
 const inputStyle = {
   background: "var(--surface-2)",
@@ -21,20 +22,43 @@ const inputStyle = {
  */
 export function StaffManager() {
   const staff = useQuery(api.users.listStaff);
+  const pending = useQuery(api.enrollments.listPendingInvites, {});
   const setRole = useMutation(api.users.setRole);
   const invite = useAction(api.invitations.inviteStudent);
-  const { profile } = useCohortScope();
+  const resendInvite = useAction(api.invitations.resendInvite);
+  const revokeInvite = useAction(api.invitations.revokeInvite);
+  const { profile, cohorts } = useCohortScope();
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [cohortId, setCohortId] = useState<Id<"cohorts"> | undefined>(undefined);
   const [sending, setSending] = useState(false);
+
+  const teacherInvites = (pending ?? []).filter((i) => i.role === "teacher");
+  const cohortName = (id: Id<"cohorts"> | undefined) => cohorts?.find((c) => c.cohort._id === id)?.cohort;
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     setSending(true);
     try {
-      const res = await invite({ email: email.trim(), displayName: name.trim() || undefined, role: "teacher" });
-      toast.success(`Instructor invite sent to ${res.email}`);
+      const res = await invite({
+        email: email.trim(),
+        displayName: name.trim() || undefined,
+        role: "teacher",
+        cohortId,
+      });
+      const target = cohortName(cohortId);
+      if (res.alreadyInCohort) {
+        toast.success(`${res.email} is already teaching${target ? ` ${target.name}` : ""}`);
+      } else if (res.alreadyHadAccount) {
+        toast.success(
+          target
+            ? `Added ${res.email} to ${target.name}. They already had an instructor account.`
+            : `${res.email} already has an instructor account. Assign them to a cohort below.`,
+        );
+      } else {
+        toast.success(`Instructor invite sent to ${res.email}${target ? ` · ${target.name}` : ""}`);
+      }
       setEmail("");
       setName("");
     } catch (err) {
@@ -60,12 +84,12 @@ export function StaffManager() {
           <UserCog size={18} style={{ color: "#2563EB" }} /> Staff
         </h2>
         <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-          <strong>Admins</strong> run the school: cohorts, curriculum, info sessions, Stark knowledge, dropping students.{" "}
-          <strong>Instructors</strong> teach their assigned cohorts: roster, homework, grades, recordings, calendar, email.
+          Invite a new instructor here — they get a sign-up email and land in the Teacher Hub.
+          If they already have an account, they&apos;re added immediately. Then assign them to a cohort.
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_340px] gap-6 items-start">
+      <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
         <div className="card divide-y" style={{ borderColor: "var(--border)" }}>
           {!staff ? (
             <div className="h-24 animate-pulse" style={{ background: "var(--surface-2)" }} />
@@ -107,24 +131,72 @@ export function StaffManager() {
           )}
         </div>
 
-        <form onSubmit={handleInvite} className="card p-4 space-y-3">
-          <div>
-            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
-              <Mail size={14} style={{ color: "#2563EB" }} /> Invite an instructor
-            </h3>
-            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-              They&apos;ll get a sign-up link and land in the Teacher Hub. Assign them to a cohort afterwards.
-            </p>
-          </div>
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="instructor@email.com" className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
-          <button type="submit" disabled={sending} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
-            {sending ? "Sending…" : "Send instructor invite"}
-          </button>
-          <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            Emails in <code>ADMIN_EMAILS</code> / <code>TEACHER_EMAILS</code> are pinned to their role and don&apos;t need an invite.
-          </p>
-        </form>
+        <div className="space-y-4">
+          <form onSubmit={handleInvite} className="card p-4 space-y-3">
+            <div>
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
+                <Mail size={14} style={{ color: "#2563EB" }} /> Invite an instructor
+              </h3>
+              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                New instructors get a sign-up link. Existing accounts skip the email and can be dropped straight into a cohort.
+              </p>
+            </div>
+            <CohortPicker
+              value={cohortId}
+              onChange={setCohortId}
+              label="Assign to cohort"
+              schoolWideLabel="No cohort yet (assign later)"
+            />
+            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="instructor@email.com" className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+            <button type="submit" disabled={sending} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
+              {sending ? "Sending…" : "Send instructor invite"}
+            </button>
+          </form>
+
+          {teacherInvites.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>
+                Pending instructor invites
+              </h3>
+              <div className="space-y-2">
+                {teacherInvites.map((inviteRow) => {
+                  const c = cohortName(inviteRow.cohortId);
+                  return (
+                    <div key={inviteRow._id} className="card p-3">
+                      <p className="text-sm font-medium truncate" style={{ color: "var(--text)" }}>
+                        {inviteRow.displayName ? `${inviteRow.displayName} · ` : ""}
+                        {inviteRow.email}
+                      </p>
+                      <p className="text-[11px] mb-2" style={{ color: "var(--text-muted)" }}>
+                        Invited {formatDate(inviteRow.invitedAt)}
+                        {c ? ` · ${c.name}` : " · no cohort yet"}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => resendInvite({ enrollmentId: inviteRow._id }).then((r) => toast.success(`Resent to ${r.email}`)).catch((e) => toast.error(e instanceof Error ? e.message : "Could not resend"))}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                          style={inputStyle}
+                        >
+                          <RefreshCw size={11} /> Resend
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => revokeInvite({ enrollmentId: inviteRow._id }).then(() => toast.success("Invite revoked")).catch((e) => toast.error(e instanceof Error ? e.message : "Could not revoke"))}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                          style={{ background: "#EF444415", color: "#EF4444" }}
+                        >
+                          <XCircle size={11} /> Revoke
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

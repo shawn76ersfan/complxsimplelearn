@@ -57,7 +57,14 @@ export function InviteStudentPanel({
         cohortId,
       });
       const target = cohortName(cohortId);
-      toast.success(`Invitation sent to ${result.email}${target ? ` · ${target.name}` : ""}`);
+      const where = target ? ` · ${target.name}` : "";
+      if (result.alreadyInCohort) {
+        toast.success(`${result.email} is already in this cohort${where}`);
+      } else if (result.alreadyHadAccount) {
+        toast.success(`Added ${result.email} to the cohort${where}. They already had an account.`);
+      } else {
+        toast.success(`Invitation sent to ${result.email}${where}`);
+      }
       setEmail("");
       setDisplayName("");
     } catch (err) {
@@ -95,7 +102,7 @@ export function InviteStudentPanel({
               Invite a student
             </h3>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Sends a sign-up email. The student lands in the chosen cohort the moment they finish creating their account.
+              New students get a sign-up email. If they already have a student account, they&apos;re added to the cohort right away.
             </p>
           </div>
         )}

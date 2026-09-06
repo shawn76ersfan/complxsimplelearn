@@ -6,6 +6,7 @@ import {
   addMember,
   assertCohortAccess,
   cohortIdsForUser,
+  releaseMember,
   scopeIncludes,
   teachingScope,
 } from "./lib/cohortAccess";
@@ -154,6 +155,18 @@ export const get = query({
           invitedAt: v.number(),
         }),
       ),
+      departures: v.array(
+        v.object({
+          _id: v.id("cohortDepartures"),
+          userId: v.id("users"),
+          email: v.string(),
+          name: v.string(),
+          role: v.union(v.literal("student"), v.literal("teacher")),
+          reason: v.string(),
+          removedAt: v.number(),
+          removedByName: v.string(),
+        }),
+      ),
     }),
   ),
   handler: async (ctx, args) => {
@@ -168,6 +181,25 @@ export const get = query({
       .query("enrollments")
       .withIndex("by_cohort", (q) => q.eq("cohortId", cohort._id))
       .collect();
+    const departureRows = await ctx.db
+      .query("cohortDepartures")
+      .withIndex("by_cohort", (q) => q.eq("cohortId", cohort._id))
+      .order("desc")
+      .take(40);
+    const departures = [];
+    for (const d of departureRows) {
+      const remover = await ctx.db.get(d.removedBy);
+      departures.push({
+        _id: d._id,
+        userId: d.userId,
+        email: d.email,
+        name: d.name,
+        role: d.role,
+        reason: d.reason,
+        removedAt: d.removedAt,
+        removedByName: remover?.name ?? "Staff",
+      });
+    }
     return {
       cohort,
       students,
@@ -175,6 +207,7 @@ export const get = query({
       pendingInvites: invites
         .filter((i) => i.status === "invited")
         .map((i) => ({ _id: i._id, email: i.email, displayName: i.displayName, invitedAt: i.invitedAt })),
+      departures,
     };
   },
 });
@@ -348,16 +381,87 @@ export const addStudents = mutation({
 });
 
 export const removeStudent = mutation({
-  args: { cohortId: v.id("cohorts"), studentId: v.id("users") },
+  args: {
+    cohortId: v.id("cohorts"),
+    studentId: v.id("users"),
+    reason: v.string(),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const staff = await requireStaff(ctx);
-    await assertCohortAccess(ctx, staff, args.cohortId);
-    const row = await ctx.db
-      .query("cohortMembers")
-      .withIndex("by_cohort_user", (q) => q.eq("cohortId", args.cohortId).eq("userId", args.studentId))
-      .unique();
-    if (row && row.role === "student") await ctx.db.delete(row._id);
+    const cohort = await assertCohortAccess(ctx, staff, args.cohortId);
+    const released = await releaseMember(ctx, {
+      cohortId: args.cohortId,
+      userId: args.studentId,
+      role: "student",
+      reason: args.reason,
+      removedBy: staff._id,
+    });
+    if (released) {
+      await notifyUsers(ctx, [args.studentId], {
+        type: "announcement",
+        title: `You've been released from ${cohort.name}`,
+        body: "You still have access to the student portal. Ask an instructor if you think this was a mistake.",
+        href: "/dashboard",
+        actorId: staff._id,
+        skipEmail: true,
+      });
+    }
+    return null;
+  },
+});
+
+/** Admin only: assign one instructor to a cohort. */
+export const addTeacher = mutation({
+  args: { cohortId: v.id("cohorts"), teacherId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+    const cohort = await ctx.db.get(args.cohortId);
+    if (!cohort) throw new Error("Cohort not found");
+    const created = await addMember(ctx, args.cohortId, args.teacherId, "teacher", admin._id);
+    if (created) {
+      await notifyUsers(ctx, [args.teacherId], {
+        type: "announcement",
+        title: `You're now teaching ${cohort.name}`,
+        body: "The cohort appears in your Teacher Hub switcher.",
+        href: "/teacher/dashboard",
+        actorId: admin._id,
+      });
+    }
+    return null;
+  },
+});
+
+/** Admin only: release an instructor from a cohort and store the reason. */
+export const removeTeacher = mutation({
+  args: {
+    cohortId: v.id("cohorts"),
+    teacherId: v.id("users"),
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+    const cohort = await ctx.db.get(args.cohortId);
+    if (!cohort) throw new Error("Cohort not found");
+    const released = await releaseMember(ctx, {
+      cohortId: args.cohortId,
+      userId: args.teacherId,
+      role: "teacher",
+      reason: args.reason,
+      removedBy: admin._id,
+    });
+    if (released) {
+      await notifyUsers(ctx, [args.teacherId], {
+        type: "announcement",
+        title: `You're no longer teaching ${cohort.name}`,
+        body: "This cohort will drop off your Teacher Hub switcher.",
+        href: "/teacher/dashboard",
+        actorId: admin._id,
+        skipEmail: true,
+      });
+    }
     return null;
   },
 });

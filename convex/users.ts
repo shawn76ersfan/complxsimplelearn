@@ -10,7 +10,7 @@ import {
 } from "./lib/enrollmentAccess";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { addStudentToCohort, visibleStudents } from "./lib/cohortAccess";
+import { addMember, addStudentToCohort, visibleStudents } from "./lib/cohortAccess";
 
 const roleValidator = v.union(v.literal("admin"), v.literal("teacher"), v.literal("student"));
 
@@ -64,6 +64,22 @@ export const store = mutation({
       if (envRole === "admin" && existing.role !== "admin") patch.role = "admin";
       else if (envRole === "teacher" && existing.role === "student") patch.role = "teacher";
       await ctx.db.patch(existing._id, patch);
+
+      // Existing accounts who were later invited into a cohort join on next sign-in.
+      if (
+        existing.status !== "dropped" &&
+        enrollment?.status === "invited" &&
+        enrollment.cohortId
+      ) {
+        if (!envRole && existing.role === "student") {
+          await addStudentToCohort(ctx, enrollment.cohortId, existing._id, enrollment.invitedBy);
+          await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email: args.email });
+        } else if (isStaffRole(existing.role) || envRole) {
+          await addMember(ctx, enrollment.cohortId, existing._id, "teacher", enrollment.invitedBy);
+          await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email: args.email });
+        }
+      }
+
       return existing._id;
     }
 
@@ -78,6 +94,9 @@ export const store = mutation({
       });
       if (enrollment) {
         await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email: args.email });
+        if (enrollment.cohortId) {
+          await addMember(ctx, enrollment.cohortId, userId, "teacher", enrollment.invitedBy);
+        }
       }
       return userId;
     }

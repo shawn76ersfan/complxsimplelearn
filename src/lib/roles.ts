@@ -5,6 +5,9 @@ export function isAdmin(role: string | null | undefined): boolean {
   return role === "admin";
 }
 
+/** Same as `isAdmin`. Kept so Convex-style `isAdminRole` imports don't crash the app. */
+export const isAdminRole = isAdmin;
+
 export function isStaff(role: string | null | undefined): boolean {
   return role === "admin" || role === "teacher";
 }
