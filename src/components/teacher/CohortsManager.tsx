@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import {
   ArrowLeft,
   Archive,
+  BookOpen,
   CalendarDays,
   Check,
   Clock,
@@ -16,6 +17,7 @@ import {
   Mail,
   Pencil,
   Plus,
+  ScrollText,
   Shield,
   Trash2,
   UserMinus,
@@ -65,9 +67,9 @@ export function CohortsManager() {
       <section>
         <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
           <div>
-            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Cohorts</h2>
+            <h2 className="font-serif text-2xl font-bold" style={{ color: "var(--text)" }}>The shelves</h2>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Each cohort is one run of the program: its own roster, instructors, schedule, homework and recordings.
+              Each book is one run of the program: its own roster, instructors, schedule, homework and recordings.
             </p>
           </div>
           <button
@@ -134,26 +136,22 @@ function CohortCard({ summary, onOpen }: { summary: CohortSummary; onOpen: () =>
     <button
       type="button"
       onClick={onOpen}
-      className="card text-left overflow-hidden hover:-translate-y-0.5 transition-transform group"
-      style={{ opacity: status === "archived" ? 0.65 : 1 }}
+      className="book-cover text-left w-full hover:-translate-y-1 transition-transform group"
+      style={{ ["--book-color" as string]: cohort.color, opacity: status === "archived" ? 0.65 : 1 }}
     >
-      <div className="h-1.5" style={{ background: cohort.color }} />
-      <div className="p-5">
+      <div className="relative flex-1 p-5 min-w-0">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0"
-              style={{ background: cohort.color }}
-            >
-              {cohort.code ?? cohort.name.slice(0, 2).toUpperCase()}
-            </span>
-            <div className="min-w-0">
-              <p className="font-bold truncate" style={{ color: "var(--text)" }}>{cohort.name}</p>
-              <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                {formatCohortDate(cohort.startDate)}
-                {cohort.endDate ? ` – ${formatCohortDate(cohort.endDate)}` : " · open-ended"}
-              </p>
-            </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-1" style={{ color: cohort.color }}>
+              {cohort.code ?? "Cohort"}
+            </p>
+            <p className="font-serif text-xl font-bold leading-tight truncate" style={{ color: "var(--text)" }}>
+              {cohort.name}
+            </p>
+            <p className="text-xs truncate mt-1" style={{ color: "var(--text-muted)" }}>
+              {formatCohortDate(cohort.startDate)}
+              {cohort.endDate ? ` – ${formatCohortDate(cohort.endDate)}` : " · open-ended"}
+            </p>
           </div>
           <StatusPill status={status} />
         </div>
@@ -178,7 +176,7 @@ function CohortCard({ summary, onOpen }: { summary: CohortSummary; onOpen: () =>
 
         <div className="mt-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-muted)" }}>
-            <span className="flex items-center gap-1"><Users size={12} /> {activeStudentCount}</span>
+            <span className="flex items-center gap-1"><Users size={12} /> {activeStudentCount} names</span>
             {pendingInvites > 0 && (
               <span className="flex items-center gap-1"><Mail size={12} /> {pendingInvites} invited</span>
             )}
@@ -392,7 +390,8 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
   const data = useQuery(api.cohorts.get, { cohortId });
   const staff = useQuery(api.users.listStaff);
   const unassigned = useQuery(api.cohorts.listUnassignedStudents);
-  const setTeachers = useMutation(api.cohorts.setTeachers);
+  const addTeacher = useMutation(api.cohorts.addTeacher);
+  const removeTeacher = useMutation(api.cohorts.removeTeacher);
   const addStudents = useMutation(api.cohorts.addStudents);
   const removeStudent = useMutation(api.cohorts.removeStudent);
   const update = useMutation(api.cohorts.update);
@@ -402,6 +401,7 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState<Set<Id<"users">>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [release, setRelease] = useState<{ kind: "student" | "teacher"; id: Id<"users">; name: string } | null>(null);
 
   const teacherIds = useMemo(() => new Set(data?.teachers.map((t) => t._id) ?? []), [data]);
 
@@ -418,18 +418,36 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
   }
 
   const { cohort, students, teachers, pendingInvites } = data;
+  const departures = data.departures ?? [];
   const progress = cohortWeek(cohort.startDate, cohort.endDate);
   const active = students.filter((s) => s.status !== "dropped");
   const dropped = students.filter((s) => s.status === "dropped");
 
-  async function toggleTeacher(id: Id<"users">) {
-    const next = new Set(teacherIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+  async function toggleTeacher(id: Id<"users">, name: string) {
+    if (teacherIds.has(id)) {
+      setRelease({ kind: "teacher", id, name });
+      return;
+    }
     try {
-      await setTeachers({ cohortId, teacherIds: [...next] });
+      await addTeacher({ cohortId, teacherId: id });
+      toast.success(`${name} is now teaching this cohort`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not update instructors");
+    }
+  }
+
+  async function confirmRelease(reason: string) {
+    if (!release) return;
+    try {
+      if (release.kind === "student") {
+        await removeStudent({ cohortId, studentId: release.id, reason });
+      } else {
+        await removeTeacher({ cohortId, teacherId: release.id, reason });
+      }
+      toast.success(`Released ${release.name} from ${cohort.name}`);
+      setRelease(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not release from cohort");
     }
   }
 
@@ -471,17 +489,16 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
       </button>
 
       {/* Hero */}
-      <div className="card overflow-hidden">
-        <div className="h-2" style={{ background: cohort.color }} />
-        <div className="p-6">
+      <div className="book-cover" style={{ ["--book-color" as string]: cohort.color }}>
+        <div className="relative flex-1 p-6 min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
-              <span className="w-14 h-14 rounded-2xl flex items-center justify-center text-sm font-black text-white flex-shrink-0" style={{ background: cohort.color }}>
-                {cohort.code ?? cohort.name.slice(0, 2).toUpperCase()}
+              <span className="w-14 h-14 rounded-lg flex items-center justify-center text-sm font-black text-white flex-shrink-0 shadow-md" style={{ background: cohort.color }}>
+                <BookOpen size={22} />
               </span>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-2xl font-black truncate" style={{ color: "var(--text)" }}>{cohort.name}</h2>
+                  <h2 className="font-serif text-2xl font-bold truncate" style={{ color: "var(--text)" }}>{cohort.name}</h2>
                   <StatusPill status={cohort.status} />
                 </div>
                 <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
@@ -549,9 +566,9 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
                       <Flame size={11} style={{ color: "#F97316" }} /> {s.streak ?? 0}
                     </span>
                     <button
-                      onClick={() => removeStudent({ cohortId, studentId: s._id }).then(() => toast.success(`Removed ${s.name}`)).catch((e) => toast.error(e.message))}
+                      onClick={() => setRelease({ kind: "student", id: s._id, name: s.name })}
                       className="p-1.5 rounded-lg hover:opacity-70"
-                      title="Remove from cohort"
+                      title="Release from cohort"
                     >
                       <UserMinus size={14} style={{ color: "#EF4444" }} />
                     </button>
@@ -620,7 +637,7 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
                     <button
                       key={p._id}
                       type="button"
-                      onClick={() => toggleTeacher(p._id)}
+                      onClick={() => toggleTeacher(p._id, p.name)}
                       className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left"
                       style={{ background: on ? `${cohort.color}15` : "transparent", border: `1px solid ${on ? cohort.color : "var(--border)"}` }}
                     >
@@ -652,6 +669,27 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
                 </button>
               ))}
             </div>
+            {departures.length > 0 && (
+              <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                <SectionTitle icon={<ScrollText size={15} />} title="Released from class" small />
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {departures.map((d) => (
+                    <div key={d._id} className="rounded-lg px-2.5 py-2" style={{ background: "var(--surface-2)" }}>
+                      <p className="text-xs font-semibold" style={{ color: "var(--text)" }}>
+                        {d.name}{" "}
+                        <span className="font-medium" style={{ color: "var(--text-muted)" }}>
+                          · {d.role === "teacher" ? "instructor" : "student"}
+                        </span>
+                      </p>
+                      <p className="text-[11px] italic mt-0.5" style={{ color: "var(--text)" }}>&ldquo;{d.reason}&rdquo;</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                        {formatDate(d.removedAt)} · {d.removedByName}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
               {!confirmDelete ? (
                 <button onClick={() => setConfirmDelete(true)} className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "#EF4444" }}>
@@ -672,6 +710,110 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
           </section>
         </aside>
       </div>
+
+      {release && (
+        <ReleaseDialog
+          name={release.name}
+          kind={release.kind}
+          onCancel={() => setRelease(null)}
+          onConfirm={confirmRelease}
+        />
+      )}
+    </div>
+  );
+}
+
+const STUDENT_RELEASE_REASONS = [
+  "Withdrew from the program",
+  "Transferred to another cohort",
+  "Inactive / stopped attending",
+  "Schedule conflict",
+  "Other",
+];
+
+const TEACHER_RELEASE_REASONS = [
+  "No longer teaching this cohort",
+  "Transferred to another cohort",
+  "Left the school",
+  "Other",
+];
+
+function ReleaseDialog({
+  name,
+  kind,
+  onCancel,
+  onConfirm,
+}: {
+  name: string;
+  kind: "student" | "teacher";
+  onCancel: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const presets = kind === "teacher" ? TEACHER_RELEASE_REASONS : STUDENT_RELEASE_REASONS;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (reason.trim().length < 3) {
+      toast.error("Add a short reason for the record.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onConfirm(reason.trim());
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+      <form onSubmit={submit} className="card w-full max-w-md p-5 space-y-4">
+        <div>
+          <h3 className="font-serif text-lg font-bold" style={{ color: "var(--text)" }}>
+            Release {name} from this class
+          </h3>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+            They keep their account. This only removes them from the cohort roster, and stores your reason in the class record.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setReason(r === "Other" ? "" : r)}
+              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+              style={{
+                background: reason === r ? "#EF444415" : "var(--surface-2)",
+                color: reason === r ? "#EF4444" : "var(--text)",
+                border: `1px solid ${reason === r ? "#EF444466" : "var(--border)"}`,
+              }}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        <textarea
+          required
+          minLength={3}
+          rows={3}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Reason for release (required)"
+          className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none resize-none"
+          style={inputStyle}
+        />
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-medium" style={inputStyle}>
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: "#EF4444" }}>
+            {saving ? "Releasing…" : "Release from cohort"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

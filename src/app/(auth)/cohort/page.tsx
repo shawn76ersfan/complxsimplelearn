@@ -7,7 +7,7 @@ import { api } from "../../../../convex/_generated/api";
 import { MyCohortCard } from "@/components/cohort/MyCohortCard";
 import { formatCohortDate } from "@/components/teacher/CohortContext";
 import { getInitials, timeAgo } from "@/lib/utils";
-import { CalendarDays, GraduationCap, Megaphone, Pin, Users, ArrowRight } from "lucide-react";
+import { BookOpen, CalendarDays, GraduationCap, Megaphone, Pin, Users, ArrowRight } from "lucide-react";
 
 function todayISO(d = new Date()): string {
   const y = d.getFullYear();
@@ -52,12 +52,20 @@ export default function CohortPage() {
   if (mine !== undefined && !membership) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "var(--surface-2)" }}>
-          <GraduationCap size={26} style={{ color: "var(--text-muted)" }} />
+        <div
+          className="w-16 h-20 mx-auto mb-5 rounded-r-md flex items-center justify-center text-white"
+          style={{
+            background: "linear-gradient(90deg, rgba(0,0,0,0.25), transparent 40%), #2563EB",
+            boxShadow: "4px 6px 0 #1d4ed822",
+          }}
+        >
+          <BookOpen size={26} />
         </div>
-        <h1 className="text-2xl font-black mb-2" style={{ color: "var(--text)" }}>You&apos;re not in a cohort yet</h1>
+        <h1 className="font-serif text-3xl font-bold mb-2" style={{ color: "var(--text)" }}>
+          Your seat isn&apos;t assigned yet
+        </h1>
         <p className="text-sm max-w-md mx-auto" style={{ color: "var(--text-muted)" }}>
-          Once your instructor adds you to a class you&apos;ll see your schedule, classmates, and announcements here.
+          Once your instructor adds you to a class you&apos;ll see the roll book, schedule, and announcements here.
           Your lessons and homework still work in the meantime.
         </p>
         <Link
@@ -76,12 +84,16 @@ export default function CohortPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] mb-1" style={{ color: "var(--text-muted)" }}>My class</p>
-        <h1 className="text-3xl font-black" style={{ color: "var(--text)" }}>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] mb-1 flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
+          <GraduationCap size={13} /> The classroom
+        </p>
+        <h1 className="font-serif text-4xl font-bold leading-tight" style={{ color: "var(--text)" }}>
           {membership ? membership.cohort.name : "Loading…"}
         </h1>
         {membership?.cohort.description && (
-          <p className="text-sm mt-1 max-w-2xl" style={{ color: "var(--text-muted)" }}>{membership.cohort.description}</p>
+          <p className="text-sm mt-2 max-w-2xl leading-relaxed" style={{ color: "var(--text-muted)" }}>
+            {membership.cohort.description}
+          </p>
         )}
       </div>
 
@@ -90,11 +102,10 @@ export default function CohortPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        {/* Announcements feed */}
         <section id="announcements">
           <div className="flex items-center gap-2 mb-4">
             <Megaphone size={18} style={{ color }} />
-            <h2 className="text-lg font-bold" style={{ color: "var(--text)" }}>Announcements</h2>
+            <h2 className="font-serif text-xl font-bold" style={{ color: "var(--text)" }}>From the desk</h2>
           </div>
 
           {announcements === undefined ? (
@@ -102,10 +113,10 @@ export default function CohortPage() {
               {[1, 2, 3].map((i) => <div key={i} className="card h-24 animate-pulse" style={{ background: "var(--surface-2)" }} />)}
             </div>
           ) : announcements.length === 0 ? (
-            <div className="card p-8 text-center">
-              <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Nothing posted yet</p>
+            <div className="notebook-sheet card p-8 text-center">
+              <p className="font-serif font-bold" style={{ color: "var(--text)" }}>Blank page</p>
               <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                Your instructors&apos; announcements will show up here and in your notification bell.
+                Your instructors&apos; notes will show up here and in your notification bell.
               </p>
             </div>
           ) : (
@@ -113,7 +124,7 @@ export default function CohortPage() {
               {announcements.map((a) => (
                 <article
                   key={a._id}
-                  className="card p-5"
+                  className="notebook-sheet card p-5"
                   style={a.pinned ? { borderColor: `${a.cohortColor ?? color}66` } : undefined}
                 >
                   <div className="flex items-start gap-3">
@@ -145,7 +156,7 @@ export default function CohortPage() {
                           </span>
                         )}
                       </div>
-                      <h3 className="font-bold mt-1" style={{ color: "var(--text)" }}>{a.title}</h3>
+                      <h3 className="font-serif font-bold text-lg mt-1" style={{ color: "var(--text)" }}>{a.title}</h3>
                       <p className="text-sm mt-1 leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-muted)" }}>{a.body}</p>
                     </div>
                   </div>
@@ -155,21 +166,20 @@ export default function CohortPage() {
           )}
         </section>
 
-        {/* Sidebar: instructors + coming up */}
         <aside className="space-y-6">
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Users size={16} style={{ color }} />
-              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Your instructors</h2>
+              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>At the front of the room</h2>
             </div>
-            <div className="card divide-y" style={{ borderColor: "var(--border)" }}>
+            <div className="cork-board rounded-2xl p-3 space-y-2">
               {instructors === undefined ? (
-                <div className="p-4 h-16 animate-pulse" />
+                <div className="h-16 animate-pulse rounded-xl bg-black/10" />
               ) : instructors.length === 0 ? (
-                <p className="p-4 text-sm" style={{ color: "var(--text-muted)" }}>To be announced.</p>
+                <p className="p-3 text-sm bg-white/90 dark:bg-black/40 rounded-xl" style={{ color: "var(--text-muted)" }}>To be announced.</p>
               ) : (
                 instructors.map((t) => (
-                  <div key={t._id} className="p-3.5 flex items-center gap-3" style={{ borderColor: "var(--border)" }}>
+                  <div key={t._id} className="p-3 flex items-center gap-3 rounded-xl bg-white/92 dark:bg-black/45 shadow-sm">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white overflow-hidden flex-shrink-0"
                       style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}
@@ -192,16 +202,16 @@ export default function CohortPage() {
               )}
             </div>
             <Link href="/feedback" className="inline-flex items-center gap-1 mt-2 text-xs font-semibold" style={{ color }}>
-              Messages from your instructors <ArrowRight size={12} />
+              Notes from your instructors <ArrowRight size={12} />
             </Link>
           </section>
 
           <section>
             <div className="flex items-center gap-2 mb-3">
               <CalendarDays size={16} style={{ color }} />
-              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Coming up</h2>
+              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>On the board</h2>
             </div>
-            <div className="card divide-y" style={{ borderColor: "var(--border)" }}>
+            <div className="card divide-y overflow-hidden" style={{ borderColor: "var(--border)" }}>
               {upcoming === undefined ? (
                 <div className="p-4 h-16 animate-pulse" />
               ) : upcoming.length === 0 ? (
@@ -234,8 +244,8 @@ export default function CohortPage() {
           </section>
 
           {membership && (
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {formatCohortDate(membership.cohort.startDate)}
+            <p className="text-xs font-serif italic" style={{ color: "var(--text-muted)" }}>
+              Term: {formatCohortDate(membership.cohort.startDate)}
               {membership.cohort.endDate ? ` → ${formatCohortDate(membership.cohort.endDate)}` : ""}
             </p>
           )}

@@ -11,29 +11,31 @@ import { LogOut, AlertTriangle, Mail } from "lucide-react";
 function DroppedLockoutPage({ reason }: { reason?: string }) {
   const { signOut } = useClerk();
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--bg)" }}>
-      <div className="card p-10 max-w-md w-full text-center space-y-5">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "#EF444420" }}>
-          <AlertTriangle size={28} style={{ color: "#EF4444" }} />
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="index-card p-8 sm:p-10 pt-0 max-w-md w-full space-y-5">
+        <div className="index-card-title justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>Office notice</span>
+          <span className="stamp">Withdrawn</span>
+        </div>
+        <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: "#EF444420" }}>
+          <AlertTriangle size={26} style={{ color: "#EF4444" }} />
         </div>
         <div>
-          <h1 className="text-2xl font-black mb-2" style={{ color: "var(--text)" }}>
+          <h1 className="font-serif text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>
             You&apos;ve been removed from this course
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
             Your access to ComplxSimple has been revoked by your instructor.
           </p>
         </div>
         {reason && (
-          <div className="rounded-xl p-4 text-sm text-left" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>
-              Reason noted
-            </p>
-            <p style={{ color: "var(--text)" }}>{reason}</p>
+          <div className="sticky-note p-4 text-sm" style={{ ["--tilt" as string]: "-1deg" }}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-70 mb-1">Reason noted</p>
+            <p className="font-serif font-semibold leading-snug">{reason}</p>
           </div>
         )}
-        <div className="rounded-xl p-4 text-sm text-left" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>
+        <div className="rounded-lg p-4 text-sm" style={{ background: "var(--surface-2)", border: "1px dashed var(--border)" }}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1" style={{ color: "var(--text-muted)" }}>
             Need help?
           </p>
           <p className="flex items-center gap-2" style={{ color: "var(--text)" }}>
@@ -41,12 +43,8 @@ function DroppedLockoutPage({ reason }: { reason?: string }) {
             Contact your instructor: <strong>Cassandra Carter</strong>
           </p>
         </div>
-        <button
-          onClick={() => signOut({ redirectUrl: "/" })}
-          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
-        >
-          <LogOut size={16} /> Sign Out
+        <button onClick={() => signOut({ redirectUrl: "/" })} className="btn-paper w-full">
+          <LogOut size={16} /> Sign out
         </button>
       </div>
     </div>
@@ -56,33 +54,31 @@ function DroppedLockoutPage({ reason }: { reason?: string }) {
 function NotEnrolledPage() {
   const { signOut } = useClerk();
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--bg)" }}>
-      <div className="card p-10 max-w-md w-full text-center space-y-5">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "#F9731620" }}>
-          <Mail size={28} style={{ color: "#F97316" }} />
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="index-card p-8 sm:p-10 pt-0 max-w-md w-full space-y-5">
+        <div className="index-card-title justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>Front desk</span>
+          <span className="stamp ink">Not on roster</span>
+        </div>
+        <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: "#F9731620" }}>
+          <Mail size={26} style={{ color: "var(--accent)" }} />
         </div>
         <div>
-          <h1 className="text-2xl font-black mb-2" style={{ color: "var(--text)" }}>
+          <h1 className="font-serif text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>
             Invitation required
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
             ComplxSimple is invite-only. Your email is not on the roster yet, or your invitation was revoked.
           </p>
         </div>
-        <div className="rounded-xl p-4 text-sm text-left" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>
-            What to do
-          </p>
-          <p style={{ color: "var(--text)" }}>
+        <div className="sticky-note blue p-4 text-sm" style={{ ["--tilt" as string]: "1deg" }}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-70 mb-1">What to do</p>
+          <p className="leading-snug">
             Ask your instructor <strong>Cassandra Carter</strong> to send you an invitation email, then use the link in that message to finish setting up your account.
           </p>
         </div>
-        <button
-          onClick={() => signOut({ redirectUrl: "/" })}
-          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
-        >
-          <LogOut size={16} /> Sign Out
+        <button onClick={() => signOut({ redirectUrl: "/" })} className="btn-paper w-full">
+          <LogOut size={16} /> Sign out
         </button>
       </div>
     </div>
@@ -138,18 +134,23 @@ function NameSetupPage({ initialName }: { initialName?: string }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--bg)" }}>
-      <form onSubmit={handleSubmit} className="card p-10 max-w-md w-full space-y-5">
-        <div className="text-center">
-          <h1 className="text-2xl font-black mb-2" style={{ color: "var(--text)" }}>
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <form onSubmit={handleSubmit} className="index-card p-8 sm:p-10 pt-0 max-w-md w-full space-y-5">
+        <div className="index-card-title">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
+            Attendance sheet · First day
+          </span>
+        </div>
+        <div>
+          <h1 className="font-serif text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>
             What should we call you?
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Your name shows on your profile and in your instructor&apos;s student list.
+          <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
+            Your name shows on your profile and in your instructor&apos;s roll book.
           </p>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--text-muted)" }}>
+          <label className="block text-xs font-bold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-muted)" }}>
             Full name
           </label>
           <input
@@ -160,20 +161,15 @@ function NameSetupPage({ initialName }: { initialName?: string }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Shawn Holmes"
-            className="w-full px-4 py-3 rounded-xl text-sm outline-none"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+            className="w-full px-4 py-3 rounded-lg text-base font-serif outline-none"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderBottom: "2px solid var(--ink)", color: "var(--text)" }}
           />
         </div>
         {error && (
           <p className="text-sm" style={{ color: "#EF4444" }}>{error}</p>
         )}
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
-        >
-          {saving ? "Saving…" : "Continue"}
+        <button type="submit" disabled={saving} className="btn-ink w-full">
+          {saving ? "Saving…" : "Sign the sheet"}
         </button>
       </form>
     </div>

@@ -275,10 +275,10 @@ function TeacherHub() {
 
   function tabStyle(active: boolean) {
     return {
-      background: active ? "linear-gradient(135deg, var(--primary), var(--accent))" : "var(--surface-2)",
-      color: active ? "white" : "var(--text)",
-      border: `1px solid ${active ? "transparent" : "var(--border)"}`,
-      boxShadow: active ? "0 4px 15px rgba(37,99,235,0.3)" : "none",
+      background: active ? "var(--ink)" : "var(--surface)",
+      color: active ? "var(--paper)" : "var(--text)",
+      border: `1px solid ${active ? "var(--ink)" : "var(--border)"}`,
+      boxShadow: active ? "3px 3px 0 var(--accent)" : "none",
     } as const;
   }
 
@@ -287,15 +287,15 @@ function TeacherHub() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] mb-1 flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
-            Teacher Hub
+          <p className="eyebrow mb-2">
+            Teacher&apos;s lounge
             {isAdmin && (
-              <span className="inline-flex items-center gap-1 normal-case tracking-normal px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: "#2563EB15", color: "#2563EB" }}>
+              <span className="inline-flex items-center gap-1 normal-case tracking-normal px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: "#2563EB15", color: "var(--primary)" }}>
                 <ShieldCheck size={10} /> Admin
               </span>
             )}
           </p>
-          <h1 className="text-3xl font-black leading-tight" style={{ color: "var(--text)" }}>
+          <h1 className="font-serif text-4xl font-bold leading-tight tracking-tight" style={{ color: "var(--text)" }}>
             {hello}{profile?.name ? `, ${profile.name.split(" ")[0]}` : ""}
           </h1>
           {showSwitcher && (

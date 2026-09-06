@@ -1,7 +1,7 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { ArrowRight, Mail } from "lucide-react";
+import { ArrowRight, CalendarDays, Mail } from "lucide-react";
 import Link from "next/link";
 
 export function SignInBtn({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -27,40 +27,24 @@ export function HeroButtons() {
   const { openSignIn } = useClerk();
   return (
     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-      <button
-        onClick={() => openSignIn()}
-        className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-lg font-semibold text-white hover:opacity-90 transition-all hover:scale-105 active:scale-95 shadow-lg"
-        style={{ background: "linear-gradient(135deg, #2563EB, #F97316)", boxShadow: "0 8px 24px rgba(37,99,235,0.35)" }}
-      >
-        Student Sign In <ArrowRight size={20} />
+      <button onClick={() => openSignIn()} className="btn-ink text-base">
+        Student Sign In <ArrowRight size={18} />
       </button>
-      <a
-        href="#info-sessions"
-        className="px-8 py-4 rounded-2xl text-lg font-medium transition-all hover:scale-105 active:scale-95 text-center"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
-      >
+      <a href="#info-sessions" className="btn-paper text-base">
         View Info Sessions
       </a>
     </div>
   );
 }
 
-export function EnrollmentButtons() {
+export function EnrollmentButtons({ align = "start" }: { align?: "start" | "center" }) {
   return (
-    <div className="flex flex-col items-center gap-4">
-      <Link
-        href="/sign-in"
-        className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-lg font-semibold text-white hover:opacity-90 transition-opacity shadow-lg"
-        style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))", boxShadow: "0 8px 24px rgba(37,99,235,0.35)" }}
-      >
-        Sign In <ArrowRight size={20} />
+    <div className={`flex flex-col sm:flex-row gap-3 ${align === "center" ? "justify-center items-center" : "items-start"}`}>
+      <Link href="/sign-in" className="btn-ink text-base">
+        Take your seat <ArrowRight size={18} />
       </Link>
-      <a
-        href="#info-sessions"
-        className="text-sm font-medium hover:opacity-70 transition-opacity"
-        style={{ color: "var(--text-muted)" }}
-      >
-        View upcoming info sessions
+      <a href="#info-sessions" className="btn-paper text-base">
+        <CalendarDays size={17} /> Attend an info session
       </a>
     </div>
   );
@@ -68,9 +52,9 @@ export function EnrollmentButtons() {
 
 export function InviteOnlyNote({ className }: { className?: string }) {
   return (
-    <p className={`text-sm flex items-center justify-center gap-2 ${className ?? ""}`} style={{ color: "var(--text-muted)" }}>
+    <p className={`text-sm flex items-center gap-2 ${className ?? ""}`} style={{ color: "var(--text-muted)" }}>
       <Mail size={14} />
-      New accounts are by invitation only. Ask your instructor for access.
+      Enrollment is by invitation. Your instructor sends the link that unlocks your seat.
     </p>
   );
 }
