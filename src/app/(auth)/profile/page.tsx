@@ -13,7 +13,7 @@ import { CalendarWidget } from "@/components/teacher/CalendarWidget";
 export default function ProfilePage() {
   const { user } = useUser();
   const profile = useQuery(api.users.getMyProfile);
-  const myAttempts = useQuery(api.attempts.getMyAttempts);
+  const scores = useQuery(api.attempts.getMyScoreSummary);
   const tracks = useQuery(api.tracks.list);
   const updateProfile = useMutation(api.users.updateProfile);
 
@@ -44,9 +44,7 @@ export default function ProfilePage() {
     setEditing(false);
   }
 
-  const totalScore = myAttempts?.reduce((s, a) => s + a.score, 0) ?? 0;
-  const totalMax = myAttempts?.reduce((s, a) => s + a.maxScore, 0) ?? 0;
-  const overallPct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
+  const testAvg = scores?.testAvg ?? null;
   const isTeacher = profile?.role === "teacher";
 
   return (
@@ -127,8 +125,8 @@ export default function ProfilePage() {
       {!isTeacher && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {[
-            { label: "Overall Score", value: `${overallPct}%`, icon: Trophy, color: "#2563EB" },
-            { label: "Lessons Done", value: myAttempts?.length ?? 0, icon: BookOpen, color: "#0EA5E9" },
+            { label: "Test avg", value: testAvg === null ? "—" : `${testAvg}%`, icon: Trophy, color: "#2563EB" },
+            { label: "Lessons Done", value: scores?.completedLessons ?? 0, icon: BookOpen, color: "#0EA5E9" },
             { label: "Tracks Enrolled", value: tracks?.length ?? 0, icon: GraduationCap, color: "#F59E0B" },
           ].map((stat) => (
             <div key={stat.label} className="card p-5 flex items-center gap-3">
@@ -136,7 +134,7 @@ export default function ProfilePage() {
                 <stat.icon size={18} style={{ color: stat.color }} />
               </div>
               <div>
-                <p className={cn("text-2xl font-black", stat.label === "Overall Score" ? percentageColor(overallPct) : "")} style={{ color: stat.label !== "Overall Score" ? "var(--text)" : undefined }}>
+                <p className={cn("text-2xl font-black", stat.label === "Test avg" && testAvg !== null ? percentageColor(testAvg) : "")} style={{ color: stat.label !== "Test avg" ? "var(--text)" : undefined }}>
                   {stat.value}
                 </p>
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>{stat.label}</p>

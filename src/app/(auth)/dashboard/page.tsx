@@ -220,17 +220,14 @@ function QuoteCard() {
 export default function StudentDashboard() {
   const { user } = useUser();
   const tracks = useQuery(api.tracks.list);
-  const myAttempts = useQuery(api.attempts.getMyAttempts);
+  const scores = useQuery(api.attempts.getMyScoreSummary);
   const profile = useQuery(api.users.getMyProfile);
   const progress = useQuery(api.assignments.getMyProgress);
   const activeWarnings = useQuery(api.feedback.getActiveWarnings);
   const acknowledgeWarning = useMutation(api.feedback.acknowledgeWarning);
   const instructor = useInstructorName();
 
-  const totalScore = myAttempts?.reduce((s, a) => s + a.score, 0) ?? 0;
-  const totalMax   = myAttempts?.reduce((s, a) => s + a.maxScore, 0) ?? 0;
-  const overallPct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
-
+  const testAvg = scores?.testAvg ?? null;
   const level = progress?.level ?? 0;
   const completedCount = progress?.completedCount ?? 0;
   const totalCount = progress?.totalCount ?? 0;
@@ -300,12 +297,12 @@ export default function StudentDashboard() {
           <DenseLevel level={level} completedCount={completedCount} totalCount={totalCount} />
         </div>
         {[
-          { label: "Score", value: `${overallPct}%`, icon: Trophy, color: "var(--primary)" },
-          { label: "Lessons", value: myAttempts?.length ?? 0, icon: BookOpen, color: "var(--secondary)" },
+          { label: "Test avg", value: testAvg === null ? "—" : `${testAvg}%`, icon: Trophy, color: "var(--primary)" },
+          { label: "Lessons", value: scores?.completedLessons ?? 0, icon: BookOpen, color: "var(--secondary)" },
           { label: "Homework", value: completedCount, icon: Star, color: "var(--accent)" },
-          { label: "Streak", value: streak, icon: Flame, color: "var(--accent)" },
+          { label: streak === 1 ? "1-day streak" : `${streak}-day streak`, value: streak, icon: Flame, color: "var(--accent)", title: "Days in a row you completed a lesson or turned in homework" },
         ].map((stat) => (
-          <div key={stat.label} className="card flex items-center gap-2.5 p-3.5">
+          <div key={stat.label} className="card flex items-center gap-2.5 p-3.5" title={"title" in stat ? stat.title : undefined}>
             <div className="flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg" style={{ background: "var(--surface-2)" }}>
               <stat.icon size={14} style={{ color: stat.color }} />
             </div>

@@ -38,6 +38,7 @@ import type * as lib_platformFacts from "../lib/platformFacts.js";
 import type * as lib_resumeRubrics from "../lib/resumeRubrics.js";
 import type * as lib_resumeScore from "../lib/resumeScore.js";
 import type * as lib_roles from "../lib/roles.js";
+import type * as lib_scoring from "../lib/scoring.js";
 import type * as lib_teacherEmails from "../lib/teacherEmails.js";
 import type * as notifications from "../notifications.js";
 import type * as quotes from "../quotes.js";
@@ -87,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   "lib/resumeRubrics": typeof lib_resumeRubrics;
   "lib/resumeScore": typeof lib_resumeScore;
   "lib/roles": typeof lib_roles;
+  "lib/scoring": typeof lib_scoring;
   "lib/teacherEmails": typeof lib_teacherEmails;
   notifications: typeof notifications;
   quotes: typeof quotes;

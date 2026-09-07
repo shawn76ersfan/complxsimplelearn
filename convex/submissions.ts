@@ -7,6 +7,7 @@ import { getCurrentUser, requireStaff } from "./_lib/auth";
 import { notifyUsers, teacherIds } from "./lib/notify";
 import { assertStudentAccess, contentInScope, teachingScope } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
+import { bumpUserStreak } from "./lib/scoring";
 
 export const r2 = new R2(components.r2);
 
@@ -144,10 +145,11 @@ export const submit = mutation({
         submittedAt: now,
         status: "submitted",
       });
+      await bumpUserStreak(ctx, user);
       return existing._id;
     }
 
-    return await ctx.db.insert("assignmentSubmissions", {
+    const submissionId = await ctx.db.insert("assignmentSubmissions", {
       assignmentId: args.assignmentId,
       studentId: user._id,
       textContent: text,
@@ -158,6 +160,8 @@ export const submit = mutation({
       submittedAt: now,
       status: "submitted",
     });
+    await bumpUserStreak(ctx, user);
+    return submissionId;
   },
 });
 

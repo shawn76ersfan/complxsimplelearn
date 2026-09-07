@@ -537,7 +537,7 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
             <Stat label="Active students" value={active.length} />
             <Stat label="Instructors" value={teachers.length} />
             <Stat label="Invited" value={pendingInvites.length} />
-            <Stat label="Avg streak" value={active.length ? Math.round(active.reduce((n, s) => n + (s.streak ?? 0), 0) / active.length) : 0} icon={<Flame size={12} style={{ color: "#F97316" }} />} />
+            <Stat label="Avg days in a row" value={active.length ? Math.round(active.reduce((n, s) => n + (s.streak ?? 0), 0) / active.length) : 0} icon={<Flame size={12} style={{ color: "#F97316" }} />} />
           </div>
         </div>
       </div>
@@ -562,8 +562,8 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
                       <Link href={`/teacher/students/${s._id}`} className="font-semibold text-sm truncate block hover:underline" style={{ color: "var(--text)" }}>{s.name}</Link>
                       <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{s.email} · joined {formatDate(s.memberSince)}</p>
                     </div>
-                    <span className="hidden sm:flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                      <Flame size={11} style={{ color: "#F97316" }} /> {s.streak ?? 0}
+                    <span className="hidden sm:flex items-center gap-1 text-xs" title="Days in a row they completed a lesson or turned in homework" style={{ color: "var(--text-muted)" }}>
+                      <Flame size={11} style={{ color: "#F97316" }} /> {s.streak ?? 0}-day
                     </span>
                     <button
                       onClick={() => setRelease({ kind: "student", id: s._id, name: s.name })}
