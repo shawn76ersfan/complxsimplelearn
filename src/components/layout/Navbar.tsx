@@ -7,7 +7,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { NotificationBell } from "./NotificationBell";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { BookOpen, BookMarked, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare, Users } from "lucide-react";
+import { BookOpen, BookMarked, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare, Users, Pin } from "lucide-react";
 import { useState } from "react";
 import { isStaff } from "@/lib/roles";
 
@@ -22,6 +22,7 @@ export function Navbar() {
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     ...(!isTeacher ? [{ href: "/cohort", label: "My Class", icon: Users }] : []),
+    { href: "/board", label: "Board", icon: Pin },
     { href: "/learn",     label: "Learn",     icon: BookOpen },
     { href: "/videos",    label: "Videos",    icon: Video },
     ...(!isTeacher

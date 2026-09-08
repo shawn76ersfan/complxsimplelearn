@@ -41,6 +41,43 @@ export function contentInScope(
   return cohortId === undefined || scopeIncludes(scope, cohortId);
 }
 
+/**
+ * Board / attendance: admins may enter any cohort. Everyone else must
+ * be a member of that cohort (student or assigned instructor).
+ */
+export async function assertBoardAccess(
+  ctx: Ctx,
+  user: Doc<"users">,
+  cohortId: Id<"cohorts">,
+): Promise<Doc<"cohorts">> {
+  const cohort = await ctx.db.get(cohortId);
+  if (!cohort) throw new Error("Cohort not found");
+  if (isAdminRole(user.role)) return cohort;
+  if (user.status === "dropped") throw new Error("Account is inactive");
+
+  const membership = await ctx.db
+    .query("cohortMembers")
+    .withIndex("by_cohort_user", (q) => q.eq("cohortId", cohortId).eq("userId", user._id))
+    .unique();
+  if (!membership) {
+    throw new Error("You are not in this cohort");
+  }
+  return cohort;
+}
+
+export async function canAccessBoard(
+  ctx: Ctx,
+  user: Doc<"users">,
+  cohortId: Id<"cohorts">,
+): Promise<boolean> {
+  try {
+    await assertBoardAccess(ctx, user, cohortId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Throws unless the staff member may manage this cohort. */
 export async function assertCohortAccess(
   ctx: Ctx,

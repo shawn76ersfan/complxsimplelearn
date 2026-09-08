@@ -163,13 +163,22 @@ export function MyCohortCard({ compact = false, className = "" }: { compact?: bo
               </a>
             )}
             {!compact && (
-              <Link
-                href="/cohort"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors"
-                style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
-              >
-                Class page <ArrowRight size={14} />
-              </Link>
+              <>
+                <Link
+                  href="/board"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
+                  style={{ background: color }}
+                >
+                  Open Board <ArrowRight size={14} />
+                </Link>
+                <Link
+                  href="/cohort"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+                >
+                  Class page <ArrowRight size={14} />
+                </Link>
+              </>
             )}
           </div>
         </div>

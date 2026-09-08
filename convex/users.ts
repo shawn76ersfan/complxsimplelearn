@@ -11,6 +11,8 @@ import {
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { addMember, addStudentToCohort, visibleStudents } from "./lib/cohortAccess";
+import { splitDisplayName } from "./lib/names";
+import { isUsState } from "./lib/usStates";
 
 const roleValidator = v.union(v.literal("admin"), v.literal("teacher"), v.literal("student"));
 
@@ -52,12 +54,23 @@ export const store = mutation({
     );
 
     if (existing) {
-      const patch: { name?: string; imageUrl?: string; role?: "admin" | "teacher" } = {
+      const patch: {
+        name?: string;
+        firstName?: string;
+        lastName?: string;
+        imageUrl?: string;
+        role?: "admin" | "teacher";
+      } = {
         imageUrl: args.imageUrl,
       };
       // Never overwrite a real name with the placeholder "Student"
       if (!isPlaceholderName(name) || isPlaceholderName(existing.name)) {
         patch.name = name;
+        if (!existing.firstName || !existing.lastName) {
+          const parts = splitDisplayName(name);
+          if (parts.firstName && !existing.firstName) patch.firstName = parts.firstName;
+          if (parts.lastName && !existing.lastName) patch.lastName = parts.lastName;
+        }
       }
       // Promote when the env config outranks the stored role (teacher -> admin,
       // student -> staff). Never demote automatically.
@@ -84,10 +97,13 @@ export const store = mutation({
     }
 
     if (isStaffRole(role)) {
+      const staffParts = splitDisplayName(name);
       const userId = await ctx.db.insert("users", {
         clerkId: args.clerkId,
         email: args.email,
         name,
+        firstName: staffParts.firstName || undefined,
+        lastName: staffParts.lastName || undefined,
         imageUrl: args.imageUrl,
         role,
         createdAt: Date.now(),
@@ -106,10 +122,13 @@ export const store = mutation({
       throw new Error("NOT_ENROLLED");
     }
 
+    const studentParts = splitDisplayName(name);
     const userId = await ctx.db.insert("users", {
       clerkId: args.clerkId,
       email: args.email,
       name,
+      firstName: studentParts.firstName || undefined,
+      lastName: studentParts.lastName || undefined,
       imageUrl: args.imageUrl,
       role: "student",
       createdAt: Date.now(),
@@ -156,11 +175,51 @@ export const listStudents = query({
 
 export const updateProfile = mutation({
   args: {
-    name: v.string(),
+    name: v.optional(v.string()),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    state: v.optional(v.string()),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
-    await ctx.db.patch(user._id, { name: args.name });
+    const first = args.firstName?.trim();
+    const last = args.lastName?.trim();
+    const state = args.state?.trim();
+    let display = args.name?.trim();
+    if (first && last) display = `${first} ${last}`;
+    else if (first) display = first;
+
+    if (display !== undefined) {
+      if (display.length < 2 || display.toLowerCase() === "student") {
+        throw new Error("Please enter your real first and last name");
+      }
+    }
+    if (state !== undefined && !isUsState(state)) {
+      throw new Error("Pick a valid state");
+    }
+
+    const patch: {
+      name?: string;
+      firstName?: string;
+      lastName?: string;
+      state?: string;
+    } = {};
+    if (display) patch.name = display;
+    if (first !== undefined) {
+      if (!first) throw new Error("First name is required");
+      patch.firstName = first;
+    }
+    if (last !== undefined) {
+      if (!last) throw new Error("Last name is required");
+      patch.lastName = last;
+    }
+    if (state !== undefined) patch.state = state;
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(user._id, patch);
+    }
+    return null;
   },
 });
 

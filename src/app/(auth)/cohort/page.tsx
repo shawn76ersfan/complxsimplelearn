@@ -7,7 +7,7 @@ import { api } from "../../../../convex/_generated/api";
 import { MyCohortCard } from "@/components/cohort/MyCohortCard";
 import { formatCohortDate } from "@/components/teacher/CohortContext";
 import { getInitials, timeAgo } from "@/lib/utils";
-import { BookOpen, CalendarDays, GraduationCap, Megaphone, Pin, Users, ArrowRight } from "lucide-react";
+import { BookOpen, CalendarDays, GraduationCap, Megaphone, Pin, Users, ArrowRight, MessageSquare } from "lucide-react";
 
 function todayISO(d = new Date()): string {
   const y = d.getFullYear();
@@ -99,6 +99,13 @@ export default function CohortPage() {
 
       <div className="mb-8">
         <MyCohortCard compact />
+        <Link
+          href="/board"
+          className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-xl text-sm font-bold text-white"
+          style={{ background: color }}
+        >
+          <MessageSquare size={14} /> Open the Board
+        </Link>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -209,7 +216,7 @@ export default function CohortPage() {
           <section>
             <div className="flex items-center gap-2 mb-3">
               <CalendarDays size={16} style={{ color }} />
-              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>On the board</h2>
+              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>On the calendar</h2>
             </div>
             <div className="card divide-y overflow-hidden" style={{ borderColor: "var(--border)" }}>
               {upcoming === undefined ? (

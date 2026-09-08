@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { LogOut, AlertTriangle, Mail } from "lucide-react";
+import { US_STATES } from "@/lib/usStates";
 
 function DroppedLockoutPage({ reason }: { reason?: string }) {
   const { signOut } = useClerk();
@@ -91,42 +92,68 @@ function needsDisplayName(name: string | undefined): boolean {
   return trimmed.length === 0 || trimmed.toLowerCase() === "student";
 }
 
-function NameSetupPage({ initialName }: { initialName?: string }) {
+function splitInitialName(initialName?: string): { first: string; last: string } {
+  if (!initialName || needsDisplayName(initialName)) return { first: "", last: "" };
+  const parts = initialName.trim().split(/\s+/);
+  return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
+}
+
+function NameSetupPage({
+  initialName,
+  initialFirst,
+  initialLast,
+  initialState,
+  requireState,
+}: {
+  initialName?: string;
+  initialFirst?: string;
+  initialLast?: string;
+  initialState?: string;
+  requireState: boolean;
+}) {
   const { user } = useUser();
   const updateProfile = useMutation(api.users.updateProfile);
-  const [name, setName] = useState(initialName && !needsDisplayName(initialName) ? initialName : "");
+  const split = splitInitialName(initialName);
+  const [firstName, setFirstName] = useState(initialFirst || split.first);
+  const [lastName, setLastName] = useState(initialLast || split.last);
+  const [state, setState] = useState(initialState ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = name.trim();
-    if (trimmed.length < 2) {
-      setError("Please enter your full name (at least 2 characters).");
+    const first = firstName.trim();
+    const last = lastName.trim();
+    if (first.length < 1 || last.length < 1) {
+      setError("Please enter your first and last name.");
       return;
     }
-    if (needsDisplayName(trimmed)) {
+    if (needsDisplayName(first) || needsDisplayName(`${first} ${last}`)) {
       setError("Please enter your real name.");
+      return;
+    }
+    if (requireState && !state) {
+      setError("Please pick the state you attend from.");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      // Best-effort sync to Clerk (requires First/last name enabled in Dashboard)
       if (user) {
-        const parts = trimmed.split(/\s+/);
-        const firstName = parts[0] ?? trimmed;
-        const lastName = parts.slice(1).join(" ");
         try {
           await user.update({
-            firstName,
-            ...(lastName ? { lastName } : {}),
+            firstName: first,
+            lastName: last,
           });
         } catch {
           // Convex profile is the source of truth for the roster
         }
       }
-      await updateProfile({ name: trimmed });
+      await updateProfile({
+        firstName: first,
+        lastName: last,
+        ...(requireState || state ? { state } : {}),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save your name");
       setSaving(false);
@@ -146,25 +173,60 @@ function NameSetupPage({ initialName }: { initialName?: string }) {
             What should we call you?
           </h1>
           <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
-            Your name shows on your profile and in your instructor&apos;s roll book.
+            First and last name show on the Board and roll book
+            {requireState ? ", along with the state you join class from." : "."}
           </p>
         </div>
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-muted)" }}>
-            Full name
-          </label>
-          <input
-            type="text"
-            autoFocus
-            required
-            minLength={2}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Shawn Holmes"
-            className="w-full px-4 py-3 rounded-lg text-base font-serif outline-none"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderBottom: "2px solid var(--ink)", color: "var(--text)" }}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-muted)" }}>
+              First name
+            </label>
+            <input
+              type="text"
+              autoFocus
+              required
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Shawn"
+              className="w-full px-4 py-3 rounded-lg text-base font-serif outline-none"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderBottom: "2px solid var(--ink)", color: "var(--text)" }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-muted)" }}>
+              Last name
+            </label>
+            <input
+              type="text"
+              required
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Holmes"
+              className="w-full px-4 py-3 rounded-lg text-base font-serif outline-none"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderBottom: "2px solid var(--ink)", color: "var(--text)" }}
+            />
+          </div>
         </div>
+        {requireState && (
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-muted)" }}>
+              State
+            </label>
+            <select
+              required
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg text-base outline-none"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderBottom: "2px solid var(--ink)", color: "var(--text)" }}
+            >
+              <option value="">Where you join class from</option>
+              {US_STATES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {error && (
           <p className="text-sm" style={{ color: "#EF4444" }}>{error}</p>
         )}
@@ -240,10 +302,27 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     return <DroppedLockoutPage reason={profile.droppedReason} />;
   }
 
-  // Gate: collect a real display name (covers invites before Clerk name fields were required)
-  if (profile && needsDisplayName(profile.name)) {
+  // Gate: first + last (and state for students) for the Board and roll book
+  const missingIdentity = Boolean(
+    profile &&
+    (
+      !profile.firstName?.trim() ||
+      !profile.lastName?.trim() ||
+      (profile.role === "student" && !profile.state?.trim()) ||
+      needsDisplayName(profile.name)
+    ),
+  );
+  if (profile && missingIdentity) {
     const clerkName = user?.fullName ?? user?.firstName ?? "";
-    return <NameSetupPage initialName={!needsDisplayName(clerkName) ? clerkName : undefined} />;
+    return (
+      <NameSetupPage
+        initialName={!needsDisplayName(clerkName) ? clerkName : undefined}
+        initialFirst={profile.firstName}
+        initialLast={profile.lastName}
+        initialState={profile.state}
+        requireState={profile.role === "student"}
+      />
+    );
   }
 
   return (

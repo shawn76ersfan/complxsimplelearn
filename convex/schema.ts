@@ -6,6 +6,9 @@ export default defineSchema({
     clerkId: v.string(),
     email: v.string(),
     name: v.string(),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    state: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     // admin = runs the school (Cassandra + dev); teacher = instructor scoped to
     // their cohorts; student = learner. See convex/lib/roles.ts.
@@ -407,4 +410,35 @@ export default defineSchema({
     .index("by_recorded_date", ["recordedDate"])
     .index("by_created_at", ["createdAt"])
     .index("by_cohort", ["cohortId"]),
+
+  // One Board thread per cohort. Only members (plus admins) can read/write.
+  boardMessages: defineTable({
+    cohortId: v.id("cohorts"),
+    authorId: v.id("users"),
+    body: v.string(),
+    imageKey: v.optional(v.string()),
+    imageContentType: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_cohort_created", ["cohortId", "createdAt"])
+    .index("by_author_created", ["authorId", "createdAt"]),
+
+  // Admin-marked attendance for a cohort meeting day.
+  attendance: defineTable({
+    cohortId: v.id("cohorts"),
+    studentId: v.id("users"),
+    date: v.string(), // YYYY-MM-DD
+    status: v.union(
+      v.literal("present"),
+      v.literal("late"),
+      v.literal("absent"),
+      v.literal("excused"),
+    ),
+    note: v.optional(v.string()),
+    markedBy: v.id("users"),
+    markedAt: v.number(),
+  })
+    .index("by_cohort_date", ["cohortId", "date"])
+    .index("by_student_date", ["studentId", "date"])
+    .index("by_cohort_student_date", ["cohortId", "studentId", "date"]),
 });
