@@ -3,24 +3,9 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import Link from "next/link";
-import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Tv, ExternalLink, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge } from "lucide-react";
+import { ArrowRight, Tv, ExternalLink } from "lucide-react";
 import { useInstructorName } from "@/components/cohort/useInstructorName";
-
-const TRACK_ICONS: Record<string, React.ElementType> = {
-  hardware:     Cpu,
-  ai:           Brain,
-  cybersecurity: Shield,
-  linux:        Terminal,
-  aws:          Cloud,
-  azure:        Cloud,
-  "version-control": GitBranch,
-  docker:       Container,
-  kubernetes:   Boxes,
-  terraform:    Layers,
-  ansible:      Wrench,
-  cicd:         Workflow,
-  monitoring:   Gauge,
-};
+import { TrackIcon } from "@/lib/trackIcons";
 
 export default function LearnPage() {
   const tracks = useQuery(api.tracks.list);
@@ -69,7 +54,6 @@ export default function LearnPage() {
               {[...tracks]
                 .sort((a, b) => a.order - b.order)
                 .map((track, i) => {
-                  const Icon = TRACK_ICONS[track.slug] ?? BookOpen;
                   return (
                     <Link
                       key={track._id}
@@ -82,7 +66,7 @@ export default function LearnPage() {
                           className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0"
                           style={{ background: `${track.color}1a`, border: `1px solid ${track.color}44` }}
                         >
-                          <Icon size={26} style={{ color: track.color }} />
+                          <TrackIcon slug={track.slug} icon={track.icon} size={26} style={{ color: track.color }} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1" style={{ color: track.color }}>
