@@ -47,14 +47,14 @@ function blocksToEditable(blocks: LessonBlock[]): EditableBlock[] {
         return {
           type: "fillblank",
           prompt: b.prompt,
-          accepted: b.accepted.map((group) => group.join("|")).join("\n"),
+          accepted: (b.accepted ?? []).map((group) => group.join("|")).join("\n"),
         };
       case "quiz":
         return {
           type: "quiz",
           question: b.question,
           options: b.options.join("\n"),
-          correctIndex: b.correctIndex,
+          correctIndex: b.correctIndex ?? 0,
           explanation: b.explanation ?? "",
         };
       case "match":

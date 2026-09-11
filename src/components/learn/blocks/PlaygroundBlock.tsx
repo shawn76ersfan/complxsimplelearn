@@ -13,6 +13,25 @@ interface Props {
   onComplete: (score: number, maxScore: number) => void;
 }
 
+function escapeScript(code: string): string {
+  return code.replace(/<\/script/gi, "<\\/script");
+}
+
+function wrapJsPreview(code: string): string {
+  return `<!DOCTYPE html><html><body><pre id="out" style="margin:0;padding:12px;font:14px/1.4 ui-monospace,monospace;white-space:pre-wrap"></pre>
+<script>
+const out = document.getElementById("out");
+const write = (...args) => { out.textContent += args.map(String).join(" ") + "\\n"; };
+console.log = write; console.error = write; console.warn = write;
+try {
+${escapeScript(code)}
+} catch (e) {
+  write("Error: " + (e && e.message ? e.message : e));
+}
+if (!out.textContent) out.textContent = "(no output — try adding console.log())";
+</script></body></html>`;
+}
+
 export function PlaygroundBlock({ language, code: initialCode, onComplete }: Props) {
   const [code, setCode] = useState(initialCode);
   const [output, setOutput] = useState<string | null>(null);
@@ -39,14 +58,7 @@ export function PlaygroundBlock({ language, code: initialCode, onComplete }: Pro
     if (language === "html") {
       setOutput(code);
     } else {
-      const logs: string[] = [];
-      try {
-        const sandbox = new Function("console", code);
-        sandbox({ log: (...args: unknown[]) => logs.push(args.map(String).join(" ")), error: (...args: unknown[]) => logs.push("Error: " + args.join(" ")) });
-        setOutput(logs.length > 0 ? logs.join("\n") : "(no output — try adding console.log())");
-      } catch (e) {
-        setOutput(`Error: ${(e as Error).message}`);
-      }
+      setOutput(wrapJsPreview(code));
     }
     if (!completed) {
       setCompleted(true);
@@ -96,13 +108,13 @@ export function PlaygroundBlock({ language, code: initialCode, onComplete }: Pro
       {/* Output */}
       {output !== null && (
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-          {language === "html" ? (
+          {language === "html" || language === "js" ? (
             <iframe
               srcDoc={output}
               sandbox="allow-scripts"
               className="w-full bg-white"
               style={{ height: "200px", display: "block" }}
-              title="HTML Preview"
+              title="Code Preview"
             />
           ) : (
             <pre className="p-4 text-sm font-mono leading-relaxed overflow-x-auto" style={{ background: "var(--surface-2)", color: "#38BDF8", minHeight: "60px" }}>

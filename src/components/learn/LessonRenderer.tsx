@@ -10,12 +10,23 @@ import { MatchBlock } from "./blocks/MatchBlock";
 import { CrosswordBlock } from "./blocks/CrosswordBlock";
 import { PlaygroundBlock } from "./blocks/PlaygroundBlock";
 import { useSoundFeedback } from "@/lib/useSoundFeedback";
+import { Id } from "../../../convex/_generated/dataModel";
 
-interface BlockCompletion { score: number; max: number }
+interface BlockCompletion { score: number; max: number; selected?: number; texts?: string[]; completed?: boolean }
+
+export type LessonSubmitPayload = {
+  blockAnswers: Array<{
+    blockIndex: number;
+    selected?: number;
+    texts?: string[];
+    completed?: boolean;
+  }>;
+};
 
 interface Props {
+  lessonId: Id<"lessons">;
   contentJson: string;
-  onComplete: (score: number, maxScore: number) => void;
+  onComplete: (payload: LessonSubmitPayload) => void;
   locked?: boolean;
 }
 
@@ -26,7 +37,7 @@ function StaticBlock({ block }: { block: LessonBlock }) {
   return <LessonContent contentJson={fakeJson} />;
 }
 
-export function LessonRenderer({ contentJson, onComplete, locked = false }: Props) {
+export function LessonRenderer({ lessonId, contentJson, onComplete, locked = false }: Props) {
   const blocks = useMemo(() => parseBlocks(contentJson), [contentJson]);
   const { playComplete } = useSoundFeedback();
 
@@ -53,15 +64,25 @@ export function LessonRenderer({ contentJson, onComplete, locked = false }: Prop
 
   /** Called by each interactive block when the user finishes it. */
   const makeBlockCompleter = useCallback(
-    (index: number) => (score: number, max: number) => {
-      setCompletionMap((prev) => ({ ...prev, [index]: { score, max } }));
+    (index: number) => (detail: { score: number; max: number; selected?: number; texts?: string[] }) => {
+      setCompletionMap((prev) => ({
+        ...prev,
+        [index]: { ...detail, completed: true },
+      }));
     },
     []
   );
 
   function handleComplete() {
     playComplete();
-    onComplete(totalScore, totalMax);
+    onComplete({
+      blockAnswers: Object.entries(completionMap).map(([index, detail]) => ({
+        blockIndex: Number(index),
+        selected: detail.selected,
+        texts: detail.texts,
+        completed: true,
+      })),
+    });
   }
 
   // If already completed and has graded interactive content, show locked state
@@ -92,7 +113,6 @@ export function LessonRenderer({ contentJson, onComplete, locked = false }: Prop
           return <StaticBlock key={i} block={block} />;
         }
 
-        const completer = makeBlockCompleter(i);
         const isDone = i in completionMap;
         const activityNumber = interactiveIndices.indexOf(i) + 1;
 
@@ -117,28 +137,34 @@ export function LessonRenderer({ contentJson, onComplete, locked = false }: Prop
               {isDone ? "Done" : `Activity ${activityNumber} of ${interactiveIndices.length}`}
             </span>
             {block.type === "flashcard" && (
-              <FlashcardBlock front={block.front} back={block.back} onComplete={completer} />
+              <FlashcardBlock front={block.front} back={block.back} onComplete={() => makeBlockCompleter(i)({ score: 1, max: 1 })} />
             )}
             {block.type === "fillblank" && (
-              <FillBlankBlock prompt={block.prompt} accepted={block.accepted} onComplete={completer} />
+              <FillBlankBlock
+                lessonId={lessonId}
+                blockIndex={i}
+                prompt={block.prompt}
+                blankCount={block.blankCount ?? block.accepted?.length ?? 1}
+                onComplete={(detail) => makeBlockCompleter(i)(detail)}
+              />
             )}
             {block.type === "quiz" && (
               <QuizBlock
+                lessonId={lessonId}
+                blockIndex={i}
                 question={block.question}
                 options={block.options}
-                correctIndex={block.correctIndex}
-                explanation={block.explanation}
-                onComplete={completer}
+                onComplete={(detail) => makeBlockCompleter(i)(detail)}
               />
             )}
             {block.type === "match" && (
-              <MatchBlock pairs={block.pairs} onComplete={completer} />
+              <MatchBlock pairs={block.pairs} onComplete={() => makeBlockCompleter(i)({ score: 1, max: 1 })} />
             )}
             {block.type === "crossword" && (
-              <CrosswordBlock pairs={block.pairs} onComplete={completer} />
+              <CrosswordBlock pairs={block.pairs} onComplete={() => makeBlockCompleter(i)({ score: 1, max: 1 })} />
             )}
             {block.type === "playground" && (
-              <PlaygroundBlock language={block.language} code={block.code} onComplete={completer} />
+              <PlaygroundBlock language={block.language} code={block.code} onComplete={() => makeBlockCompleter(i)({ score: 1, max: 1 })} />
             )}
           </div>
         );

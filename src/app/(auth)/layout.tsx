@@ -246,11 +246,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const { user, isLoaded } = useUser();
   const storeUser = useMutation(api.users.store);
   const ensureSeeded = useMutation(api.init.ensureSeeded);
-  const addLinuxTrack = useMutation(api.init.addLinuxTrack);
-  const addHardwareCrossword = useMutation(api.init.addHardwareCrossword);
-  const addAICrossword = useMutation(api.init.addAICrossword);
-  const reorderTracksLinuxFirst = useMutation(api.init.reorderTracksLinuxFirst);
-  const patchCrosswordsToMandatory = useMutation(api.init.patchCrosswordsToMandatory);
   const profile = useQuery(api.users.getMyProfile);
   const [syncState, setSyncState] = useState<SyncState>("idle");
 
@@ -261,8 +256,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     }
     setSyncState("syncing");
     storeUser({
-      clerkId: user.id,
-      email: user.emailAddresses[0]?.emailAddress ?? "",
       name: user.fullName ?? user.firstName ?? "Student",
       imageUrl: user.imageUrl,
     })
@@ -277,11 +270,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         }
       });
     void ensureSeeded();
-    void addLinuxTrack();
-    void addHardwareCrossword();
-    void addAICrossword();
-    void reorderTracksLinuxFirst();
-    void patchCrosswordsToMandatory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, user?.id]);
 

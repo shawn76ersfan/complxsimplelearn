@@ -7,6 +7,7 @@ import { getCurrentUser, getCurrentUserOrNull } from "./_lib/auth";
 import { assertBoardAccess, canAccessBoard, cohortIdsForUser } from "./lib/cohortAccess";
 import { rosterName } from "./lib/names";
 import { isAdminRole } from "./lib/roles";
+import { assertOwnedUpload, assertUploadAllowed, claimUpload } from "./lib/uploads";
 
 export const r2 = new R2(components.r2);
 
@@ -39,7 +40,13 @@ const messageReturn = v.object({
 
 export const { generateUploadUrl, syncMetadata } = r2.clientApi<DataModel>({
   checkUpload: async (ctx) => {
-    await getCurrentUser(ctx);
+    await assertUploadAllowed(ctx);
+  },
+  onSyncMetadata: async (ctx, { key }) => {
+    await claimUpload(ctx, r2, key, "board", {
+      maxBytes: MAX_IMAGE_BYTES,
+      contentTypes: ALLOWED_IMAGE_TYPES,
+    });
   },
 });
 
@@ -154,10 +161,12 @@ export const post = mutation({
       throw new Error(`Messages can be ${MAX_BODY} characters at most`);
     }
     if (args.imageKey) {
-      if (args.imageSize !== undefined && args.imageSize > MAX_IMAGE_BYTES) {
+      await assertOwnedUpload(ctx, me._id, args.imageKey, "board");
+      const meta = await r2.getMetadata(ctx, args.imageKey);
+      if (meta?.size !== undefined && meta.size > MAX_IMAGE_BYTES) {
         throw new Error("Photos must be 5 MB or smaller");
       }
-      if (args.imageContentType && !ALLOWED_IMAGE_TYPES.has(args.imageContentType)) {
+      if (meta?.contentType && !ALLOWED_IMAGE_TYPES.has(meta.contentType)) {
         throw new Error("Use a JPG, PNG, GIF, or WebP photo");
       }
     }

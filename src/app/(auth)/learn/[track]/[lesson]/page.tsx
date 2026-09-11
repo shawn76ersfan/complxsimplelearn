@@ -33,13 +33,26 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
   const next = index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
   const doneIds = useMemo(() => new Set(myAttempts?.map((a) => a.lessonId) ?? []), [myAttempts]);
 
-  async function handleComplete(score: number, max: number, answers?: number[]) {
-    if (!trackData || !lesson) return;
-    setResult({ score, max });
-    await submitAttempt({ lessonId: lesson._id, trackId: trackData._id, score, maxScore: max, answers });
-    const pct = pctOf(score, max);
-    const praise = pct >= 80 ? "Excellent" : pct >= 60 ? "Good job" : "Keep going";
-    toast.success(`${praise} · ${pct}%`, { duration: 3000 });
+  async function handleComplete(payload: { answers?: number[]; blockAnswers?: Array<{
+    blockIndex: number;
+    selected?: number;
+    texts?: string[];
+    completed?: boolean;
+  }> } = {}) {
+    if (!lesson) return;
+    try {
+      const graded = await submitAttempt({
+        lessonId: lesson._id,
+        answers: payload.answers,
+        blockAnswers: payload.blockAnswers,
+      });
+      setResult({ score: graded.score, max: graded.maxScore });
+      const pct = pctOf(graded.score, graded.maxScore);
+      const praise = pct >= 80 ? "Excellent" : pct >= 60 ? "Good job" : "Keep going";
+      toast.success(`${praise} · ${pct}%`, { duration: 3000 });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save your score");
+    }
   }
 
   if (!lesson || !trackData) {
@@ -169,12 +182,14 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
             <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>{chapterLabel.replace(" of ", " / ")}</span>
           </div>
           <div className="mt-4">
-            {isContentBased && <LessonRenderer contentJson={lesson.content} onComplete={handleComplete} />}
-            {isLegacyQuiz && questions && questions.length > 0 && <QuizQuestion questions={questions} onComplete={handleComplete} />}
+            {isContentBased && <LessonRenderer lessonId={lesson._id} contentJson={lesson.content} onComplete={handleComplete} />}
+            {isLegacyQuiz && questions && questions.length > 0 && (
+              <QuizQuestion lessonId={lesson._id} questions={questions} onComplete={handleComplete} />
+            )}
             {isLegacyQuiz && questions && questions.length === 0 && (
               <p className="text-sm text-center py-8" style={{ color: "var(--text-muted)" }}>This quiz has no questions yet.</p>
             )}
-            {isLegacyGame && <PcPartsGame onComplete={(s, m) => handleComplete(s, m)} />}
+            {isLegacyGame && <PcPartsGame onComplete={() => void handleComplete()} />}
           </div>
         </article>
       )}

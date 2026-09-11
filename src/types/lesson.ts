@@ -6,10 +6,10 @@ export type StaticBlock =
 
 export type InteractiveBlock =
   | { type: "flashcard";  front: string; back: string }
-  | { type: "fillblank";  prompt: string; accepted: string[][] }
+  | { type: "fillblank";  prompt: string; accepted?: string[][]; blankCount?: number }
   | { type: "match";      pairs: Array<{ term: string; definition: string }> }
   | { type: "crossword";  pairs: Array<{ term: string; definition: string }> }
-  | { type: "quiz";       question: string; options: string[]; correctIndex: number; explanation?: string }
+  | { type: "quiz";       question: string; options: string[]; correctIndex?: number; explanation?: string }
   | { type: "playground"; language: "html" | "js"; code: string };
 
 export type LessonBlock = StaticBlock | InteractiveBlock;

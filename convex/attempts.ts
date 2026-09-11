@@ -12,6 +12,7 @@ import {
   testAverageForAttempts,
   type LessonMeta,
 } from "./lib/scoring";
+import { scoreLessonContent } from "./lib/lessonContent";
 
 async function lessonsByIdMap(ctx: QueryCtx): Promise<Map<string, LessonMeta>> {
   const lessons = await ctx.db.query("lessons").collect();
@@ -74,25 +75,64 @@ export const getStudentQuizDetail = query({
 export const submit = mutation({
   args: {
     lessonId: v.id("lessons"),
-    trackId: v.id("tracks"),
+    answers: v.optional(v.array(v.number())),
+    blockAnswers: v.optional(
+      v.array(
+        v.object({
+          blockIndex: v.number(),
+          selected: v.optional(v.number()),
+          texts: v.optional(v.array(v.string())),
+          completed: v.optional(v.boolean()),
+        }),
+      ),
+    ),
+  },
+  returns: v.object({
     score: v.number(),
     maxScore: v.number(),
-    answers: v.optional(v.array(v.number())),
-  },
+  }),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+    const lesson = await ctx.db.get(args.lessonId);
+    if (!lesson || !lesson.published) throw new Error("Lesson not found");
+
+    const questions = (
+      await ctx.db
+        .query("quizQuestions")
+        .withIndex("by_lesson", (q) => q.eq("lessonId", args.lessonId))
+        .collect()
+    ).sort((a, b) => a.order - b.order);
+
+    let score = 0;
+    let maxScore = 0;
+    if (questions.length > 0) {
+      const answers = args.answers ?? [];
+      if (answers.length !== questions.length) {
+        throw new Error("Answer every question");
+      }
+      maxScore = questions.length;
+      score = questions.filter((question, i) => answers[i] === question.correctIndex).length;
+    } else if (lesson.type === "game") {
+      score = 1;
+      maxScore = 1;
+    } else {
+      const graded = scoreLessonContent(lesson.content, args.blockAnswers ?? []);
+      score = graded.score;
+      maxScore = graded.maxScore;
+    }
 
     await ctx.db.insert("attempts", {
       userId: user._id,
-      lessonId: args.lessonId,
-      trackId: args.trackId,
-      score: args.score,
-      maxScore: args.maxScore,
+      lessonId: lesson._id,
+      trackId: lesson.trackId,
+      score,
+      maxScore,
       answers: args.answers,
       completedAt: Date.now(),
     });
 
     await bumpUserStreak(ctx, user);
+    return { score, maxScore };
   },
 });
 

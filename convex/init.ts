@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation, internalMutation } from "./_generated/server";
 
 /**
  * Seeds all tracks and lessons if the database is empty.
@@ -8,6 +8,9 @@ import { mutation } from "./_generated/server";
 export const ensureSeeded = mutation({
   args: {},
   handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
     const existing = await ctx.db.query("tracks").first();
     if (existing) return;
 
@@ -120,7 +123,7 @@ export const ensureSeeded = mutation({
  * Makes Linux Mastery order:1 and shifts other tracks up.
  * Safe to call multiple times.
  */
-export const reorderTracksLinuxFirst = mutation({
+export const reorderTracksLinuxFirst = internalMutation({
   args: {},
   handler: async (ctx) => {
     const tracks = await ctx.db.query("tracks").collect();
@@ -152,7 +155,7 @@ export const reorderTracksLinuxFirst = mutation({
 /**
  * Patches existing crossword lessons to type "mandatory".
  */
-export const patchCrosswordsToMandatory = mutation({
+export const patchCrosswordsToMandatory = internalMutation({
   args: {},
   handler: async (ctx) => {
     const lessons = await ctx.db.query("lessons").collect();
@@ -167,7 +170,7 @@ export const patchCrosswordsToMandatory = mutation({
 /**
  * Adds the Linux Mastery crossword lesson.
  */
-export const addLinuxCrossword = mutation({
+export const addLinuxCrossword = internalMutation({
   args: {},
   handler: async (ctx) => {
     const track = await ctx.db
@@ -224,7 +227,7 @@ export const addLinuxCrossword = mutation({
  * Adds the Hardware Fundamentals crossword lesson if it doesn't already exist.
  * Safe to call multiple times.
  */
-export const addHardwareCrossword = mutation({
+export const addHardwareCrossword = internalMutation({
   args: {},
   handler: async (ctx) => {
     const track = await ctx.db
@@ -284,7 +287,7 @@ export const addHardwareCrossword = mutation({
 /**
  * Adds the AI Fundamentals crossword lesson if it doesn't already exist.
  */
-export const addAICrossword = mutation({
+export const addAICrossword = internalMutation({
   args: {},
   handler: async (ctx) => {
     const track = await ctx.db
@@ -341,7 +344,7 @@ export const addAICrossword = mutation({
  * Adds the Linux Mastery track if it doesn't exist yet.
  * Safe to call multiple times — exits immediately if the track already exists.
  */
-export const addLinuxTrack = mutation({
+export const addLinuxTrack = internalMutation({
   args: {},
   handler: async (ctx) => {
     const existing = await ctx.db

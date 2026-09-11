@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser, getCurrentUserOrNull, requireAdmin } from "./_lib/auth";
-import { envRoleForEmail } from "./lib/teacherEmails";
+import { envRoleForEmail, normalizeEmail } from "./lib/teacherEmails";
 import { isStaffRole } from "./lib/roles";
 import {
   emailHasActiveEnrollment,
@@ -29,22 +29,31 @@ function resolveDisplayName(
 
 export const store = mutation({
   args: {
-    clerkId: v.string(),
-    email: v.string(),
     name: v.string(),
     imageUrl: v.optional(v.string()),
   },
   returns: v.id("users"),
   handler: async (ctx, args): Promise<Id<"users">> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const clerkId = identity.subject;
+    const email = identity.email ? normalizeEmail(identity.email) : "";
+
     const existing = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
       .unique();
 
-    const enrollment = await getEnrollmentByEmail(ctx, args.email);
+    if (!email) {
+      if (existing) return existing._id;
+      throw new Error("Your account has no email address");
+    }
+
+    const enrollment = await getEnrollmentByEmail(ctx, email);
     // ADMIN_EMAILS / TEACHER_EMAILS win; otherwise an invited teacher becomes
-    // a teacher; everyone else is a student.
-    const envRole = envRoleForEmail(args.email);
+    // a teacher; everyone else is a student. Role is taken from the JWT email
+    // only — never from client-supplied fields.
+    const envRole = envRoleForEmail(email);
     const role: "admin" | "teacher" | "student" =
       envRole ?? (enrollment?.role === "teacher" && enrollment.status !== "revoked" ? "teacher" : "student");
     const name = resolveDisplayName(
@@ -55,6 +64,7 @@ export const store = mutation({
 
     if (existing) {
       const patch: {
+        email?: string;
         name?: string;
         firstName?: string;
         lastName?: string;
@@ -63,6 +73,7 @@ export const store = mutation({
       } = {
         imageUrl: args.imageUrl,
       };
+      if (existing.email !== email) patch.email = email;
       // Never overwrite a real name with the placeholder "Student"
       if (!isPlaceholderName(name) || isPlaceholderName(existing.name)) {
         patch.name = name;
@@ -86,10 +97,10 @@ export const store = mutation({
       ) {
         if (!envRole && existing.role === "student") {
           await addStudentToCohort(ctx, enrollment.cohortId, existing._id, enrollment.invitedBy);
-          await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email: args.email });
+          await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email });
         } else if (isStaffRole(existing.role) || envRole) {
           await addMember(ctx, enrollment.cohortId, existing._id, "teacher", enrollment.invitedBy);
-          await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email: args.email });
+          await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email });
         }
       }
 
@@ -99,8 +110,8 @@ export const store = mutation({
     if (isStaffRole(role)) {
       const staffParts = splitDisplayName(name);
       const userId = await ctx.db.insert("users", {
-        clerkId: args.clerkId,
-        email: args.email,
+        clerkId,
+        email,
         name,
         firstName: staffParts.firstName || undefined,
         lastName: staffParts.lastName || undefined,
@@ -109,7 +120,7 @@ export const store = mutation({
         createdAt: Date.now(),
       });
       if (enrollment) {
-        await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email: args.email });
+        await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email });
         if (enrollment.cohortId) {
           await addMember(ctx, enrollment.cohortId, userId, "teacher", enrollment.invitedBy);
         }
@@ -117,15 +128,15 @@ export const store = mutation({
       return userId;
     }
 
-    const allowed = await emailHasActiveEnrollment(ctx, args.email);
+    const allowed = await emailHasActiveEnrollment(ctx, email);
     if (!allowed) {
       throw new Error("NOT_ENROLLED");
     }
 
     const studentParts = splitDisplayName(name);
     const userId = await ctx.db.insert("users", {
-      clerkId: args.clerkId,
-      email: args.email,
+      clerkId,
+      email,
       name,
       firstName: studentParts.firstName || undefined,
       lastName: studentParts.lastName || undefined,
@@ -135,7 +146,7 @@ export const store = mutation({
     });
 
     await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, {
-      email: args.email,
+      email,
     });
 
     // Drop them straight into the cohort they were invited to.

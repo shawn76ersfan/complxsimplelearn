@@ -423,6 +423,22 @@ export default defineSchema({
     .index("by_cohort_created", ["cohortId", "createdAt"])
     .index("by_author_created", ["authorId", "createdAt"]),
 
+  // Who uploaded an R2 object. Keys are claimed at sync time so later
+  // posts/extracts can reject files the caller does not own.
+  uploadedObjects: defineTable({
+    key: v.string(),
+    userId: v.id("users"),
+    kind: v.union(
+      v.literal("board"),
+      v.literal("homework"),
+      v.literal("resume"),
+      v.literal("video"),
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_user_created", ["userId", "createdAt"]),
+
   // Admin-marked attendance for a cohort meeting day.
   attendance: defineTable({
     cohortId: v.id("cohorts"),

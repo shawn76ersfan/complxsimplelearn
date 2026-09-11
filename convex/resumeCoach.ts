@@ -1,5 +1,5 @@
-import { action, mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
+import { action, mutation, query, type ActionCtx } from "./_generated/server";
+import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { getCurrentUser, requireAdmin } from "./_lib/auth";
@@ -30,6 +30,7 @@ import {
   type ScoreResult,
 } from "./lib/resumeScore";
 import { chatComplete, tryExtractJsonObject } from "./lib/llmChat";
+import { requireActiveProfile } from "./lib/actionAuth";
 
 const careerTrackValidator = v.union(
   v.literal("devops"),
@@ -46,6 +47,34 @@ const jobLevelValidator = v.union(
   v.literal("mid"),
   v.literal("senior"),
 );
+
+async function writeExchange(
+  ctx: ActionCtx,
+  conversationId: Id<"starkConversations">,
+  userId: Id<"users">,
+  userText: string,
+  assistantText: string,
+) {
+  await ctx.runMutation(internal.conversations.appendExchange, {
+    conversationId,
+    userId,
+    userText,
+    assistantText,
+  });
+}
+
+async function writeAssistant(
+  ctx: ActionCtx,
+  conversationId: Id<"starkConversations">,
+  userId: Id<"users">,
+  content: string,
+) {
+  await ctx.runMutation(internal.conversations.addAssistantMessage, {
+    conversationId,
+    userId,
+    content,
+  });
+}
 
 function emptyParsed(): ParsedResume {
   return {
@@ -849,6 +878,15 @@ export const saveVersionAndReview = mutation({
   }),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+    if (args.fileKey) {
+      const upload = await ctx.db
+        .query("uploadedObjects")
+        .withIndex("by_key", (q) => q.eq("key", args.fileKey as string))
+        .unique();
+      if (!upload || upload.userId !== user._id || upload.kind !== "resume") {
+        throw new Error("Invalid resume file");
+      }
+    }
     const convo = await ctx.db.get(args.conversationId);
     if (!convo || convo.userId !== user._id) throw new Error("Not found");
 
@@ -951,6 +989,7 @@ export const reviewResume = action({
     scoreChangeSummary: string | null;
     rubricVersion: string;
   }> => {
+    const profile = await requireActiveProfile(ctx);
     const rawText = args.rawText.trim();
     if (rawText.length < 40) {
       throw new Error("Paste more of your resume (at least a few sections).");
@@ -1113,16 +1152,13 @@ export const reviewResume = action({
       : "";
     const reply = `${card}${changeBlock}\n\n---\n\n${sanitizeCoachFeedback(evalResult.feedbackMarkdown)}\n\n---\n\nI'm in **Coach Mode** on **version ${versionNumber}**. Use **Fix this** for a diagnosis first, then rewrite when you're ready.`;
 
-    await ctx.runMutation(api.conversations.addMessage, {
+    await writeExchange(
+      ctx,
       conversationId,
-      role: "user",
-      content: `[Resume v${versionNumber} submitted for ${rubric.label} · ${jobLevelLabel(args.jobLevel)} review]`,
-    });
-    await ctx.runMutation(api.conversations.addMessage, {
-      conversationId,
-      role: "assistant",
-      content: reply,
-    });
+      profile._id,
+      `[Resume v${versionNumber} submitted for ${rubric.label} · ${jobLevelLabel(args.jobLevel)} review]`,
+      reply,
+    );
 
     return {
       conversationId,
@@ -1159,6 +1195,7 @@ export const coachMessage = action({
     conversationId: v.id("starkConversations"),
   }),
   handler: async (ctx, args) => {
+    const profile = await requireActiveProfile(ctx);
     const userText = args.userText.trim();
     if (!userText) throw new Error("Message is empty");
 
@@ -1168,16 +1205,7 @@ export const coachMessage = action({
     if (!progress?.activeVersionId) {
       const reply =
         "Upload or paste your resume in Coach Mode first, then I can coach specific bullets.";
-      await ctx.runMutation(api.conversations.addMessage, {
-        conversationId: args.conversationId,
-        role: "user",
-        content: userText,
-      });
-      await ctx.runMutation(api.conversations.addMessage, {
-        conversationId: args.conversationId,
-        role: "assistant",
-        content: reply,
-      });
+      await writeExchange(ctx, args.conversationId, profile._id, userText, reply);
       return { reply, conversationId: args.conversationId };
     }
 
@@ -1254,16 +1282,7 @@ If the student asks to re-score after edits, tell them to paste the updated resu
       { maxTokens: 1200, temperature: 0.35, preferOpenAI: true },
     );
 
-    await ctx.runMutation(api.conversations.addMessage, {
-      conversationId: args.conversationId,
-      role: "user",
-      content: userText,
-    });
-    await ctx.runMutation(api.conversations.addMessage, {
-      conversationId: args.conversationId,
-      role: "assistant",
-      content: reply,
-    });
+    await writeExchange(ctx, args.conversationId, profile._id, userText, reply);
 
     return { reply, conversationId: args.conversationId };
   },
@@ -1330,6 +1349,7 @@ export const diagnoseImprovement = action({
     bulletIds: string[];
     reply: string;
   }> => {
+    const profile = await requireActiveProfile(ctx);
     const progress = await ctx.runQuery(api.resumeCoach.getProgress, {
       conversationId: args.conversationId,
     });
@@ -1473,11 +1493,7 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}
 
 When you're ready, use **Rewrite affected bullets** to create a new scored version — we won't invent metrics.`;
 
-    await ctx.runMutation(api.conversations.addMessage, {
-      conversationId: args.conversationId,
-      role: "assistant",
-      content: reply,
-    });
+    await writeAssistant(ctx, args.conversationId, profile._id, reply);
 
     return {
       title,
@@ -1516,6 +1532,7 @@ export const rewriteAffectedBullets = action({
     rewrites: Array<{ bulletId: string; before: string; after: string }>;
     reply: string;
   }> => {
+    const profile = await requireActiveProfile(ctx);
     if (args.bulletIds.length === 0) {
       throw new Error("Pick at least one bullet to rewrite.");
     }
@@ -1652,11 +1669,7 @@ ${changed
 
 Overall score is now **${result.overallScore}/100** (v${result.versionNumber}).`;
 
-    await ctx.runMutation(api.conversations.addMessage, {
-      conversationId: args.conversationId,
-      role: "assistant",
-      content: reply,
-    });
+    await writeAssistant(ctx, args.conversationId, profile._id, reply);
 
     return {
       conversationId: args.conversationId,
@@ -1698,6 +1711,7 @@ export const improveBullet = action({
     scoreChangeSummary: string | null;
     reply: string;
   }> => {
+    const profile = await requireActiveProfile(ctx);
     const progress: {
       activeVersionId: Id<"resumeVersions"> | null;
       jobLevel: string | null;
@@ -1816,11 +1830,7 @@ Overall score is now **${result.overallScore}/100** (v${result.versionNumber}).$
 
     // reviewResume already wrote user/assistant messages for the full review;
     // add a short coaching note about this bullet.
-    await ctx.runMutation(api.conversations.addMessage, {
-      conversationId: args.conversationId,
-      role: "assistant",
-      content: reply,
-    });
+    await writeAssistant(ctx, args.conversationId, profile._id, reply);
 
     return {
       conversationId: args.conversationId,

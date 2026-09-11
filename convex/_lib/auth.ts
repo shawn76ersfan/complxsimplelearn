@@ -14,6 +14,7 @@ export async function getCurrentUser(
     .unique();
 
   if (!user) throw new Error("User not found. Please refresh the page.");
+  if (user.status === "dropped") throw new Error("Account is inactive");
   return user;
 }
 
@@ -23,10 +24,12 @@ export async function getCurrentUserOrNull(
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
 
-  return await ctx.db
+  const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
     .unique();
+  if (!user || user.status === "dropped") return null;
+  return user;
 }
 
 /** Admin or teacher. Use for anything in the Teacher Hub that is cohort-scoped. */

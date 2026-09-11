@@ -17,8 +17,6 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (isLoaded && user) {
       storeUser({
-        clerkId: user.id,
-        email: user.emailAddresses[0]?.emailAddress ?? "",
         name: user.fullName ?? user.firstName ?? "Student",
         imageUrl: user.imageUrl,
       });
