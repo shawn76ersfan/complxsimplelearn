@@ -1,9 +1,10 @@
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 import { PLATFORM_FACTS } from "./lib/platformFacts";
+import { requireActiveProfile } from "./lib/actionAuth";
 
 const EMBEDDING_MODEL = "jina-embeddings-v3";
 const EMBEDDING_URL = "https://api.jina.ai/v1/embeddings";
@@ -322,8 +323,8 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
 export const generateAllEmbeddings = action({
   args: {},
   handler: async (ctx): Promise<{ embedded: number }> => {
-    const profile = await ctx.runQuery(api.users.getMyProfile, {});
-    if (!profile || profile.role !== "admin") {
+    const profile = await requireActiveProfile(ctx);
+    if (profile.role !== "admin") {
       throw new Error("Admin access required");
     }
     return await rebuildIndex(ctx);

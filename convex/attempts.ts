@@ -139,12 +139,7 @@ export const submit = mutation({
 export const getMyAttempts = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return [];
     return await ctx.db
       .query("attempts")
@@ -187,12 +182,7 @@ export const getMyScoreSummary = query({
 export const getBestForLesson = query({
   args: { lessonId: v.id("lessons") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return null;
     const attempts = await ctx.db
       .query("attempts")
@@ -208,12 +198,7 @@ export const getBestForLesson = query({
 export const getTrackProgress = query({
   args: { trackId: v.id("tracks") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return { completed: 0, total: 0, percentage: 0 };
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return { completed: 0, total: 0, percentage: 0 };
 
     const lessons = await ctx.db
@@ -267,12 +252,7 @@ export const getContinueLearning = query({
     v.null()
   ),
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return null;
 
     const tracks = (
