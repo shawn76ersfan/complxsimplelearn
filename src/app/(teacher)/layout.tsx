@@ -17,8 +17,6 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (isLoaded && user) {
       storeUser({
-        clerkId: user.id,
-        email: user.emailAddresses[0]?.emailAddress ?? "",
         name: user.fullName ?? user.firstName ?? "Student",
         imageUrl: user.imageUrl,
       });
@@ -45,10 +43,13 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)" }}>
         <Navbar />
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-6xl mb-4">🔒</div>
-            <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>Access Denied</h1>
-            <p style={{ color: "var(--text-muted)" }}>This area is for instructors only.</p>
+          <div className="index-card p-8 pt-0 max-w-sm w-full text-center">
+            <div className="index-card-title justify-center">
+              <span className="stamp">Staff only</span>
+            </div>
+            <div className="text-5xl mb-3 mt-2">🔒</div>
+            <h1 className="font-serif text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>Teacher&apos;s lounge</h1>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>This area is for instructors only.</p>
           </div>
         </div>
       </div>

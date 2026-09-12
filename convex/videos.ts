@@ -13,6 +13,7 @@ import {
   visibleToStudent,
 } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
+import { assertOwnedUpload, assertUploadAllowed, claimUpload } from "./lib/uploads";
 
 export const r2 = new R2(components.r2);
 
@@ -26,6 +27,12 @@ export const r2 = new R2(components.r2);
 export const { generateUploadUrl, syncMetadata } = r2.clientApi<DataModel>({
   checkUpload: async (ctx) => {
     await requireStaff(ctx);
+    await assertUploadAllowed(ctx);
+  },
+  onSyncMetadata: async (ctx, { key }) => {
+    await claimUpload(ctx, r2, key, "video", {
+      maxBytes: 8 * 1024 * 1024 * 1024, // 8 GB class recordings
+    });
   },
 });
 
@@ -47,6 +54,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const teacher = await requireStaff(ctx);
     await assertContentAccess(ctx, teacher, args.cohortId);
+    await assertOwnedUpload(ctx, teacher._id, args.key, "video");
 
     const title = args.title.trim();
     if (!title) throw new Error("Title is required");
@@ -91,7 +99,6 @@ export const list = query({
       title: v.string(),
       recordedDate: v.string(),
       description: v.optional(v.string()),
-      key: v.string(),
       contentType: v.optional(v.string()),
       fileSize: v.optional(v.number()),
       uploadedBy: v.id("users"),
@@ -126,7 +133,19 @@ export const list = query({
           // R2 not configured yet, or object missing — surface as unplayable.
           url = null;
         }
-        return { ...video, url };
+        return {
+          _id: video._id,
+          _creationTime: video._creationTime,
+          title: video.title,
+          recordedDate: video.recordedDate,
+          description: video.description,
+          contentType: video.contentType,
+          fileSize: video.fileSize,
+          uploadedBy: video.uploadedBy,
+          createdAt: video.createdAt,
+          cohortId: video.cohortId,
+          url,
+        };
       })
     );
   },

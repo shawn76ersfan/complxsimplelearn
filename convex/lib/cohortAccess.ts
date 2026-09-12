@@ -41,6 +41,43 @@ export function contentInScope(
   return cohortId === undefined || scopeIncludes(scope, cohortId);
 }
 
+/**
+ * Board / attendance: admins may enter any cohort. Everyone else must
+ * be a member of that cohort (student or assigned instructor).
+ */
+export async function assertBoardAccess(
+  ctx: Ctx,
+  user: Doc<"users">,
+  cohortId: Id<"cohorts">,
+): Promise<Doc<"cohorts">> {
+  const cohort = await ctx.db.get(cohortId);
+  if (!cohort) throw new Error("Cohort not found");
+  if (isAdminRole(user.role)) return cohort;
+  if (user.status === "dropped") throw new Error("Account is inactive");
+
+  const membership = await ctx.db
+    .query("cohortMembers")
+    .withIndex("by_cohort_user", (q) => q.eq("cohortId", cohortId).eq("userId", user._id))
+    .unique();
+  if (!membership) {
+    throw new Error("You are not in this cohort");
+  }
+  return cohort;
+}
+
+export async function canAccessBoard(
+  ctx: Ctx,
+  user: Doc<"users">,
+  cohortId: Id<"cohorts">,
+): Promise<boolean> {
+  try {
+    await assertBoardAccess(ctx, user, cohortId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Throws unless the staff member may manage this cohort. */
 export async function assertCohortAccess(
   ctx: Ctx,
@@ -251,6 +288,62 @@ export async function addStudentToCohort(
   const cohort = await ctx.db.get(cohortId);
   if (!cohort) return;
   await addMember(ctx, cohortId, userId, "student", addedBy);
+}
+
+/** Used by users.store: drop a newly signed-up instructor into the cohort they were invited to. */
+export async function addTeacherToCohort(
+  ctx: MutationCtx,
+  cohortId: Id<"cohorts">,
+  userId: Id<"users">,
+  addedBy: Id<"users">,
+): Promise<void> {
+  const cohort = await ctx.db.get(cohortId);
+  if (!cohort) return;
+  await addMember(ctx, cohortId, userId, "teacher", addedBy);
+}
+
+export function normalizeReleaseReason(reason: string): string {
+  const trimmed = reason.trim();
+  if (trimmed.length < 3) {
+    throw new Error("Add a short reason for releasing them from this cohort.");
+  }
+  if (trimmed.length > 500) {
+    throw new Error("Reason is too long (keep it under 500 characters).");
+  }
+  return trimmed;
+}
+
+/** Delete the membership and write a lasting departure record. Returns false if they were not a member. */
+export async function releaseMember(
+  ctx: MutationCtx,
+  args: {
+    cohortId: Id<"cohorts">;
+    userId: Id<"users">;
+    role: "student" | "teacher";
+    reason: string;
+    removedBy: Id<"users">;
+  },
+): Promise<boolean> {
+  const reason = normalizeReleaseReason(args.reason);
+  const row = await ctx.db
+    .query("cohortMembers")
+    .withIndex("by_cohort_user", (q) => q.eq("cohortId", args.cohortId).eq("userId", args.userId))
+    .unique();
+  if (!row || row.role !== args.role) return false;
+
+  const user = await ctx.db.get(args.userId);
+  await ctx.db.delete(row._id);
+  await ctx.db.insert("cohortDepartures", {
+    cohortId: args.cohortId,
+    userId: args.userId,
+    email: user?.email ?? "",
+    name: user?.name ?? "Unknown",
+    role: args.role,
+    reason,
+    removedBy: args.removedBy,
+    removedAt: Date.now(),
+  });
+  return true;
 }
 
 /** Filter a list of cohort-tagged rows down to what a student may see. */

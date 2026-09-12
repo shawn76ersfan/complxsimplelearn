@@ -5,15 +5,19 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { Id } from "../../../../../../convex/_generated/dataModel";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import {
   ArrowLeft, BookOpen, CheckCircle, Clock, Flame,
   Star, Trophy, Cpu, Brain, Shield, TrendingUp,
   Terminal, Send, MessageSquare, AlertTriangle, UserX,
   UserCheck, Bell, AlertCircle, RotateCcw, Cloud, Container,
   Boxes, GitBranch, Layers, Wrench, Workflow, Gauge,
+  GraduationCap,
 } from "lucide-react";
 import { cn, percentageColor, percentageBg, getInitials, formatDate } from "@/lib/utils";
 import { QuizDetailAccordion } from "@/components/teacher/QuizDetailAccordion";
+import { isAdminRole } from "@/lib/roles";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
   hardware: Cpu,
@@ -31,10 +35,11 @@ const TRACK_ICONS: Record<string, React.ElementType> = {
   monitoring: Gauge,
 };
 
-function ScoreRing({ pct, color }: { pct: number; color: string }) {
+function ScoreRing({ pct, color }: { pct: number | null; color: string }) {
   const r = 28;
   const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
+  const shown = pct ?? 0;
+  const dash = (shown / 100) * circ;
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" className="flex-shrink-0">
       <circle cx="36" cy="36" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="6" />
@@ -48,7 +53,9 @@ function ScoreRing({ pct, color }: { pct: number; color: string }) {
         transform="rotate(-90 36 36)"
         style={{ transition: "stroke-dasharray 0.6s ease" }}
       />
-      <text x="36" y="40" textAnchor="middle" fontSize="14" fontWeight="800" fill={color}>{pct}%</text>
+      <text x="36" y="40" textAnchor="middle" fontSize="14" fontWeight="800" fill={color}>
+        {pct === null ? "—" : `${pct}%`}
+      </text>
     </svg>
   );
 }
@@ -65,8 +72,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
   const sendFeedback = useMutation(api.feedback.send);
   const previousFeedback = useQuery(api.feedback.getForStudent, { studentId: studentId as Id<"users"> });
 
+  const profile = useQuery(api.users.getMyProfile);
   const dropStudent = useMutation(api.users.dropStudent);
   const reactivateStudent = useMutation(api.users.reactivateStudent);
+  const setRole = useMutation(api.users.setRole);
+  const router = useRouter();
+  const [promoting, setPromoting] = useState(false);
 
   const [dropReason, setDropReason] = useState("");
   const [showDropForm, setShowDropForm] = useState(false);
@@ -93,6 +104,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
 
   async function handleReactivate() {
     await reactivateStudent({ studentId: studentId as Id<"users"> });
+  }
+
+  async function handleMakeInstructor() {
+    if (promoting) return;
+    setPromoting(true);
+    try {
+      await setRole({ userId: studentId as Id<"users">, role: "teacher" });
+      toast.success("They're an instructor again. Assign them to a cohort under Cohorts → Instructors.");
+      router.push("/teacher/dashboard");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not change their role");
+    } finally {
+      setPromoting(false);
+    }
   }
 
   async function handleSendWarning() {
@@ -160,7 +185,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
     );
   }
 
-  const { student, trackDetails, overall, totalAttempts } = data;
+  const { student, trackDetails, overall, homeworkAvg, totalAttempts } = data;
   const level = progress?.level ?? 0;
   const completedAssignments = progress?.completedCount ?? 0;
   const totalAssignments = progress?.totalCount ?? 0;
@@ -217,19 +242,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
 
           {/* Overall score ring */}
           <div className="flex flex-col items-center gap-1 flex-shrink-0">
-            <ScoreRing pct={overall} color={overall >= 80 ? "#0EA5E9" : overall >= 60 ? "#F59E0B" : "#EF4444"} />
-            <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Overall</p>
+            <ScoreRing
+              pct={overall}
+              color={overall === null ? "var(--text-muted)" : overall >= 80 ? "#0EA5E9" : overall >= 60 ? "#F59E0B" : "#EF4444"}
+            />
+            <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Test avg</p>
           </div>
         </div>
 
         {/* Level = completed homework assignments */}
-        <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t" style={{ borderColor: "var(--border)" }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t" style={{ borderColor: "var(--border)" }}>
           {[
             { icon: Star, label: "Assignments done", value: `${completedAssignments}/${totalAssignments}`, color: "#F97316" },
+            { icon: Trophy, label: "Homework avg", value: homeworkAvg === null || homeworkAvg === undefined ? "—" : `${homeworkAvg}%`, color: "#0EA5E9" },
             { icon: TrendingUp, label: "Level", value: level, color: "#2563EB" },
-            { icon: Flame, label: "Day Streak", value: student.streak ?? 0, color: "#F97316" },
+            { icon: Flame, label: student.streak === 1 ? "1-day streak" : `${student.streak ?? 0}-day streak`, value: student.streak ?? 0, color: "#F97316", title: "Days in a row they completed a lesson or turned in homework" },
           ].map((s) => (
-            <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: `${s.color}10` }}>
+            <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl" title={"title" in s ? s.title : undefined} style={{ background: `${s.color}10` }}>
               <s.icon size={16} style={{ color: s.color }} />
               <div>
                 <p className="font-black text-lg leading-none" style={{ color: s.color }}>{s.value}</p>
@@ -245,6 +274,26 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
         <h2 className="text-base font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
           <AlertCircle size={16} style={{ color: "#2563EB" }} /> Student Actions
         </h2>
+
+        {isAdminRole(profile?.role) && student.role === "student" && !isDropped && (
+          <div className="rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3" style={{ background: "#2563EB10", border: "1px solid #2563EB33" }}>
+            <div className="flex-1">
+              <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>This person should be an instructor</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                Turns their account back into staff. They leave any student roster seats and show up under Staff. Re-assign them to a cohort afterwards.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleMakeInstructor}
+              disabled={promoting}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
+            >
+              <GraduationCap size={14} /> {promoting ? "Updating…" : "Make instructor"}
+            </button>
+          </div>
+        )}
 
         {/* Drop / Reactivate */}
         <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
@@ -390,13 +439,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
                   <div className="flex items-center justify-between mb-1.5">
                     <h3 className="font-bold" style={{ color: "var(--text)" }}>{track.trackName}</h3>
                     <span className="text-sm font-black ml-3 flex-shrink-0" style={{ color: track.trackColor }}>
-                      {track.percentage}%
+                      {track.percentage === null ? "—" : `${track.percentage}%`}
                     </span>
                   </div>
                   <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
                     <div
                       className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${track.percentage}%`, background: track.trackColor }}
+                      style={{ width: `${track.percentage ?? 0}%`, background: track.trackColor }}
                     />
                   </div>
                   <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
@@ -409,9 +458,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
               {track.lessons.length > 0 && (
                 <div className="border-t" style={{ borderColor: "var(--border)" }}>
                   {track.lessons.map((lesson, i) => {
-                    const lessonPct = lesson.completed
+                    const isScoredLesson = lesson.type === "quiz" || lesson.type === "game" || lesson.type === "mandatory";
+                    const lessonPct = lesson.completed && isScoredLesson && lesson.bestMax > 0
                       ? Math.round((lesson.bestScore / lesson.bestMax) * 100)
-                      : 0;
+                      : null;
                     return (
                       <div key={lesson.lessonId}>
                         <div
@@ -440,7 +490,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
                           </div>
 
                           {/* Score badge */}
-                          {lesson.completed && (
+                          {lessonPct !== null && (
                             <span className={cn("text-sm font-bold flex-shrink-0", percentageColor(lessonPct))}>
                               {lessonPct}%
                             </span>

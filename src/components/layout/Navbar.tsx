@@ -7,7 +7,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { NotificationBell } from "./NotificationBell";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { BookOpen, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare, Users } from "lucide-react";
+import { BookOpen, BookMarked, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare, Users, Pin } from "lucide-react";
 import { useState } from "react";
 import { isStaff } from "@/lib/roles";
 
@@ -22,6 +22,7 @@ export function Navbar() {
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     ...(!isTeacher ? [{ href: "/cohort", label: "My Class", icon: Users }] : []),
+    { href: "/board", label: "Board", icon: Pin },
     { href: "/learn",     label: "Learn",     icon: BookOpen },
     { href: "/videos",    label: "Videos",    icon: Video },
     ...(!isTeacher
@@ -38,8 +39,9 @@ export function Navbar() {
     <nav
       className="sticky top-0 z-50"
       style={{
-        background: "var(--surface)",
-        borderBottom: "1px solid var(--border)",
+        background: "color-mix(in srgb, var(--surface) 92%, transparent)",
+        borderBottom: "2px solid var(--border)",
+        boxShadow: "0 1px 0 var(--surface), 0 6px 18px -12px rgba(30,20,5,0.25)",
         backdropFilter: "blur(12px)",
       }}
     >
@@ -47,21 +49,18 @@ export function Navbar() {
         <div className="flex items-center justify-between h-14">
 
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2.5 font-bold">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
             <span
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-black"
-              style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
-            >
-              C
-            </span>
-            <span
-              className="hidden sm:block text-sm font-bold"
+              className="w-8 h-8 rounded-md flex items-center justify-center text-white"
               style={{
-                background: "linear-gradient(135deg, #2563EB, #F97316)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
+                background: "linear-gradient(160deg, #2563EB, #1e40af)",
+                boxShadow: "2px 2px 0 var(--accent)",
+                clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%)",
               }}
             >
+              <BookMarked size={14} />
+            </span>
+            <span className="hidden sm:block font-serif text-base font-bold tracking-tight" style={{ color: "var(--text)" }}>
               ComplxSimple
             </span>
           </Link>
@@ -76,7 +75,7 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${active ? "font-bold" : "font-medium"}`}
                   style={
                     isStark
                       ? {
@@ -85,8 +84,13 @@ export function Navbar() {
                           border: "1px solid #14B8A630",
                         }
                       : {
-                          background: active ? "linear-gradient(135deg, #2563EB, #F97316)" : "transparent",
-                          color: active ? "#fff" : "var(--text)",
+                          background: "transparent",
+                          color: active ? "var(--text)" : "var(--text-muted)",
+                          textDecorationLine: active ? "underline" : "none",
+                          textDecorationStyle: "wavy",
+                          textDecorationColor: "var(--accent)",
+                          textDecorationThickness: "2px",
+                          textUnderlineOffset: "6px",
                         }
                   }
                   onMouseEnter={(e) => {
@@ -103,9 +107,7 @@ export function Navbar() {
                   {badge > 0 && (
                     <span
                       className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
-                      style={{
-                        background: active ? "rgba(255,255,255,0.25)" : "linear-gradient(135deg, #2563EB, #F97316)",
-                      }}
+                      style={{ background: "var(--accent)" }}
                     >
                       {badge > 9 ? "9+" : badge}
                     </span>
@@ -165,8 +167,9 @@ export function Navbar() {
                         border: "1px solid #14B8A630",
                       }
                     : {
-                        background: active ? "linear-gradient(135deg, #2563EB, #F97316)" : "var(--surface-2)",
-                        color: active ? "#fff" : "var(--text)",
+                        background: active ? "var(--ink)" : "var(--surface-2)",
+                        color: active ? "var(--paper)" : "var(--text)",
+                        boxShadow: active ? "3px 3px 0 var(--accent)" : "none",
                       }
                 }
               >
@@ -175,9 +178,7 @@ export function Navbar() {
                 {badge > 0 && (
                   <span
                     className="min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
-                    style={{
-                      background: active ? "rgba(255,255,255,0.25)" : "linear-gradient(135deg, #2563EB, #F97316)",
-                    }}
+                    style={{ background: active ? "rgba(255,255,255,0.25)" : "var(--accent)" }}
                   >
                     {badge > 9 ? "9+" : badge}
                   </span>

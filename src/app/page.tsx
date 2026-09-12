@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
   Award,
+  BookMarked,
   BookOpen,
   Boxes,
   BriefcaseBusiness,
@@ -15,8 +16,8 @@ import {
   Layers,
   MessageCircle,
   Network,
+  Pin,
   Quote,
-  Rocket,
   Server,
   Terminal,
   Trophy,
@@ -28,7 +29,6 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { SignInBtn, SignUpBtn, EnrollmentButtons, InviteOnlyNote } from "@/components/layout/AuthButtons";
-import { RainAnimation } from "@/components/layout/RainAnimation";
 import { InfoSessionsSection } from "@/components/marketing/InfoSessionsSection";
 
 const TESTIMONIALS = [
@@ -72,7 +72,7 @@ const BENEFITS = [
   { icon: Terminal, title: "Hands-On Labs", desc: "Practice in real cloud environments." },
   { icon: BriefcaseBusiness, title: "Real Projects", desc: "Build production-grade infrastructure for your portfolio." },
   { icon: Trophy, title: "Career Support", desc: "Get resume optimization and interview preparation." },
-  { icon: Users, title: "Live Mentorship", desc: "Learn directly from an experienced instructor." },
+  { icon: Users, title: "Live Mentorship", desc: "Learn in live, interactive sessions with dedicated instructors." },
   { icon: Video, title: "Recorded Sessions", desc: "Review every class inside the learning platform." },
   { icon: MessageCircle, title: "Community Support", desc: "Learn alongside an active student community." },
   { icon: BookOpen, title: "Beginner Friendly", desc: "Start with the fundamentals—no previous experience required." },
@@ -83,51 +83,65 @@ const CURRICULUM = [
   {
     number: "01",
     title: "Linux Administration",
+    spine: "Linux Admin",
+    color: "#F59E0B",
     topics: ["Linux Fundamentals", "Command Line Interface", "File Permissions", "Users and Groups", "Networking", "Process Management", "Package Management", "Bash Scripting"],
   },
   {
     number: "02",
     title: "AWS Cloud",
+    color: "#FF9900",
     topics: ["IAM", "EC2", "S3", "VPC", "Route Tables", "Security Groups", "Load Balancers", "Auto Scaling", "Route 53", "RDS", "CloudWatch", "EFS", "Lambda", "SNS", "SQS", "CloudFormation"],
   },
   {
     number: "03",
     title: "Microsoft Azure",
+    color: "#0078D4",
     topics: ["Virtual Machines", "Storage", "Networking", "Virtual Networks", "Azure Active Directory", "Monitoring", "Security"],
   },
   {
     number: "04",
     title: "Version Control",
+    color: "#F05032",
     topics: ["Git", "GitHub", "Branching", "Pull Requests"],
   },
   {
     number: "05",
     title: "Containerization",
+    spine: "Containers",
+    color: "#2496ED",
     topics: ["Docker Fundamentals", "Docker Images", "Containers", "Docker Compose"],
   },
   {
     number: "06",
     title: "Kubernetes",
+    color: "#326CE5",
     topics: ["Pods", "Deployments", "Services", "ConfigMaps", "Secrets", "Persistent Volumes", "Scaling Applications"],
   },
   {
     number: "07",
     title: "Infrastructure as Code",
+    spine: "Infra as Code",
+    color: "#7B42BC",
     topics: ["Terraform Basics", "Variables", "Modules", "Provisioning AWS Infrastructure"],
   },
   {
     number: "08",
     title: "Configuration Management",
+    spine: "Config Mgmt",
+    color: "#EE0000",
     topics: ["Ansible", "Playbooks", "Inventory", "Automation"],
   },
   {
     number: "09",
     title: "CI/CD",
+    color: "#D33833",
     topics: ["Jenkins", "GitHub Actions", "Pipelines", "Deployment Automation"],
   },
   {
     number: "10",
     title: "Monitoring",
+    color: "#E6522C",
     topics: ["Prometheus", "Grafana", "Alerting"],
   },
 ];
@@ -177,42 +191,77 @@ const FAQS = [
   },
 ];
 
+const TRACKS = [
+  { icon: Terminal,  label: "Linux Administration", blurb: "Servers, shells, permissions, scripting.", color: "#F59E0B" },
+  { icon: Cloud,     label: "AWS Cloud",            blurb: "Compute, storage, networking, IAM.",       color: "#FF9900" },
+  { icon: Network,   label: "Microsoft Azure",      blurb: "VMs, VNets, identity, monitoring.",       color: "#0078D4" },
+  { icon: Container, label: "Docker",               blurb: "Images, containers, Compose.",            color: "#2496ED" },
+  { icon: Boxes,     label: "Kubernetes",           blurb: "Pods, deployments, scaling.",             color: "#326CE5" },
+];
+
+const FEATURE_NOTES = [
+  { icon: Zap,    title: "Interactive lessons", desc: "Quizzes and games make it stick — not just reading.", tone: "", pin: "#EF4444", tilt: "-2deg" },
+  { icon: Trophy, title: "Track your progress", desc: "Earn scores on every lesson and watch your percentage climb.", tone: "blue", pin: "#2563EB", tilt: "1.5deg" },
+  { icon: Users,  title: "Teacher dashboard",   desc: "Cassandra sees every student's progress, grades, and sends updates.", tone: "pink", pin: "#16A34A", tilt: "-1deg" },
+];
+
+/* Books on the hero shelf — heights vary so it reads like a real shelf */
+const SHELF_SIZES = ["tall", "", "short", "wide", "", "tall", "short", "", "wide lean", ""];
+
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+  align = "center",
+}: {
+  eyebrow: string;
+  title: React.ReactNode;
+  description?: string;
+  align?: "center" | "left";
+}) {
+  return (
+    <div className={`${align === "center" ? "text-center mx-auto" : ""} max-w-2xl mb-12`}>
+      <p className={`eyebrow mb-4 ${align === "center" ? "justify-center" : ""}`}>{eyebrow}</p>
+      <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight mb-4" style={{ color: "var(--text)" }}>
+        {title}
+      </h2>
+      {description && <p className="text-base leading-relaxed" style={{ color: "var(--text-muted)" }}>{description}</p>}
+    </div>
+  );
+}
+
 export default async function LandingPage() {
   const { userId } = await auth();
   if (userId) redirect("/dashboard");
-
-  const tracks = [
-    { icon: Terminal,  label: "Linux Administration", color: "#F59E0B", bg: "#F59E0B10" },
-    { icon: Cloud,     label: "AWS Cloud",            color: "#FF9900", bg: "#FF990010" },
-    { icon: Network,   label: "Microsoft Azure",      color: "#0078D4", bg: "#0078D410" },
-    { icon: Container, label: "Docker",               color: "#2496ED", bg: "#2496ED10" },
-    { icon: Boxes,     label: "Kubernetes",           color: "#326CE5", bg: "#326CE510" },
-  ];
-
-  const features = [
-    { icon: Zap,    title: "Interactive Lessons",  desc: "Hands-on quizzes and games make learning stick — not just reading.", color: "#2563EB" },
-    { icon: Trophy, title: "Track Your Progress",  desc: "Earn scores on every lesson. Watch your knowledge percentage grow.", color: "#F97316" },
-    { icon: Users,  title: "Teacher Dashboard",    desc: "Cassandra can see every student's progress, grades, and send updates.", color: "#0EA5E9" },
-  ];
 
   // Duplicate testimonials so the loop is seamless
   const doubled = [...TESTIMONIALS, ...TESTIMONIALS];
 
   return (
-    <div className="min-h-screen relative" style={{ background: "var(--bg)" }}>
-      <RainAnimation />
-
+    <div className="min-h-screen relative" style={{ background: "transparent" }}>
       {/* Nav */}
-      <header className="relative z-10 max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 font-bold text-lg">
+      <header className="relative z-10 max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+        <a href="#top" className="flex items-center gap-3">
           <span
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm"
-            style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
+            className="w-10 h-10 rounded-md flex items-center justify-center text-white"
+            style={{
+              background: "linear-gradient(160deg, #2563EB, #1e40af)",
+              boxShadow: "3px 3px 0 var(--accent)",
+              clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%)",
+            }}
           >
-            C
+            <BookMarked size={18} />
           </span>
-          <span className="gradient-text">ComplxSimple</span>
-        </div>
+          <span className="font-serif text-xl font-bold tracking-tight" style={{ color: "var(--text)" }}>
+            ComplxSimple
+          </span>
+        </a>
+        <nav className="hidden md:flex items-center gap-6 text-sm font-semibold" style={{ color: "var(--text-muted)" }}>
+          <a href="#curriculum" className="hover:opacity-70 transition-opacity">Curriculum</a>
+          <a href="#projects" className="hover:opacity-70 transition-opacity">Projects</a>
+          <a href="#pricing" className="hover:opacity-70 transition-opacity">Tuition</a>
+          <a href="#faq" className="hover:opacity-70 transition-opacity">Office hours</a>
+        </nav>
         <div className="flex items-center gap-3">
           <a
             href="#info-sessions"
@@ -223,268 +272,331 @@ export default async function LandingPage() {
             <span className="hidden lg:inline">Info Sessions</span>
           </a>
           <ThemeToggle />
-          <SignInBtn
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-all hover:scale-105 active:scale-95"
-            style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
-          />
+          <SignInBtn className="btn-ink btn-sm" />
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-24 text-center">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full blur-3xl" style={{ background: "rgba(37,99,235,0.12)" }} />
-          <div className="absolute top-20 right-1/4 w-80 h-80 rounded-full blur-3xl"      style={{ background: "rgba(249,115,22,0.10)" }} />
-          <div className="absolute bottom-0 left-1/2 w-96 h-96 rounded-full blur-3xl"     style={{ background: "rgba(14,165,233,0.08)" }} />
-        </div>
-        <div className="relative">
-          <div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-6"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
-          >
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }} />
-            Next cohort date to be announced &mdash; Limited seats
+      <section id="top" className="relative z-10 max-w-7xl mx-auto px-6 pt-10 pb-24 lg:pt-16">
+        <div className="grid lg:grid-cols-[1fr_1.1fr] gap-14 items-center">
+          <div>
+            <p className="eyebrow mb-6">Cohort-based · Live instruction · Invite only</p>
+            <h1
+              className="font-serif text-5xl sm:text-6xl lg:text-[4.4rem] font-bold tracking-tight mb-7 leading-[1.05]"
+              style={{ color: "var(--text)" }}
+            >
+              Become a job-ready{" "}
+              <span className="highlighter">DevOps &amp; Cloud</span> Engineer.
+            </h1>
+            <p className="text-lg sm:text-xl max-w-xl mb-9 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+              Live, interactive classes and modules with dedicated instructors, plus a portfolio of real infrastructure. Hands-on labs and mentorship that follows you into the job hunt.
+            </p>
+            <EnrollmentButtons />
+            <InviteOnlyNote className="mt-6" />
+
+            <dl className="mt-12 grid grid-cols-3 gap-4 max-w-md">
+              {[
+                { k: "10+", v: "Interactive modules" },
+                { k: "7", v: "Portfolio projects" },
+                { k: "1", v: "AWS voucher" },
+              ].map((s) => (
+                <div key={s.v} className="border-l-2 pl-4" style={{ borderColor: "var(--accent)" }}>
+                  <dt className="font-serif text-3xl font-bold leading-none" style={{ color: "var(--text)" }}>{s.k}</dt>
+                  <dd className="text-xs mt-1.5 font-medium" style={{ color: "var(--text-muted)" }}>{s.v}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <h1
-            className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-6 leading-tight"
-            style={{ color: "var(--text)" }}
-          >
-            Become a Job-Ready
-            <br />
-            <span className="gradient-text">DevOps &amp; Cloud Engineer</span>
-          </h1>
-          <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--text-muted)" }}>
-            Live instructor-led training with hands-on labs and real projects that get you hired.
-          </p>
-          <EnrollmentButtons />
-          <InviteOnlyNote className="mt-6" />
+
+          {/* The shelf */}
+          <div className="relative pt-10">
+            <div className="sticky-note absolute -top-2 right-2 sm:right-6 z-20 w-44 p-4" style={{ ["--tilt" as string]: "4deg" }}>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-70 mb-1">Reminder</p>
+              <p className="font-serif text-base font-bold leading-snug">Next cohort date TBA — limited seats.</p>
+            </div>
+
+            <div className="index-card p-5 pt-0 mb-8 max-w-xs">
+              <div className="index-card-title">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
+                  Course catalog · Fall syllabus
+                </p>
+              </div>
+              <p className="font-serif text-lg font-bold leading-snug mt-2" style={{ color: "var(--text)" }}>
+                DevOps &amp; Cloud Engineering Bootcamp
+              </p>
+              <p className="text-sm mt-1.5" style={{ color: "var(--text-muted)" }}>
+                Instructor: Cassandra Carter · Foundation → Cloud → Automation
+              </p>
+            </div>
+
+            <div className="bookshelf overflow-x-auto sm:overflow-visible">
+              {CURRICULUM.map((m, i) => (
+                <a
+                  key={m.number}
+                  href="#curriculum"
+                  className={`book-spine ${SHELF_SIZES[i] ?? ""}`}
+                  style={{ ["--book-color" as string]: m.color }}
+                  title={`Module ${m.number}: ${m.title}`}
+                >
+                  <span className="spine-badge text-[11px] font-black">{m.number}</span>
+                  <span className="spine-title">{"spine" in m && m.spine ? m.spine : m.title}</span>
+                  <span className="text-[9px] font-bold tracking-widest opacity-80">CS</span>
+                </a>
+              ))}
+            </div>
+            <p className="text-center text-xs mt-6 font-medium" style={{ color: "var(--text-muted)" }}>
+              Ten volumes. Pull one off the shelf below.
+            </p>
+          </div>
         </div>
       </section>
 
       <InfoSessionsSection />
 
-      {/* Tools */}
+      {/* Tools — the supply list */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <p className="text-center text-xs font-bold uppercase tracking-[0.22em] mb-6" style={{ color: "var(--text-muted)" }}>
-          Tools you&apos;ll master
-        </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          {TOOLS.map((tool) => (
-            <div
-              key={tool}
-              className="px-5 py-3 rounded-2xl text-sm font-bold transition-transform hover:-translate-y-1"
-              style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", boxShadow: "0 8px 24px rgba(15,23,42,0.05)" }}
-            >
-              {tool}
-            </div>
-          ))}
+        <div className="index-card p-6 sm:p-8 pt-0">
+          <div className="index-card-title">
+            <p className="eyebrow">Required supplies</p>
+          </div>
+          <div className="flex flex-wrap gap-2.5 mt-3">
+            {TOOLS.map((tool) => (
+              <span
+                key={tool}
+                className="px-4 py-2 rounded-lg text-sm font-bold font-serif transition-transform hover:-translate-y-0.5"
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+              >
+                {tool}
+              </span>
+            ))}
+            <span className="px-4 py-2 rounded-lg text-sm italic" style={{ color: "var(--text-muted)" }}>
+              …and a notebook. Laptop optional; curiosity mandatory.
+            </span>
+          </div>
         </div>
       </section>
 
-      {/* Tracks */}
+      {/* Tracks — five books on the desk */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <h2 className="text-3xl font-bold text-center mb-3" style={{ color: "var(--text)" }}>Core Skills You&apos;ll Build</h2>
-        <p className="text-center mb-12 text-sm" style={{ color: "var(--text-muted)" }}>Start with Linux, then move into cloud platforms, containers, automation, and operations.</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
-          {tracks.map((track) => (
+        <SectionHeading
+          eyebrow="Core skills"
+          title={<>Five textbooks, one <span className="pencil-underline">career</span>.</>}
+          description="Start with Linux, then move into cloud platforms, containers, automation, and operations."
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          {TRACKS.map((track) => (
             <div
               key={track.label}
-              className="card p-5 flex flex-col items-center text-center gap-3 hover:scale-105 transition-transform cursor-default"
+              className="book-cover hover:-translate-y-1 transition-transform"
+              style={{ ["--book-color" as string]: track.color }}
             >
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                style={{ background: track.bg, border: `1px solid ${track.color}33` }}
-              >
-                <track.icon size={24} style={{ color: track.color }} />
+              <div className="relative z-10 p-5 flex flex-col gap-3 min-h-[168px]">
+                <div
+                  className="w-11 h-11 rounded-lg flex items-center justify-center"
+                  style={{ background: `${track.color}1a`, border: `1px solid ${track.color}44` }}
+                >
+                  <track.icon size={20} style={{ color: track.color }} />
+                </div>
+                <div className="mt-auto">
+                  <p className="font-serif font-bold leading-tight" style={{ color: "var(--text)" }}>{track.label}</p>
+                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{track.blurb}</p>
+                </div>
               </div>
-              <p className="font-semibold text-xs" style={{ color: "var(--text)" }}>{track.label}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Linux spotlight — Cassandra's quote */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div
-          className="rounded-3xl p-8 sm:p-10 relative overflow-hidden"
-          style={{ background: "linear-gradient(135deg, #1c1917 0%, #292524 100%)", border: "1px solid #44403c" }}
-        >
-          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: "radial-gradient(circle at 70% 50%, #F59E0B, transparent 60%)" }} />
-          <div className="relative flex flex-col sm:flex-row items-start gap-6">
+      {/* Linux spotlight — on the chalkboard */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-28">
+        <div className="chalkboard p-8 sm:p-12">
+          <div className="flex flex-col sm:flex-row items-start gap-8">
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl"
-              style={{ background: "#F59E0B20", border: "1px solid #F59E0B44" }}
+              className="w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0 text-3xl"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px dashed rgba(255,255,255,0.3)" }}
             >
               🐧
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Terminal size={14} style={{ color: "#F59E0B" }} />
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#F59E0B" }}>Linux Mastery Track</span>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-4">
+                <Terminal size={14} />
+                <span className="text-xs font-bold uppercase tracking-[0.2em]">Today&apos;s lesson — Linux Mastery Track</span>
               </div>
-              <p className="text-lg font-semibold leading-relaxed mb-3" style={{ color: "#fafaf9" }}>
-                &ldquo;This is not just a certification — it&apos;s a <span style={{ color: "#F59E0B" }}>job-ready pathway</span> to managing servers at scale. At the end of this training you should be confident applying to System Admin roles and managing servers and Linux environments at scale!&rdquo;
+              <p className="font-serif text-xl sm:text-2xl leading-relaxed mb-5">
+                &ldquo;This is not just a certification — it&apos;s a{" "}
+                <span className="chalk-line">job-ready pathway</span>{" "}to managing servers at scale. At the end of this training you should be confident applying to System Admin roles and managing servers and Linux environments at scale!&rdquo;
               </p>
-              <p className="text-sm font-semibold" style={{ color: "#a8a29e" }}>— Cassandra Carter</p>
+              <p className="text-sm font-semibold chalk-muted">— Cassandra Carter, written on the board</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
+      {/* Features — sticky notes on the cork board */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {features.map((f) => (
-            <div key={f.title} className="card p-8">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: `${f.color}18` }}
-              >
-                <f.icon size={22} style={{ color: f.color }} />
-              </div>
-              <h3 className="font-bold text-lg mb-2" style={{ color: "var(--text)" }}>{f.title}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Why choose the program */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#2563EB" }}>Why choose us</p>
-          <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>
-            Everything you need to launch your cloud career
-          </h2>
-          <p style={{ color: "var(--text-muted)" }}>A premium learning experience built around practice, mentorship, and job-ready results.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {BENEFITS.map((benefit, index) => (
-            <div key={benefit.title} className="card p-6">
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: index % 2 === 0 ? "#2563EB14" : "#F9731614" }}
-              >
-                <benefit.icon size={20} style={{ color: index % 2 === 0 ? "#2563EB" : "#F97316" }} />
-              </div>
-              <h3 className="font-bold mb-2" style={{ color: "var(--text)" }}>{benefit.title}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>{benefit.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Curriculum */}
-      <section className="relative z-10 pb-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-12">
-            <div className="max-w-2xl">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#F97316" }}>Program curriculum</p>
-              <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>10 modules. Zero to job-ready.</h2>
-              <p style={{ color: "var(--text-muted)" }}>A structured roadmap covering the essential DevOps and cloud engineering skills employers expect.</p>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-              <Server size={20} style={{ color: "#2563EB" }} />
-              <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>Foundation → Cloud → Automation</span>
-            </div>
+        <div className="cork-board rounded-2xl p-6 sm:p-10">
+          <div className="flex items-center gap-2 mb-8">
+            <Pin size={16} className="text-white/80" />
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/85">Pinned to the board</p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {CURRICULUM.map((module) => (
-              <div key={module.number} className="card p-6 sm:p-7">
-                <div className="flex items-start gap-4">
-                  <span
-                    className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-xs font-black"
-                    style={{ background: "linear-gradient(135deg, #2563EB, #0EA5E9)", color: "white" }}
-                  >
-                    {module.number}
-                  </span>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1" style={{ color: "var(--text-muted)" }}>Module {module.number}</p>
-                    <h3 className="text-lg font-bold mb-4" style={{ color: "var(--text)" }}>{module.title}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {module.topics.map((topic) => (
-                        <span
-                          key={topic}
-                          className="px-2.5 py-1 rounded-lg text-xs"
-                          style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
-                        >
-                          {topic}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {FEATURE_NOTES.map((f) => (
+              <div
+                key={f.title}
+                className={`sticky-note ${f.tone} p-6 pt-8`}
+                style={{ ["--tilt" as string]: f.tilt }}
+              >
+                <span className="push-pin" style={{ ["--pin" as string]: f.pin }} />
+                <f.icon size={22} className="mb-3 opacity-80" />
+                <h3 className="font-serif font-bold text-xl mb-2 leading-tight">{f.title}</h3>
+                <p className="text-sm leading-relaxed opacity-85">{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Projects */}
+      {/* Why choose the program — index cards */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#2563EB" }}>Real-world projects</p>
-          <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>Build a portfolio recruiters take seriously</h2>
-          <p style={{ color: "var(--text-muted)" }}>Complete production-style projects across the full DevOps lifecycle.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {PROJECTS.map((project) => (
-            <div key={project.title} className="card p-6 group">
-              <div className="flex items-center justify-between mb-5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "#2563EB14" }}>
-                  <project.icon size={20} style={{ color: "#2563EB" }} />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full" style={{ background: "#F9731612", color: "#F97316" }}>
-                  {project.tag}
+        <SectionHeading
+          eyebrow="Why choose us"
+          title="Everything you need to launch your cloud career"
+          description="A premium learning experience built around practice, mentorship, and job-ready results."
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {BENEFITS.map((benefit, index) => (
+            <div key={benefit.title} className="index-card p-5 pt-0">
+              <div className="index-card-title gap-3">
+                <span
+                  className="w-8 h-8 rounded-md flex items-center justify-center"
+                  style={{ background: index % 2 === 0 ? "#2563EB14" : "#F9731614" }}
+                >
+                  <benefit.icon size={16} style={{ color: index % 2 === 0 ? "var(--primary)" : "var(--accent)" }} />
                 </span>
+                <h3 className="font-serif font-bold" style={{ color: "var(--text)" }}>{benefit.title}</h3>
               </div>
-              <h3 className="font-bold leading-snug" style={{ color: "var(--text)" }}>{project.title}</h3>
+              <p className="text-sm leading-7 mt-2" style={{ color: "var(--text-muted)" }}>{benefit.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Certification */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div
-          className="rounded-3xl p-8 sm:p-12 relative overflow-hidden"
-          style={{ background: "linear-gradient(135deg, #172554, #1e3a8a 55%, #0c4a6e)", border: "1px solid rgba(96,165,250,0.35)" }}
-        >
-          <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full" style={{ background: "rgba(56,189,248,0.16)", filter: "blur(50px)" }} />
-          <div className="relative grid md:grid-cols-[auto_1fr] gap-7 items-center">
-            <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)" }}>
-              <GraduationCap size={36} style={{ color: "#7dd3fc" }} />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] mb-2" style={{ color: "#7dd3fc" }}>Certification track</p>
-              <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">AWS Certified Solutions Architect Associate (SAA-C03)</h2>
-              <p className="leading-relaxed mb-5" style={{ color: "rgba(255,255,255,0.7)" }}>
-                Get structured exam preparation, practical labs, and support designed to help you test with confidence.
+      {/* Curriculum — table of contents in an open textbook */}
+      <section id="curriculum" className="relative z-10 max-w-7xl mx-auto px-6 pb-24 scroll-mt-20">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-12">
+          <div className="max-w-2xl">
+            <p className="eyebrow mb-4">Program curriculum</p>
+            <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight mb-4" style={{ color: "var(--text)" }}>
+              Table of contents. Ten chapters, zero to job-ready.
+            </h2>
+            <p style={{ color: "var(--text-muted)" }}>A structured roadmap covering the essential DevOps and cloud engineering skills employers expect.</p>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <Server size={20} style={{ color: "var(--primary)" }} />
+            <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>Foundation → Cloud → Automation</span>
+          </div>
+        </div>
+
+        <div className="open-book">
+          {[CURRICULUM.slice(0, 5), CURRICULUM.slice(5)].map((half, pageIndex) => (
+            <div key={pageIndex} className="page">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] mb-6" style={{ color: "var(--text-muted)" }}>
+                {pageIndex === 0 ? "Part I · Foundations & Cloud" : "Part II · Orchestration & Automation"}
               </p>
-              <div className="inline-flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)" }}>
-                <Award size={20} style={{ color: "#fbbf24" }} />
-                <span className="text-sm font-bold text-white">Free AWS Solutions Architect Associate exam voucher included</span>
+              <ol className="space-y-7">
+                {half.map((module) => (
+                  <li key={module.number}>
+                    <div className="toc-row">
+                      <span className="font-serif text-2xl font-bold w-10 flex-shrink-0" style={{ color: module.color }}>
+                        {module.number}
+                      </span>
+                      <span className="font-serif text-lg font-bold" style={{ color: "var(--text)" }}>{module.title}</span>
+                      <span className="toc-leader" />
+                      <span className="text-xs font-semibold flex-shrink-0" style={{ color: "var(--text-muted)" }}>
+                        {module.topics.length} topics
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-3 pl-10">
+                      {module.topics.map((topic) => (
+                        <span
+                          key={topic}
+                          className="px-2 py-0.5 rounded text-[11px]"
+                          style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
+                        >
+                          {topic}
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <p className="text-center text-xs mt-10 font-serif italic" style={{ color: "var(--text-muted)" }}>
+                — {pageIndex === 0 ? "i" : "ii"} —
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Projects — lab notebook */}
+      <section id="projects" className="relative z-10 max-w-7xl mx-auto px-6 pb-24 scroll-mt-20">
+        <SectionHeading
+          eyebrow="Lab notebook"
+          title="Build a portfolio recruiters take seriously"
+          description="Complete production-style projects across the full DevOps lifecycle. Every one goes in your notebook."
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7 pt-3">
+          {PROJECTS.map((project, i) => (
+            <article
+              key={project.title}
+              className="notebook-sheet relative rounded-md p-6 pl-12 min-h-[164px] flex flex-col"
+              style={{ border: "1px solid var(--border)", boxShadow: "0 10px 26px rgba(30,20,5,0.08)" }}
+            >
+              <span className={`washi-tape ${i % 3 === 0 ? "left" : i % 3 === 1 ? "" : "right"}`} />
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "#2563EB14" }}>
+                  <project.icon size={18} style={{ color: "var(--primary)" }} />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full" style={{ background: "#F9731614", color: "var(--accent)" }}>
+                  {project.tag}
+                </span>
               </div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1" style={{ color: "var(--text-muted)" }}>
+                Project {String(i + 1).padStart(2, "0")}
+              </p>
+              <h3 className="font-serif font-bold text-lg leading-snug" style={{ color: "var(--text)" }}>{project.title}</h3>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* Certification — the diploma */}
+      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-24">
+        <div className="diploma p-10 sm:p-14 text-center">
+          <p className="eyebrow justify-center mb-5">Certification track</p>
+          <h2 className="font-serif text-2xl sm:text-4xl font-bold mb-3" style={{ color: "var(--text)" }}>
+            AWS Certified Solutions Architect
+            <br className="hidden sm:block" /> Associate (SAA-C03)
+          </h2>
+          <p className="max-w-xl mx-auto leading-relaxed mb-8" style={{ color: "var(--text-muted)" }}>
+            Structured exam preparation, practical labs, and support designed to help you test with confidence.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+            <div className="diploma-seal">
+              <GraduationCap size={30} />
+            </div>
+            <div className="inline-flex items-center gap-3 px-5 py-3 rounded-lg text-left" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+              <Award size={20} style={{ color: "#B8860B" }} />
+              <span className="text-sm font-bold" style={{ color: "var(--text)" }}>Free SAA exam voucher included with enrollment</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Stark teaser */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div
-          className="rounded-3xl p-8 sm:p-12 relative overflow-hidden"
-          style={{ background: "linear-gradient(135deg, #020d0d 0%, #071a17 40%, #030f0f 100%)", border: "1px solid rgba(20,184,166,0.25)" }}
-        >
-          {/* Teal glow blobs */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute -top-20 left-1/4 w-96 h-96 rounded-full" style={{ background: "rgba(20,184,166,0.12)", filter: "blur(70px)" }} />
-            <div className="absolute -bottom-20 right-1/3 w-72 h-72 rounded-full" style={{ background: "rgba(13,148,136,0.10)", filter: "blur(60px)" }} />
-          </div>
-
-          <div className="relative flex flex-col md:flex-row items-start md:items-center gap-8">
-            {/* Logo mark */}
+      {/* Stark teaser — teal chalk on the board */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-28">
+        <div className="chalkboard p-8 sm:p-12" style={{ ["--board" as string]: "#0b201e", ["--board-edge" as string]: "#07302b" }}>
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
             <div
               className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0"
               style={{
@@ -497,86 +609,77 @@ export default async function LandingPage() {
             </div>
 
             <div className="flex-1">
-              {/* Name + badge */}
               <div className="flex items-center gap-3 mb-3 flex-wrap">
-                <h2
-                  className="font-extrabold text-white leading-none"
-                  style={{
-                    fontSize: "clamp(28px, 5vw, 40px)",
-                    letterSpacing: "0.18em",
-                  }}
-                >
+                <h2 className="font-extrabold text-white leading-none" style={{ fontSize: "clamp(28px, 5vw, 40px)", letterSpacing: "0.18em" }}>
                   STARK
                 </h2>
-                <span
-                  className="font-bold text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-full"
-                  style={{
-                    color: "#14B8A6",
-                    border: "1px solid #14B8A644",
-                    background: "#14B8A610",
-                  }}
-                >
-                  INCLUDED WITH ENROLLMENT
-                </span>
+                <span className="stamp" style={{ ["--stamp" as string]: "#5eead4" }}>Included with enrollment</span>
               </div>
 
-              <p className="text-base leading-relaxed mb-5" style={{ color: "rgba(255,255,255,0.6)", maxWidth: "580px" }}>
-                Join the platform and get access to Stark, your course-aware AI learning assistant. Ask questions about lessons, break down Linux and cloud concepts, review DevOps tools, and get guidance whenever you need it.
+              <p className="text-base leading-relaxed mb-5 chalk-muted" style={{ maxWidth: "580px" }}>
+                Your course-aware AI teaching assistant. Ask questions about lessons, break down Linux and cloud concepts, review DevOps tools, and get guidance whenever office hours are closed.
               </p>
 
-              <div className="flex flex-wrap gap-2 mb-5">
-                {["Course-specific knowledge", "Linux & Cloud Q&A", "DevOps explanations", "Career guidance", "Available to enrolled students"].map((tag) => (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {["Course-specific knowledge", "Linux & Cloud Q&A", "DevOps explanations", "Career guidance", "Enrolled students only"].map((tag) => (
                   <span
                     key={tag}
                     className="text-xs font-medium px-3 py-1.5 rounded-full"
-                    style={{ background: "rgba(20,184,166,0.08)", color: "#5eead4", border: "1px solid rgba(20,184,166,0.2)" }}
+                    style={{ background: "rgba(20,184,166,0.1)", color: "#5eead4", border: "1px dashed rgba(94,234,212,0.4)" }}
                   >
                     {tag}
                   </span>
                 ))}
               </div>
 
-              <SignUpBtn
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
-                style={{ background: "#14B8A6", color: "#fff" }}
-              >
-                Sign in to access Stark
+              <SignUpBtn className="btn-ink btn-sm" style={{ ["--ink" as string]: "#14B8A6", ["--paper" as string]: "#062b28", ["--accent" as string]: "#5eead4" }}>
+                Sign in to meet Stark
               </SignUpBtn>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Testimonials — infinite horizontal marquee */}
+      {/* Testimonials — notes passed around class */}
       <section className="relative z-10 pb-32">
-        <h2 className="text-3xl font-bold text-center mb-3 px-6" style={{ color: "var(--text)" }}>What Students Say</h2>
-        <p className="text-center mb-10 text-sm px-6" style={{ color: "var(--text-muted)" }}>Real feedback from Cassandra&apos;s students</p>
+        <div className="px-6">
+          <SectionHeading
+            eyebrow="From the guest book"
+            title="What students say"
+            description="Real feedback from Cassandra's students."
+          />
+        </div>
 
-        <div className="marquee-wrapper">
+        <div className="marquee-wrapper py-4">
           <div className="marquee-track">
             {doubled.map((t, i) => (
               <div
                 key={i}
-                className="card mx-4 p-6 flex-shrink-0"
-                style={{ width: "360px", maxWidth: "90vw", position: "relative" }}
+                className="index-card mx-4 p-6 pt-0 flex-shrink-0"
+                style={{ width: "360px", maxWidth: "90vw" }}
               >
-                <Quote size={28} className="mb-3 opacity-20" style={{ color: "#2563EB" }} />
+                <div className="index-card-title justify-between">
+                  <Quote size={20} style={{ color: "var(--accent)" }} />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
+                    Note #{(i % TESTIMONIALS.length) + 1}
+                  </span>
+                </div>
                 <p
-                  className="text-sm leading-relaxed mb-4"
-                  style={{ color: "var(--text-muted)", display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+                  className="text-sm leading-7 mb-4 mt-1"
+                  style={{ color: "var(--text)", display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical", overflow: "hidden" }}
                 >
                   {t.text}
                 </p>
-                <div className="flex items-center gap-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
+                <div className="flex items-center gap-3 pt-3">
                   <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 font-serif"
                     style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
                   >
                     {t.name[0]}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{t.name}</p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>ComplxSimple Student</p>
+                    <p className="text-sm font-bold font-serif" style={{ color: "var(--text)" }}>{t.name}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>ComplxSimple student</p>
                   </div>
                 </div>
               </div>
@@ -585,141 +688,129 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="relative z-10 max-w-6xl mx-auto px-6 pb-24">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#F97316" }}>Pricing</p>
-          <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>Programs &amp; tuition</h2>
-          <p style={{ color: "var(--text-muted)" }}>
-            The DevOps bootcamp and the instructor course are separate programs with different pricing.
-          </p>
-        </div>
+      {/* Pricing — tuition folder */}
+      <section id="pricing" className="relative z-10 max-w-6xl mx-auto px-6 pb-24 scroll-mt-20">
+        <SectionHeading
+          eyebrow="Tuition"
+          title="Programs &amp; tuition"
+          description="The DevOps bootcamp and the instructor course are separate programs with different pricing."
+        />
 
-        <div className="card overflow-hidden mb-6">
-          <div className="grid lg:grid-cols-[0.85fr_1.15fr]">
-            <div className="p-8 sm:p-10" style={{ background: "linear-gradient(145deg, #111827, #172554)", color: "white" }}>
-              <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold mb-6" style={{ background: "#2563EB25", border: "1px solid #2563EB55", color: "#93C5FD" }}>
-                DevOps bootcamp
-              </span>
-              <h3 className="text-2xl font-black mb-3">Complete Bootcamp</h3>
-              <p className="text-sm leading-relaxed mb-8" style={{ color: "rgba(255,255,255,0.65)" }}>
-                Everything included—live training, labs, projects, mentorship, career support, Stark access, and certification preparation.
-              </p>
-              <p className="text-lg font-bold mb-2">Tuition by cohort</p>
-              <p className="text-sm leading-relaxed mb-8" style={{ color: "rgba(255,255,255,0.65)" }}>
-                Bootcamp pricing is not the same as the instructor course below. Schedule a free consultation for current tuition, installment plans, and seat availability.
-              </p>
-              <SignUpBtn
-                className="w-full py-3.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
-                style={{ background: "linear-gradient(135deg, #2563EB, #F97316)", color: "white" }}
-              >
-                Sign in (invite only)
-              </SignUpBtn>
-              <p className="text-center text-xs mt-4" style={{ color: "rgba(255,255,255,0.5)" }}>Next cohort date to be announced</p>
-            </div>
-
-            <div className="p-8 sm:p-10">
-              <div className="flex items-center gap-3 mb-7">
-                <Network size={22} style={{ color: "#2563EB" }} />
-                <h3 className="text-lg font-bold" style={{ color: "var(--text)" }}>Everything included in the bootcamp</h3>
+        <div className="relative mt-8 mb-12">
+          <span className="folder-tab">Bootcamp · Tuition folder</span>
+          <div className="card overflow-hidden rounded-tl-none">
+            <div className="grid lg:grid-cols-[0.85fr_1.15fr]">
+              <div className="chalkboard flat p-8 sm:p-10">
+                <span className="stamp mb-6" style={{ ["--stamp" as string]: "#fde68a" }}>DevOps bootcamp</span>
+                <h3 className="font-serif text-3xl font-bold mb-3 mt-4">Complete Bootcamp</h3>
+                <p className="text-sm leading-relaxed mb-8 chalk-muted">
+                  Everything included—live training, labs, projects, mentorship, career support, Stark access, and certification preparation.
+                </p>
+                <p className="font-serif text-xl font-bold mb-2">Tuition by cohort</p>
+                <p className="text-sm leading-relaxed mb-8 chalk-muted">
+                  Bootcamp pricing is not the same as the instructor course. Schedule a free consultation for current tuition, installment plans, and seat availability.
+                </p>
+                <SignUpBtn className="btn-ink w-full" style={{ ["--ink" as string]: "#E9F1EB", ["--paper" as string]: "#1F3B32", ["--accent" as string]: "#fde68a" }}>
+                  Sign in (invite only)
+                </SignUpBtn>
+                <p className="text-center text-xs mt-4 chalk-muted">Next cohort date to be announced</p>
               </div>
-              <div className="grid sm:grid-cols-2 gap-x-7 gap-y-4">
-                {PRICING_FEATURES.map((feature) => (
-                  <div key={feature} className="flex items-start gap-3">
-                    <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "#16A34A16" }}>
-                      <Check size={12} strokeWidth={3} style={{ color: "#16A34A" }} />
-                    </span>
-                    <span className="text-sm" style={{ color: "var(--text-muted)" }}>{feature}</span>
-                  </div>
-                ))}
+
+              <div className="p-8 sm:p-10">
+                <div className="flex items-center gap-3 mb-7">
+                  <Network size={22} style={{ color: "var(--primary)" }} />
+                  <h3 className="font-serif text-xl font-bold" style={{ color: "var(--text)" }}>Everything included in the bootcamp</h3>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-x-7 gap-y-3.5">
+                  {PRICING_FEATURES.map((feature) => (
+                    <div key={feature} className="flex items-start gap-3">
+                      <span className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5" style={{ border: "2px solid var(--ink)", background: "var(--surface-2)" }}>
+                        <Check size={12} strokeWidth={3} style={{ color: "#16A34A" }} />
+                      </span>
+                      <span className="text-sm" style={{ color: "var(--text)" }}>{feature}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="card p-8 sm:p-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+        <div className="index-card p-8 sm:p-10 pt-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div className="max-w-xl">
-            <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold mb-4" style={{ background: "#F9731620", border: "1px solid #F9731644", color: "#F97316" }}>
-              Separate program
-            </span>
-            <h3 className="text-xl font-black mb-2" style={{ color: "var(--text)" }}>Instructor course</h3>
-            <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
+            <div className="index-card-title">
+              <span className="stamp">Separate program</span>
+            </div>
+            <h3 className="font-serif text-2xl font-bold mb-2 mt-2" style={{ color: "var(--text)" }}>Instructor course</h3>
+            <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
               This is not the DevOps bootcamp. It is Cassandra&apos;s instructor-focused program with its own curriculum and enrollment.
             </p>
           </div>
-          <div className="text-left sm:text-right flex-shrink-0">
+          <div className="text-left sm:text-right flex-shrink-0 sm:pt-8">
             <div className="flex items-end gap-2 sm:justify-end mb-1">
-              <span className="text-4xl font-black" style={{ color: "var(--text)" }}>$1,600+</span>
+              <span className="font-serif text-4xl font-bold" style={{ color: "var(--text)" }}>$1,600+</span>
               <span className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>one-time</span>
             </div>
             <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Installment payment available—contact the administrator for details.</p>
-            <a
-              href="#info-sessions"
-              className="px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-[1.02] inline-block"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
-            >
+            <a href="#info-sessions" className="btn-paper btn-sm">
               Inquire about instructor course
             </a>
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="relative z-10 max-w-4xl mx-auto px-6 pb-24">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl sm:text-4xl font-black mb-3" style={{ color: "var(--text)" }}>Frequently asked questions</h2>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>The essentials before you enroll.</p>
-        </div>
-        <div className="space-y-3">
-          {FAQS.map((faq) => (
-            <details key={faq.question} className="card group p-5">
-              <summary className="cursor-pointer list-none flex items-center justify-between gap-4 font-semibold" style={{ color: "var(--text)" }}>
-                {faq.question}
-                <span className="text-xl transition-transform group-open:rotate-45" style={{ color: "#2563EB" }}>+</span>
+      {/* FAQ — office hours */}
+      <section id="faq" className="relative z-10 max-w-4xl mx-auto px-6 pb-24 scroll-mt-20">
+        <SectionHeading
+          eyebrow="Office hours"
+          title="Frequently asked questions"
+          description="The essentials before you enroll."
+        />
+        <div className="notebook-sheet rounded-lg p-2 sm:p-4" style={{ border: "1px solid var(--border)", boxShadow: "0 12px 30px rgba(30,20,5,0.08)" }}>
+          {FAQS.map((faq, i) => (
+            <details key={faq.question} className="group px-4 sm:px-6 pl-12 sm:pl-14 py-3.5" style={{ borderBottom: i === FAQS.length - 1 ? "none" : "1px solid var(--border)" }}>
+              <summary className="cursor-pointer list-none flex items-start justify-between gap-4 font-serif font-bold text-base sm:text-lg leading-7" style={{ color: "var(--text)" }}>
+                <span><span className="mr-3" style={{ color: "var(--accent)" }}>Q{i + 1}.</span>{faq.question}</span>
+                <span className="text-xl leading-7 transition-transform group-open:rotate-45 flex-shrink-0" style={{ color: "var(--primary)" }}>+</span>
               </summary>
-              <p className="text-sm leading-relaxed pt-4 pr-8" style={{ color: "var(--text-muted)" }}>{faq.answer}</p>
+              <p className="text-sm leading-7 pt-2 pr-8" style={{ color: "var(--text-muted)" }}>
+                <span className="font-bold mr-2" style={{ color: "var(--primary)" }}>A.</span>{faq.answer}
+              </p>
             </details>
           ))}
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div
-          className="rounded-3xl p-10 sm:p-14 text-center relative overflow-hidden card"
-        >
-          <div className="absolute -top-16 left-1/4 w-64 h-64 rounded-full" style={{ background: "color-mix(in srgb, var(--primary) 12%, transparent)", filter: "blur(50px)" }} />
-          <div className="relative">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}>
-              <Rocket size={25} color="white" />
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>Start your cloud engineering career</h2>
-            <p className="max-w-2xl mx-auto mb-8" style={{ color: "var(--text-muted)" }}>
-              Master AWS, Azure, Docker, Kubernetes, Terraform, CI/CD, and DevOps through practical projects and expert mentorship.
-            </p>
-            <EnrollmentButtons />
-          <InviteOnlyNote className="mt-6" />
+      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-24">
+        <div className="index-card relative p-10 sm:p-14 pt-0 text-center">
+          <span className="washi-tape left" />
+          <span className="washi-tape right" />
+          <div className="index-card-title justify-center">
+            <p className="eyebrow">Enrollment</p>
           </div>
+          <h2 className="font-serif text-3xl sm:text-5xl font-bold mb-4 mt-4" style={{ color: "var(--text)" }}>
+            Your seat is waiting.
+          </h2>
+          <p className="max-w-2xl mx-auto mb-8 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+            Master AWS, Azure, Docker, Kubernetes, Terraform, CI/CD, and DevOps through practical projects and expert mentorship.
+          </p>
+          <EnrollmentButtons align="center" />
+          <InviteOnlyNote className="mt-6 justify-center" />
         </div>
       </section>
 
       {/* Footer */}
       <footer
-        className="relative z-10 border-t py-8 text-center text-sm"
+        className="relative z-10 border-t py-10 text-center text-sm"
         style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
       >
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-3">
-          <a
-            href="/pamphlet"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-105"
-            style={{ background: "linear-gradient(135deg, #2563EB, #F97316)", color: "white" }}
-          >
-            <Download size={15} /> Download Course Guide (PDF)
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-5">
+          <a href="/pamphlet" target="_blank" rel="noopener noreferrer" className="btn-paper btn-sm">
+            <Download size={15} /> Download course guide (PDF)
           </a>
         </div>
-        ComplxSimple &mdash; Built with ❤️ for Cassandra Carter&apos;s students
+        <p className="font-serif">ComplxSimple &mdash; Built with ❤️ for Cassandra Carter&apos;s students</p>
       </footer>
     </div>
   );

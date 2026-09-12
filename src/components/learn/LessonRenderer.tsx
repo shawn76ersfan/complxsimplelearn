@@ -10,12 +10,23 @@ import { MatchBlock } from "./blocks/MatchBlock";
 import { CrosswordBlock } from "./blocks/CrosswordBlock";
 import { PlaygroundBlock } from "./blocks/PlaygroundBlock";
 import { useSoundFeedback } from "@/lib/useSoundFeedback";
+import { Id } from "../../../convex/_generated/dataModel";
 
-interface BlockCompletion { score: number; max: number }
+interface BlockCompletion { score: number; max: number; selected?: number; texts?: string[]; completed?: boolean }
+
+export type LessonSubmitPayload = {
+  blockAnswers: Array<{
+    blockIndex: number;
+    selected?: number;
+    texts?: string[];
+    completed?: boolean;
+  }>;
+};
 
 interface Props {
+  lessonId: Id<"lessons">;
   contentJson: string;
-  onComplete: (score: number, maxScore: number) => void;
+  onComplete: (payload: LessonSubmitPayload) => void;
   locked?: boolean;
 }
 
@@ -26,7 +37,7 @@ function StaticBlock({ block }: { block: LessonBlock }) {
   return <LessonContent contentJson={fakeJson} />;
 }
 
-export function LessonRenderer({ contentJson, onComplete, locked = false }: Props) {
+export function LessonRenderer({ lessonId, contentJson, onComplete, locked = false }: Props) {
   const blocks = useMemo(() => parseBlocks(contentJson), [contentJson]);
   const { playComplete } = useSoundFeedback();
 
@@ -53,15 +64,25 @@ export function LessonRenderer({ contentJson, onComplete, locked = false }: Prop
 
   /** Called by each interactive block when the user finishes it. */
   const makeBlockCompleter = useCallback(
-    (index: number) => (score: number, max: number) => {
-      setCompletionMap((prev) => ({ ...prev, [index]: { score, max } }));
+    (index: number) => (detail: { score: number; max: number; selected?: number; texts?: string[] }) => {
+      setCompletionMap((prev) => ({
+        ...prev,
+        [index]: { ...detail, completed: true },
+      }));
     },
     []
   );
 
   function handleComplete() {
     playComplete();
-    onComplete(totalScore, totalMax);
+    onComplete({
+      blockAnswers: Object.entries(completionMap).map(([index, detail]) => ({
+        blockIndex: Number(index),
+        selected: detail.selected,
+        texts: detail.texts,
+        completed: true,
+      })),
+    });
   }
 
   // If already completed and has graded interactive content, show locked state
@@ -92,42 +113,58 @@ export function LessonRenderer({ contentJson, onComplete, locked = false }: Prop
           return <StaticBlock key={i} block={block} />;
         }
 
-        const completer = makeBlockCompleter(i);
         const isDone = i in completionMap;
+        const activityNumber = interactiveIndices.indexOf(i) + 1;
 
         return (
           <div
             key={i}
-            className="rounded-2xl p-6 transition-all"
+            className="relative rounded-2xl p-6 pt-7 mt-4 transition-all"
             style={{
               background: "var(--surface-2)",
-              border: `1px solid ${isDone ? "#0EA5E933" : "var(--border)"}`,
+              border: `1px solid ${isDone ? "#15803D55" : "var(--border)"}`,
+              boxShadow: isDone ? "none" : "inset 4px 0 0 var(--track-color, var(--accent))",
               opacity: isDone ? 0.85 : 1,
             }}
           >
+            <span
+              className="absolute -top-3 left-5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.16em]"
+              style={{
+                background: isDone ? "#15803D" : "var(--track-color, var(--accent))",
+                color: "#fff",
+              }}
+            >
+              {isDone ? "Done" : `Activity ${activityNumber} of ${interactiveIndices.length}`}
+            </span>
             {block.type === "flashcard" && (
-              <FlashcardBlock front={block.front} back={block.back} onComplete={completer} />
+              <FlashcardBlock front={block.front} back={block.back} onComplete={() => makeBlockCompleter(i)({ score: 1, max: 1 })} />
             )}
             {block.type === "fillblank" && (
-              <FillBlankBlock prompt={block.prompt} accepted={block.accepted} onComplete={completer} />
+              <FillBlankBlock
+                lessonId={lessonId}
+                blockIndex={i}
+                prompt={block.prompt}
+                blankCount={block.blankCount ?? block.accepted?.length ?? 1}
+                onComplete={(detail) => makeBlockCompleter(i)(detail)}
+              />
             )}
             {block.type === "quiz" && (
               <QuizBlock
+                lessonId={lessonId}
+                blockIndex={i}
                 question={block.question}
                 options={block.options}
-                correctIndex={block.correctIndex}
-                explanation={block.explanation}
-                onComplete={completer}
+                onComplete={(detail) => makeBlockCompleter(i)(detail)}
               />
             )}
             {block.type === "match" && (
-              <MatchBlock pairs={block.pairs} onComplete={completer} />
+              <MatchBlock pairs={block.pairs} onComplete={() => makeBlockCompleter(i)({ score: 1, max: 1 })} />
             )}
             {block.type === "crossword" && (
-              <CrosswordBlock pairs={block.pairs} onComplete={completer} />
+              <CrosswordBlock pairs={block.pairs} onComplete={() => makeBlockCompleter(i)({ score: 1, max: 1 })} />
             )}
             {block.type === "playground" && (
-              <PlaygroundBlock language={block.language} code={block.code} onComplete={completer} />
+              <PlaygroundBlock language={block.language} code={block.code} onComplete={() => makeBlockCompleter(i)({ score: 1, max: 1 })} />
             )}
           </div>
         );
@@ -135,13 +172,16 @@ export function LessonRenderer({ contentJson, onComplete, locked = false }: Prop
 
       {/* Complete button — appears once all interactive blocks are done */}
       {allDone && (
-        <button
-          onClick={handleComplete}
-          className="w-full py-3 rounded-xl font-semibold text-white text-sm transition-all hover:opacity-90 hover:scale-[1.01]"
-          style={{ background: "linear-gradient(135deg, #2563EB, #F97316)", boxShadow: "0 4px 15px rgba(37,99,235,0.3)" }}
-        >
-          {interactiveIndices.length === 0 ? "Mark Complete ✓" : `Complete Lesson — ${Math.round((totalScore / totalMax) * 100)}% ✓`}
-        </button>
+        <div className="mt-4 pt-6 flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderTop: "1px dashed var(--border)" }}>
+          <p className="text-sm flex-1" style={{ color: "var(--text-muted)" }}>
+            {interactiveIndices.length === 0
+              ? "That's the end of the chapter. Mark it done to record your progress."
+              : `All ${interactiveIndices.length} ${interactiveIndices.length === 1 ? "activity" : "activities"} finished. Submit to record your score.`}
+          </p>
+          <button onClick={handleComplete} className="btn-ink">
+            {interactiveIndices.length === 0 ? "Mark chapter done" : `Submit chapter · ${Math.round((totalScore / totalMax) * 100)}%`}
+          </button>
+        </div>
       )}
     </div>
   );

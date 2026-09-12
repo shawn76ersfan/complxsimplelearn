@@ -1,9 +1,34 @@
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { getCurrentUser, getCurrentUserOrNull } from "./_lib/auth";
 import { canAccessStudent, visibleStudents } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
+import {
+  bestScoredAttempts,
+  bumpUserStreak,
+  homeworkAverageFromSubmissions,
+  testAverageForAttempts,
+  type LessonMeta,
+} from "./lib/scoring";
+import { scoreLessonContent } from "./lib/lessonContent";
+
+async function lessonsByIdMap(ctx: QueryCtx): Promise<Map<string, LessonMeta>> {
+  const lessons = await ctx.db.query("lessons").collect();
+  return new Map(lessons.map((lesson) => [lesson._id, lesson]));
+}
+
+async function homeworkAvgForStudent(
+  ctx: QueryCtx,
+  studentId: Id<"users">,
+): Promise<number | null> {
+  const rows = await ctx.db
+    .query("assignmentSubmissions")
+    .withIndex("by_student", (q) => q.eq("studentId", studentId))
+    .collect();
+  return homeworkAverageFromSubmissions(rows);
+}
 
 export const getStudentQuizDetail = query({
   args: { studentId: v.id("users"), lessonId: v.id("lessons") },
@@ -47,59 +72,74 @@ export const getStudentQuizDetail = query({
   },
 });
 
-function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export const submit = mutation({
   args: {
     lessonId: v.id("lessons"),
-    trackId: v.id("tracks"),
+    answers: v.optional(v.array(v.number())),
+    blockAnswers: v.optional(
+      v.array(
+        v.object({
+          blockIndex: v.number(),
+          selected: v.optional(v.number()),
+          texts: v.optional(v.array(v.string())),
+          completed: v.optional(v.boolean()),
+        }),
+      ),
+    ),
+  },
+  returns: v.object({
     score: v.number(),
     maxScore: v.number(),
-    answers: v.optional(v.array(v.number())),
-  },
+  }),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+    const lesson = await ctx.db.get(args.lessonId);
+    if (!lesson || !lesson.published) throw new Error("Lesson not found");
+
+    const questions = (
+      await ctx.db
+        .query("quizQuestions")
+        .withIndex("by_lesson", (q) => q.eq("lessonId", args.lessonId))
+        .collect()
+    ).sort((a, b) => a.order - b.order);
+
+    let score = 0;
+    let maxScore = 0;
+    if (questions.length > 0) {
+      const answers = args.answers ?? [];
+      if (answers.length !== questions.length) {
+        throw new Error("Answer every question");
+      }
+      maxScore = questions.length;
+      score = questions.filter((question, i) => answers[i] === question.correctIndex).length;
+    } else if (lesson.type === "game") {
+      score = 1;
+      maxScore = 1;
+    } else {
+      const graded = scoreLessonContent(lesson.content, args.blockAnswers ?? []);
+      score = graded.score;
+      maxScore = graded.maxScore;
+    }
 
     await ctx.db.insert("attempts", {
       userId: user._id,
-      lessonId: args.lessonId,
-      trackId: args.trackId,
-      score: args.score,
-      maxScore: args.maxScore,
+      lessonId: lesson._id,
+      trackId: lesson.trackId,
+      score,
+      maxScore,
       answers: args.answers,
       completedAt: Date.now(),
     });
 
-    // Daily streak only — levels come from completed homework assignments
-    const today = todayUTC();
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-    const prevStreak = user.streak ?? 0;
-    const prevDate = user.lastActivityDate ?? "";
-
-    let newStreak: number;
-    if (prevDate === today) newStreak = prevStreak;
-    else if (prevDate === yesterday) newStreak = prevStreak + 1;
-    else newStreak = 1;
-
-    await ctx.db.patch(user._id, {
-      streak: newStreak,
-      lastActivityDate: today,
-    });
+    await bumpUserStreak(ctx, user);
+    return { score, maxScore };
   },
 });
 
 export const getMyAttempts = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return [];
     return await ctx.db
       .query("attempts")
@@ -108,15 +148,41 @@ export const getMyAttempts = query({
   },
 });
 
+/** Best-attempt test average plus graded homework average for the signed-in student. */
+export const getMyScoreSummary = query({
+  args: {},
+  returns: v.object({
+    testAvg: v.union(v.number(), v.null()),
+    scoredLessons: v.number(),
+    completedLessons: v.number(),
+    homeworkAvg: v.union(v.number(), v.null()),
+  }),
+  handler: async (ctx) => {
+    const user = await getCurrentUserOrNull(ctx);
+    if (!user) {
+      return { testAvg: null, scoredLessons: 0, completedLessons: 0, homeworkAvg: null };
+    }
+
+    const attempts = await ctx.db
+      .query("attempts")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    const lessonsById = await lessonsByIdMap(ctx);
+    const best = bestScoredAttempts(attempts, lessonsById);
+
+    return {
+      testAvg: testAverageForAttempts(attempts, lessonsById),
+      scoredLessons: best.length,
+      completedLessons: new Set(attempts.map((attempt) => attempt.lessonId)).size,
+      homeworkAvg: await homeworkAvgForStudent(ctx, user._id),
+    };
+  },
+});
+
 export const getBestForLesson = query({
   args: { lessonId: v.id("lessons") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return null;
     const attempts = await ctx.db
       .query("attempts")
@@ -132,12 +198,7 @@ export const getBestForLesson = query({
 export const getTrackProgress = query({
   args: { trackId: v.id("tracks") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return { completed: 0, total: 0, percentage: 0 };
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return { completed: 0, total: 0, percentage: 0 };
 
     const lessons = await ctx.db
@@ -191,12 +252,7 @@ export const getContinueLearning = query({
     v.null()
   ),
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return null;
 
     const tracks = (
@@ -290,11 +346,12 @@ export const getStudentDetailForTeacher = query({
       .query("attempts")
       .withIndex("by_user", (q) => q.eq("userId", args.studentId))
       .collect();
+    const lessonsById = await lessonsByIdMap(ctx);
 
-    // Build per-lesson best attempts map
+    // Best attempt per lesson for the lesson list (any type).
     const bestPerLesson = new Map<string, { score: number; maxScore: number; completedAt: number }>();
     for (const attempt of allAttempts) {
-      const key = attempt.lessonId as string;
+      const key = attempt.lessonId;
       const existing = bestPerLesson.get(key);
       if (!existing || attempt.score > existing.score) {
         bestPerLesson.set(key, { score: attempt.score, maxScore: attempt.maxScore, completedAt: attempt.completedAt });
@@ -305,25 +362,24 @@ export const getStudentDetailForTeacher = query({
       tracks.map(async (track) => {
         const lessons = await ctx.db
           .query("lessons")
-          .withIndex("by_track", (q) => q.eq("trackId", track._id))
-          .filter((q) => q.eq(q.field("published"), true))
+          .withIndex("by_track_published", (q) =>
+            q.eq("trackId", track._id).eq("published", true)
+          )
           .collect();
 
         const trackAttempts = allAttempts.filter((a) => a.trackId === track._id);
-        const totalScore = trackAttempts.reduce((s, a) => s + a.score, 0);
-        const totalMax   = trackAttempts.reduce((s, a) => s + a.maxScore, 0);
-        const completedIds = new Set(trackAttempts.map((a) => a.lessonId as string));
+        const completedIds = new Set(trackAttempts.map((a) => a.lessonId));
 
         const lessonResults = lessons
           .sort((a, b) => a.order - b.order)
           .map((lesson) => {
-            const best = bestPerLesson.get(lesson._id as string);
+            const best = bestPerLesson.get(lesson._id);
             return {
               lessonId: lesson._id,
               title: lesson.title,
               type: lesson.type,
               order: lesson.order,
-              completed: completedIds.has(lesson._id as string),
+              completed: completedIds.has(lesson._id),
               bestScore: best?.score ?? 0,
               bestMax: best?.maxScore ?? 1,
               completedAt: best?.completedAt ?? null,
@@ -336,7 +392,7 @@ export const getStudentDetailForTeacher = query({
           trackColor: track.color,
           trackSlug: track.slug,
           trackIcon: track.icon,
-          percentage: totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0,
+          percentage: testAverageForAttempts(allAttempts, lessonsById, track._id),
           completedLessons: completedIds.size,
           totalLessons: lessons.length,
           lessons: lessonResults,
@@ -344,11 +400,13 @@ export const getStudentDetailForTeacher = query({
       })
     );
 
-    const overall = trackDetails.length > 0
-      ? Math.round(trackDetails.reduce((s, t) => s + t.percentage, 0) / trackDetails.length)
-      : 0;
-
-    return { student, trackDetails, overall, totalAttempts: allAttempts.length };
+    return {
+      student,
+      trackDetails,
+      overall: testAverageForAttempts(allAttempts, lessonsById),
+      homeworkAvg: await homeworkAvgForStudent(ctx, args.studentId),
+      totalAttempts: allAttempts.length,
+    };
   },
 });
 
@@ -361,6 +419,7 @@ export const getAllStudentScores = query({
     const students = await visibleStudents(ctx, teacher, args.cohortId);
 
     const tracks = await ctx.db.query("tracks").collect();
+    const lessonsById = await lessonsByIdMap(ctx);
 
     const results = await Promise.all(
       students.map(async (student) => {
@@ -370,32 +429,21 @@ export const getAllStudentScores = query({
           .collect();
 
         const trackSummaries = tracks.map((track) => {
-          const trackAttempts = attempts.filter(
-            (a) => a.trackId === track._id
-          );
-          const totalScore = trackAttempts.reduce((s, a) => s + a.score, 0);
-          const totalMax = trackAttempts.reduce((s, a) => s + a.maxScore, 0);
+          const trackAttempts = attempts.filter((a) => a.trackId === track._id);
           return {
             trackId: track._id,
             trackName: track.name,
             trackColor: track.color,
-            percentage: totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0,
+            percentage: testAverageForAttempts(attempts, lessonsById, track._id),
             completedLessons: new Set(trackAttempts.map((a) => a.lessonId)).size,
           };
         });
 
-        const overall =
-          trackSummaries.length > 0
-            ? Math.round(
-                trackSummaries.reduce((s, t) => s + t.percentage, 0) /
-                  trackSummaries.length
-              )
-            : 0;
-
         return {
           student,
           trackSummaries,
-          overall,
+          overall: testAverageForAttempts(attempts, lessonsById),
+          homeworkAvg: await homeworkAvgForStudent(ctx, student._id),
           totalAttempts: attempts.length,
         };
       })

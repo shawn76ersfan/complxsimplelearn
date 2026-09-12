@@ -18,6 +18,27 @@ export async function getEnrollmentByEmail(
     .unique();
 }
 
+/** Looks up a user by email, trying the normalized form and Clerk's original casing. */
+export async function getUserByEmail(
+  ctx: QueryCtx | MutationCtx,
+  email: string,
+): Promise<Doc<"users"> | null> {
+  const normalized = normalizeEmail(email);
+  const byNormalized = await ctx.db
+    .query("users")
+    .withIndex("by_email", (q) => q.eq("email", normalized))
+    .unique();
+  if (byNormalized) return byNormalized;
+  const trimmed = email.trim();
+  if (trimmed !== normalized) {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", trimmed))
+      .unique();
+  }
+  return null;
+}
+
 export async function emailHasActiveEnrollment(
   ctx: QueryCtx | MutationCtx,
   email: string,

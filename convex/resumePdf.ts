@@ -1,10 +1,11 @@
 "use node";
 
 import { action } from "./_generated/server";
-import { components } from "./_generated/api";
+import { components, api } from "./_generated/api";
 import { v } from "convex/values";
 import { R2 } from "@convex-dev/r2";
 import { extractText, getDocumentProxy } from "unpdf";
+import { requireActiveProfile } from "./lib/actionAuth";
 
 const r2 = new R2(components.r2);
 
@@ -24,8 +25,13 @@ export const extractTextFromKey = action({
     pageCount: v.number(),
   }),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const profile = await requireActiveProfile(ctx);
+    const owned = await ctx.runQuery(api.starkResumeFiles.getOwnedKey, {
+      key: args.key,
+    });
+    if (!owned || owned.userId !== profile._id) {
+      throw new Error("Could not access the uploaded PDF. Please try uploading again.");
+    }
 
     let url: string;
     try {

@@ -53,12 +53,7 @@ async function withAuthorNames<T extends { teacherId: Id<"users"> }>(
 export const getMyFeedback = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return [];
     const rows = await ctx.db
       .query("feedback")
@@ -72,12 +67,7 @@ export const getMyFeedback = query({
 export const getUnreadCount = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return 0;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return 0;
     const unread = await ctx.db
       .query("feedback")
@@ -134,12 +124,7 @@ export const markAllRead = mutation({
 export const getActiveWarnings = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUserOrNull(ctx);
     if (!user) return [];
     // Stay on the dashboard until the student explicitly acknowledges —
     // reading in Messages alone does not dismiss the banner.

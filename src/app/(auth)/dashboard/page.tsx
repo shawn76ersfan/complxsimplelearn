@@ -64,70 +64,69 @@ function ContinueLearningCard() {
 
   if (next === null || next.allComplete) {
     return (
-      <div
-        className="card p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-6"
-        style={{
-          border: "1px solid transparent",
-          backgroundImage: "linear-gradient(var(--surface), var(--surface)), linear-gradient(135deg, var(--primary), var(--accent))",
-          backgroundOrigin: "border-box",
-          backgroundClip: "padding-box, border-box",
-        }}
-      >
-        <ProgressRing percentage={next?.percentage ?? 100} color="var(--primary)" size={96} />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--primary)" }}>
-            Continue Learning
-          </p>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: "var(--text)" }}>
-            {next?.allComplete ? "All lessons complete" : "Start your first lesson"}
-          </h2>
-          <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-            {next?.allComplete
-              ? "Nice work — browse tracks anytime to review material."
-              : "Pick a track and begin building job-ready skills."}
-          </p>
-          <Link
-            href="/learn"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}
-          >
-            Browse tracks <ArrowRight size={16} />
-          </Link>
+      <div className="index-card p-6 sm:p-8 pt-0 mb-6 relative overflow-hidden">
+        <Bookmark color="var(--primary)" />
+        <div className="index-card-title">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>Bookmark · Where you left off</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mt-2">
+          <ProgressRing percentage={next?.percentage ?? 100} color="var(--primary)" size={96} />
+          <div className="flex-1 min-w-0">
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold mb-2" style={{ color: "var(--text)" }}>
+              {next?.allComplete ? "Every chapter read" : "Open your first chapter"}
+            </h2>
+            <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+              {next?.allComplete
+                ? "Nice work — browse the shelf anytime to review material."
+                : "Pick a textbook and begin building job-ready skills."}
+            </p>
+            <Link href="/learn" className="btn-ink btn-sm">
+              Browse the shelf <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      className="card p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-6"
-      style={{
-        border: "1px solid transparent",
-        backgroundImage: "linear-gradient(var(--surface), var(--surface)), linear-gradient(135deg, var(--primary), var(--accent))",
-        backgroundOrigin: "border-box",
-        backgroundClip: "padding-box, border-box",
-      }}
-    >
-      <ProgressRing percentage={next.percentage} color={next.trackColor} size={96} />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: next.trackColor }}>
-          Continue Learning · {next.trackName}
+    <div className="index-card p-6 sm:p-8 pt-0 mb-6 relative overflow-hidden">
+      <Bookmark color={next.trackColor} />
+      <div className="index-card-title">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: next.trackColor }}>
+          Bookmark · {next.trackName}
         </p>
-        <h2 className="text-2xl sm:text-3xl font-bold mb-2 truncate" style={{ color: "var(--text)" }}>
-          {next.lessonTitle}
-        </h2>
-        <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-          {next.completed} of {next.total} lessons complete
-        </p>
-        <Link
-          href={`/learn/${next.trackSlug}/${next.lessonId}`}
-          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}
-        >
-          <Play size={16} fill="currentColor" /> Continue
-        </Link>
+      </div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mt-2">
+        <ProgressRing percentage={next.percentage} color={next.trackColor} size={96} />
+        <div className="flex-1 min-w-0">
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold mb-2 truncate" style={{ color: "var(--text)" }}>
+            {next.lessonTitle}
+          </h2>
+          <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+            {next.completed} of {next.total} lessons complete
+          </p>
+          <Link href={`/learn/${next.trackSlug}/${next.lessonId}`} className="btn-ink btn-sm">
+            <Play size={15} fill="currentColor" /> Pick up where you left off
+          </Link>
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Ribbon bookmark hanging off the top-right corner of a card. */
+function Bookmark({ color }: { color: string }) {
+  return (
+    <span
+      aria-hidden
+      className="absolute top-0 right-6 sm:right-8 w-7 h-14"
+      style={{
+        background: color,
+        clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%)",
+        boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
+      }}
+    />
   );
 }
 
@@ -137,28 +136,34 @@ function TrackCard({ track }: { track: { _id: string; name: string; slug: string
   const pct = progress?.percentage ?? 0;
 
   return (
-    <Link href={`/learn/${track.slug}`} className="card p-6 flex flex-col gap-4 hover:scale-[1.02] transition-transform group cursor-pointer">
-      <div className="flex items-start justify-between">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `${track.color}18` }}>
-          <Icon size={22} style={{ color: track.color }} />
+    <Link
+      href={`/learn/${track.slug}`}
+      className="book-cover hover:-translate-y-1 transition-transform group cursor-pointer"
+      style={{ ["--book-color" as string]: track.color }}
+    >
+      <div className="relative z-10 p-5 flex flex-col gap-4 flex-1 min-w-0">
+        <div className="flex items-start justify-between">
+          <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: `${track.color}18`, border: `1px solid ${track.color}44` }}>
+            <Icon size={20} style={{ color: track.color }} />
+          </div>
+          <span className="text-xs font-bold px-2 py-1 rounded font-serif" style={{ background: `${track.color}14`, color: track.color }}>{pct}%</span>
         </div>
-        <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: `${track.color}12`, color: track.color }}>{pct}%</span>
-      </div>
-      <div>
-        <h3 className="font-bold text-base mb-1" style={{ color: "var(--text)" }}>{track.name}</h3>
-        <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>{track.description}</p>
-      </div>
-      <div>
-        <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
-          <span>{progress?.completed ?? 0}/{progress?.total ?? 0} lessons</span>
-          <span>{pct}% complete</span>
+        <div>
+          <h3 className="font-serif font-bold text-lg leading-tight mb-1" style={{ color: "var(--text)" }}>{track.name}</h3>
+          <p className="text-sm leading-relaxed line-clamp-2" style={{ color: "var(--text-muted)" }}>{track.description}</p>
         </div>
-        <div className="w-full rounded-full overflow-hidden" style={{ height: "6px", background: "var(--surface-2)", borderRadius: "999px" }}>
-          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(135deg, var(--primary), var(--accent))", borderRadius: "999px" }} />
+        <div className="mt-auto">
+          <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
+            <span>{progress?.completed ?? 0}/{progress?.total ?? 0} chapters</span>
+            <span>{pct}% read</span>
+          </div>
+          <div className="w-full rounded-full overflow-hidden" style={{ height: "6px", background: "var(--surface-2)" }}>
+            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: track.color }} />
+          </div>
         </div>
-      </div>
-      <div className="flex items-center gap-1 text-sm font-medium group-hover:gap-2 transition-all" style={{ color: track.color }}>
-        Continue <ArrowRight size={14} />
+        <div className="flex items-center gap-1 text-sm font-semibold group-hover:gap-2 transition-all" style={{ color: track.color }}>
+          Open book <ArrowRight size={14} />
+        </div>
       </div>
     </Link>
   );
@@ -178,7 +183,7 @@ function DenseLevel({
     <div className="card p-3.5 h-full">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}>
+          <span className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold font-serif" style={{ background: "var(--ink)", color: "var(--paper)" }}>
             {level}
           </span>
           <span className="font-semibold text-xs" style={{ color: "var(--text)" }}>Level {level}</span>
@@ -186,7 +191,7 @@ function DenseLevel({
         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{completedCount}/{totalCount}</span>
       </div>
       <div className="w-full rounded-full overflow-hidden" style={{ height: "5px", background: "var(--surface-2)" }}>
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(135deg, var(--primary), var(--accent))" }} />
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "var(--accent)" }} />
       </div>
     </div>
   );
@@ -196,23 +201,16 @@ function QuoteCard() {
   const quote = useQuery(api.quotes.getCurrent);
   if (!quote) return null;
   return (
-    <div
-      className="card p-6 relative overflow-hidden"
-      style={{
-        border: "2px solid transparent",
-        backgroundImage: "linear-gradient(var(--surface), var(--surface)), linear-gradient(135deg, var(--primary), var(--accent))",
-        backgroundOrigin: "border-box",
-        backgroundClip: "padding-box, border-box",
-      }}
-    >
-      <Quote size={40} className="absolute -top-1 -left-1 opacity-10" style={{ color: "var(--primary)" }} />
+    <div className="sticky-note p-6 pt-7 relative" style={{ ["--tilt" as string]: "-0.8deg" }}>
+      <span className="push-pin" style={{ ["--pin" as string]: "#2563EB" }} />
+      <Quote size={40} className="absolute top-3 left-3 opacity-15" />
       <div className="relative">
-        <p className="text-sm font-semibold mb-1" style={{ color: "var(--primary)" }}>Quote of the Week</p>
-        <p className="text-base leading-relaxed italic font-medium" style={{ color: "var(--text)" }}>
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-70 mb-2">Quote of the week</p>
+        <p className="font-serif text-lg leading-relaxed italic font-medium">
           &ldquo;{quote.text}&rdquo;
         </p>
         {quote.author && (
-          <p className="text-xs mt-2 font-semibold" style={{ color: "var(--text-muted)" }}>— {quote.author}</p>
+          <p className="text-xs mt-3 font-bold opacity-80">— {quote.author}</p>
         )}
       </div>
     </div>
@@ -222,17 +220,14 @@ function QuoteCard() {
 export default function StudentDashboard() {
   const { user } = useUser();
   const tracks = useQuery(api.tracks.list);
-  const myAttempts = useQuery(api.attempts.getMyAttempts);
+  const scores = useQuery(api.attempts.getMyScoreSummary);
   const profile = useQuery(api.users.getMyProfile);
   const progress = useQuery(api.assignments.getMyProgress);
   const activeWarnings = useQuery(api.feedback.getActiveWarnings);
   const acknowledgeWarning = useMutation(api.feedback.acknowledgeWarning);
   const instructor = useInstructorName();
 
-  const totalScore = myAttempts?.reduce((s, a) => s + a.score, 0) ?? 0;
-  const totalMax   = myAttempts?.reduce((s, a) => s + a.maxScore, 0) ?? 0;
-  const overallPct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
-
+  const testAvg = scores?.testAvg ?? null;
   const level = progress?.level ?? 0;
   const completedCount = progress?.completedCount ?? 0;
   const totalCount = progress?.totalCount ?? 0;
@@ -240,11 +235,12 @@ export default function StudentDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl mb-1" style={{ fontWeight: 700, color: "var(--text)" }}>
-          Hey, {user?.firstName ?? "Student"}
+      <div className="mb-8">
+        <p className="eyebrow mb-3">Your desk</p>
+        <h1 className="font-serif text-4xl font-bold tracking-tight mb-1" style={{ color: "var(--text)" }}>
+          Hey, {user?.firstName ?? "Student"}.
         </h1>
-        <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>Ready to learn something new today?</p>
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>Ready to learn something new today?</p>
       </div>
 
       {activeWarnings && activeWarnings.length > 0 && (
@@ -301,12 +297,12 @@ export default function StudentDashboard() {
           <DenseLevel level={level} completedCount={completedCount} totalCount={totalCount} />
         </div>
         {[
-          { label: "Score", value: `${overallPct}%`, icon: Trophy, color: "var(--primary)" },
-          { label: "Lessons", value: myAttempts?.length ?? 0, icon: BookOpen, color: "var(--secondary)" },
+          { label: "Test avg", value: testAvg === null ? "—" : `${testAvg}%`, icon: Trophy, color: "var(--primary)" },
+          { label: "Lessons", value: scores?.completedLessons ?? 0, icon: BookOpen, color: "var(--secondary)" },
           { label: "Homework", value: completedCount, icon: Star, color: "var(--accent)" },
-          { label: "Streak", value: streak, icon: Flame, color: "var(--accent)" },
+          { label: streak === 1 ? "1-day streak" : `${streak}-day streak`, value: streak, icon: Flame, color: "var(--accent)", title: "Days in a row you completed a lesson or turned in homework" },
         ].map((stat) => (
-          <div key={stat.label} className="card flex items-center gap-2.5 p-3.5">
+          <div key={stat.label} className="card flex items-center gap-2.5 p-3.5" title={"title" in stat ? stat.title : undefined}>
             <div className="flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg" style={{ background: "var(--surface-2)" }}>
               <stat.icon size={14} style={{ color: stat.color }} />
             </div>
@@ -322,9 +318,12 @@ export default function StudentDashboard() {
         <FeedbackPreviewCard />
       </div>
 
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Your Learning Tracks</h2>
-        <Link href="/learn" className="text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: "var(--primary)" }}>View all</Link>
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <p className="eyebrow mb-2">The shelf</p>
+          <h2 className="font-serif text-2xl font-bold" style={{ color: "var(--text)" }}>Your textbooks</h2>
+        </div>
+        <Link href="/learn" className="text-sm font-semibold hover:opacity-70 transition-opacity pencil-underline" style={{ color: "var(--text)" }}>See the whole shelf</Link>
       </div>
 
       {(!tracks || tracks.length === 0) ? (
@@ -340,20 +339,15 @@ export default function StudentDashboard() {
       )}
 
       <div className="mb-8">
-        <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text)" }}>Homework & Assignments</h2>
+        <p className="eyebrow mb-2">Due dates</p>
+        <h2 className="font-serif text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>Homework &amp; assignments</h2>
         <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
           Assignments from {instructor.short} — complete them before the deadline.
         </p>
         <StudentHomework />
       </div>
 
-      <div
-        className="card p-6 mb-8 relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #020d0d, #071a17, #030f0f)", border: "1px solid rgba(20,184,166,0.25)" }}
-      >
-        <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none" style={{ background: "rgba(20,184,166,0.14)", filter: "blur(40px)" }} />
-        <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full pointer-events-none" style={{ background: "rgba(13,148,136,0.10)", filter: "blur(36px)" }} />
-
+      <div className="chalkboard p-6 sm:p-8 mb-12" style={{ ["--board" as string]: "#0b201e", ["--board-edge" as string]: "#07302b" }}>
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-5">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
@@ -382,13 +376,13 @@ export default function StudentDashboard() {
                 AVAILABLE NOW
               </span>
             </div>
-            <p className="text-sm leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.55)" }}>
-              Stark is included with your platform access. Ask course questions, review Linux and cloud concepts, break down DevOps tools, and get learning guidance whenever you need it.
+            <p className="text-sm leading-relaxed mb-4 chalk-muted">
+              Stark is included with your platform access. Ask course questions, review Linux and cloud concepts, break down DevOps tools, and get learning guidance whenever office hours are closed.
             </p>
             <Link
               href="/stark"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-opacity hover:opacity-90"
-              style={{ background: "#14B8A6", color: "#fff" }}
+              className="btn-ink btn-sm"
+              style={{ ["--ink" as string]: "#14B8A6", ["--paper" as string]: "#062b28", ["--accent" as string]: "#5eead4" }}
             >
               Open Stark <ArrowRight size={13} />
             </Link>

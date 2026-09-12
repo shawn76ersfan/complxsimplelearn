@@ -114,30 +114,27 @@ export function MyCohortCard({ compact = false, className = "" }: { compact?: bo
 
   return (
     <div
-      className={`card relative overflow-hidden ${className}`}
-      style={{ borderTop: `4px solid ${color}` }}
+      className={`book-cover ${className}`}
+      style={{ ["--book-color" as string]: color }}
     >
-      {/* soft colour wash in the corner so each cohort feels distinct */}
-      <div
-        className="absolute -top-16 -right-16 w-56 h-56 rounded-full pointer-events-none"
-        style={{ background: color, opacity: 0.08, filter: "blur(30px)" }}
-      />
-
-      <div className="relative p-5 sm:p-6">
+      <div className="relative flex-1 p-5 sm:p-6 min-w-0">
         {/* Header row */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3 min-w-0">
             <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center font-black text-white text-sm tracking-wide flex-shrink-0"
-              style={{ background: color, boxShadow: `0 6px 18px ${color}55` }}
+              className="w-12 h-14 rounded-r-md flex items-center justify-center font-black text-white text-sm tracking-wide flex-shrink-0"
+              style={{
+                background: `linear-gradient(90deg, rgba(0,0,0,0.25), transparent 42%), ${color}`,
+                boxShadow: `3px 4px 0 ${color}33`,
+              }}
             >
               {cohort.code ?? getInitials(cohort.name)}
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-                Your cohort
+                Your roll book
               </p>
-              <h2 className="text-xl sm:text-2xl font-black leading-tight truncate" style={{ color: "var(--text)" }}>
+              <h2 className="font-serif text-xl sm:text-2xl font-bold leading-tight truncate" style={{ color: "var(--text)" }}>
                 {cohort.name}
               </h2>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
@@ -166,13 +163,22 @@ export function MyCohortCard({ compact = false, className = "" }: { compact?: bo
               </a>
             )}
             {!compact && (
-              <Link
-                href="/cohort"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors"
-                style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
-              >
-                Class page <ArrowRight size={14} />
-              </Link>
+              <>
+                <Link
+                  href="/board"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
+                  style={{ background: color }}
+                >
+                  Open Board <ArrowRight size={14} />
+                </Link>
+                <Link
+                  href="/cohort"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+                >
+                  Class page <ArrowRight size={14} />
+                </Link>
+              </>
             )}
           </div>
         </div>

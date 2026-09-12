@@ -77,7 +77,9 @@ async function revokePendingClerkInvitationsForEmail(email: string): Promise<voi
   }
 }
 
-async function createClerkInvitation(email: string): Promise<string | undefined> {
+async function createClerkInvitation(
+  email: string,
+): Promise<{ alreadyRegistered: boolean; clerkInvitationId?: string }> {
   const redirectUrl = `${appBaseUrl()}/sign-up`;
 
   async function postInvite(): Promise<{ ok: boolean; bodyText: string; id?: string }> {
@@ -102,7 +104,8 @@ async function createClerkInvitation(email: string): Promise<string | undefined>
   }
 
   let result = await postInvite();
-  if (result.ok) return result.id;
+  if (result.ok) return { alreadyRegistered: false, clerkInvitationId: result.id };
+  if (isClerkIdentifierTaken(result.bodyText)) return { alreadyRegistered: true };
 
   const lowered = result.bodyText.toLowerCase();
   const isDuplicate =
@@ -114,10 +117,63 @@ async function createClerkInvitation(email: string): Promise<string | undefined>
     // Clear stale Clerk invites (e.g. after we only revoked in Convex), then retry once.
     await revokePendingClerkInvitationsForEmail(email);
     result = await postInvite();
-    if (result.ok) return result.id;
+    if (result.ok) return { alreadyRegistered: false, clerkInvitationId: result.id };
+    if (isClerkIdentifierTaken(result.bodyText)) return { alreadyRegistered: true };
   }
 
   throw new Error(`Could not send Clerk invitation: ${result.bodyText}`);
+}
+
+function isClerkIdentifierTaken(bodyText: string): boolean {
+  const lowered = bodyText.toLowerCase();
+  return (
+    lowered.includes("form_identifier_exists") ||
+    lowered.includes("email address is taken") ||
+    lowered.includes("identifier_exists")
+  );
+}
+
+async function findClerkUserByEmail(email: string): Promise<{
+  clerkId: string;
+  name: string;
+  imageUrl?: string;
+} | null> {
+  const response = await fetch(
+    `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email)}&limit=5`,
+    {
+      headers: {
+        Authorization: `Bearer ${clerkSecret()}`,
+      },
+    },
+  );
+  const bodyText = await response.text();
+  if (!response.ok) {
+    throw new Error(`Could not look up Clerk user: ${bodyText}`);
+  }
+  const data = JSON.parse(bodyText) as
+    | Array<{
+        id: string;
+        first_name?: string | null;
+        last_name?: string | null;
+        image_url?: string | null;
+      }>
+    | {
+        data?: Array<{
+          id: string;
+          first_name?: string | null;
+          last_name?: string | null;
+          image_url?: string | null;
+        }>;
+      };
+  const list = Array.isArray(data) ? data : (data.data ?? []);
+  const user = list[0];
+  if (!user) return null;
+  const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  return {
+    clerkId: user.id,
+    name: name || "Student",
+    imageUrl: user.image_url ?? undefined,
+  };
 }
 
 type Role = "admin" | "teacher" | "student";
@@ -149,11 +205,19 @@ export const inviteStudent = action({
     success: v.literal(true),
     email: v.string(),
     enrollmentId: v.id("enrollments"),
+    alreadyHadAccount: v.boolean(),
+    alreadyInCohort: v.boolean(),
   }),
   handler: async (
     ctx,
     args,
-  ): Promise<{ success: true; email: string; enrollmentId: Id<"enrollments"> }> => {
+  ): Promise<{
+    success: true;
+    email: string;
+    enrollmentId: Id<"enrollments">;
+    alreadyHadAccount: boolean;
+    alreadyInCohort: boolean;
+  }> => {
     const profile = await requireStaffProfile(ctx);
     const role = args.role ?? "student";
 
@@ -174,7 +238,47 @@ export const inviteStudent = action({
     const email = normalizeEmail(args.email);
     if (!email.includes("@")) throw new Error("Enter a valid email address.");
 
-    const clerkInvitationId = await createClerkInvitation(email);
+    const enrolled = await enrollExistingMember(ctx, {
+      email,
+      displayName: args.displayName?.trim() || undefined,
+      invitedBy: profile._id,
+      cohortId: args.cohortId,
+      role,
+    });
+    if (enrolled) {
+      return {
+        success: true as const,
+        email,
+        enrollmentId: enrolled.enrollmentId,
+        alreadyHadAccount: true,
+        alreadyInCohort: enrolled.alreadyInCohort,
+      };
+    }
+
+    const invite = await createClerkInvitation(email);
+    if (invite.alreadyRegistered) {
+      const again = await enrollExistingMember(ctx, {
+        email,
+        displayName: args.displayName?.trim() || undefined,
+        invitedBy: profile._id,
+        cohortId: args.cohortId,
+        role,
+      });
+      if (again) {
+        return {
+          success: true as const,
+          email,
+          enrollmentId: again.enrollmentId,
+          alreadyHadAccount: true,
+          alreadyInCohort: again.alreadyInCohort,
+        };
+      }
+      throw new Error(
+        role === "teacher"
+          ? "This email already has an account. Assign them to a cohort from the Instructors list."
+          : "This email already has an account, but we could not add them to the cohort. Try again or add them from the cohort roster.",
+      );
+    }
 
     const enrollmentId: Id<"enrollments"> = await ctx.runMutation(
       internal.enrollments.upsertInviteRecord,
@@ -182,15 +286,53 @@ export const inviteStudent = action({
         email,
         displayName: args.displayName?.trim() || undefined,
         invitedBy: profile._id,
-        clerkInvitationId,
-        cohortId: role === "teacher" ? undefined : args.cohortId,
+        clerkInvitationId: invite.clerkInvitationId,
+        cohortId: args.cohortId,
         role,
       },
     );
 
-    return { success: true as const, email, enrollmentId };
+    return {
+      success: true as const,
+      email,
+      enrollmentId,
+      alreadyHadAccount: false,
+      alreadyInCohort: false,
+    };
   },
 });
+
+async function enrollExistingMember(
+  ctx: ActionCtx,
+  args: {
+    email: string;
+    displayName?: string;
+    invitedBy: Id<"users">;
+    cohortId?: Id<"cohorts">;
+    role: "student" | "teacher";
+  },
+): Promise<{ enrollmentId: Id<"enrollments">; alreadyInCohort: boolean } | null> {
+  const existing = await ctx.runMutation(internal.enrollments.addExistingStudentByEmail, {
+    email: args.email,
+    displayName: args.displayName,
+    invitedBy: args.invitedBy,
+    cohortId: args.cohortId,
+    role: args.role,
+  });
+  if (existing) return existing;
+
+  const clerkUser = await findClerkUserByEmail(args.email);
+  if (!clerkUser) return null;
+
+  return await ctx.runMutation(internal.enrollments.addExistingStudentByEmail, {
+    email: args.email,
+    displayName: args.displayName,
+    invitedBy: args.invitedBy,
+    cohortId: args.cohortId,
+    role: args.role,
+    clerkUser,
+  });
+}
 
 export const resendInvite = action({
   args: { enrollmentId: v.id("enrollments") },
@@ -211,7 +353,12 @@ export const resendInvite = action({
       await revokeClerkInvitation(enrollment.clerkInvitationId);
     }
     await revokePendingClerkInvitationsForEmail(enrollment.email);
-    await createClerkInvitation(enrollment.email);
+    const invite = await createClerkInvitation(enrollment.email);
+    if (invite.alreadyRegistered) {
+      throw new Error(
+        "This student already has an account. Add them to the cohort instead of resending an invite.",
+      );
+    }
     return { success: true as const, email: enrollment.email };
   },
 });

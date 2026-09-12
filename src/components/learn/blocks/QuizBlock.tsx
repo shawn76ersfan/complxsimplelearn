@@ -1,32 +1,49 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useSoundFeedback } from "@/lib/useSoundFeedback";
 import { cn } from "@/lib/utils";
 
 interface Props {
+  lessonId: Id<"lessons">;
+  blockIndex: number;
   question: string;
   options: string[];
-  correctIndex: number;
-  explanation?: string;
-  onComplete: (score: number, maxScore: number) => void;
+  onComplete: (detail: { score: number; max: number; selected: number }) => void;
 }
 
-export function QuizBlock({ question, options, correctIndex, explanation, onComplete }: Props) {
+export function QuizBlock({ lessonId, blockIndex, question, options, onComplete }: Props) {
+  const checkBlock = useMutation(api.lessons.checkBlock);
   const [selected, setSelected] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    correct: boolean;
+    correctIndex?: number;
+    explanation?: string;
+  } | null>(null);
   const { playCorrect, playWrong } = useSoundFeedback();
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (selected === null) return;
-    setSubmitted(true);
-    const correct = selected === correctIndex;
-    if (correct) playCorrect(); else playWrong();
-    onComplete(correct ? 1 : 0, 1);
+    setChecking(true);
+    try {
+      const result = await checkBlock({ lessonId, blockIndex, selected });
+      setFeedback(result);
+      setSubmitted(true);
+      if (result.correct) playCorrect(); else playWrong();
+      onComplete({ score: result.score, max: result.maxScore, selected });
+    } finally {
+      setChecking(false);
+    }
   }
 
-  const isCorrect = selected === correctIndex;
+  const isCorrect = feedback?.correct ?? false;
+  const correctIndex = feedback?.correctIndex;
 
   return (
     <div className="flex flex-col gap-4">
@@ -40,7 +57,7 @@ export function QuizBlock({ question, options, correctIndex, explanation, onComp
           let borderColor = "var(--border)";
           let bg = "var(--surface-2)";
           let color = "var(--text)";
-          if (submitted) {
+          if (submitted && correctIndex !== undefined) {
             if (idx === correctIndex) { borderColor = "#0EA5E9"; bg = "#0EA5E912"; color = "#0EA5E9"; }
             else if (idx === selected) { borderColor = "#EF4444"; bg = "#EF444412"; color = "#EF4444"; }
           } else if (idx === selected) {
@@ -67,20 +84,20 @@ export function QuizBlock({ question, options, correctIndex, explanation, onComp
         })}
       </div>
 
-      {submitted && explanation && (
+      {submitted && feedback?.explanation && (
         <div className="ml-9 rounded-xl p-3 text-sm" style={{ background: isCorrect ? "#0EA5E912" : "#EF444412", color: isCorrect ? "#0EA5E9" : "#EF4444", border: `1px solid ${isCorrect ? "#0EA5E933" : "#EF444433"}` }}>
-          <strong>{isCorrect ? "Correct!" : "Not quite."}</strong> {explanation}
+          <strong>{isCorrect ? "Correct!" : "Not quite."}</strong> {feedback.explanation}
         </div>
       )}
 
       {!submitted && (
         <button
-          onClick={handleSubmit}
-          disabled={selected === null}
+          onClick={() => void handleSubmit()}
+          disabled={selected === null || checking}
           className="ml-9 px-5 py-2 rounded-xl font-semibold text-white text-sm transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
         >
-          Submit
+          {checking ? "Checking…" : "Submit"}
         </button>
       )}
     </div>

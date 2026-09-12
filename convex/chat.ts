@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { chatComplete, type ChatMessage } from "./lib/llmChat";
 import { PLATFORM_FACTS } from "./lib/platformFacts";
+import { requireActiveProfile } from "./lib/actionAuth";
 
 const EMBEDDING_MODEL = "jina-embeddings-v3";
 const EMBEDDING_URL = "https://api.jina.ai/v1/embeddings";
@@ -490,6 +491,7 @@ export const getChunksByIds = internalQuery({
 async function persistExchange(
   ctx: ActionCtx,
   conversationId: Id<"starkConversations"> | undefined,
+  userId: Id<"users">,
   userText: string,
   reply: string
 ): Promise<Id<"starkConversations">> {
@@ -500,15 +502,11 @@ async function persistExchange(
     const tempTitle = userText.slice(0, 40) + (userText.length > 40 ? "…" : "");
     convId = await ctx.runMutation(api.conversations.create, { title: tempTitle });
   }
-  await ctx.runMutation(api.conversations.addMessage, {
+  await ctx.runMutation(internal.conversations.appendExchange, {
     conversationId: convId,
-    role: "user",
-    content: userText,
-  });
-  await ctx.runMutation(api.conversations.addMessage, {
-    conversationId: convId,
-    role: "assistant",
-    content: reply,
+    userId,
+    userText,
+    assistantText: reply,
   });
 
   if (isNewConvo) {
@@ -543,12 +541,14 @@ export const sendMessage = action({
     conversationId: v.id("starkConversations"),
   }),
   handler: async (ctx, args): Promise<{ reply: string; conversationId: Id<"starkConversations"> }> => {
-    const { userText, history } = args;
+    const profile = await requireActiveProfile(ctx);
+    const userText = args.userText.trim().slice(0, 8000);
+    const history = args.history.slice(-8);
 
     // 0. Safety backstop: refuse obvious attempts before any external API call.
     const immediateRefusal = getSafetyRefusal(userText);
     if (immediateRefusal) {
-      const convId = await persistExchange(ctx, args.conversationId, userText, immediateRefusal);
+      const convId = await persistExchange(ctx, args.conversationId, profile._id, userText, immediateRefusal);
       return { reply: immediateRefusal, conversationId: convId };
     }
 
@@ -557,7 +557,7 @@ export const sendMessage = action({
     const assessmentPrompts = await ctx.runQuery(internal.chat.getAssessmentPrompts, {});
     const inputRefusal = getSafetyRefusal(userText, assessmentPrompts);
     if (inputRefusal) {
-      const convId = await persistExchange(ctx, args.conversationId, userText, inputRefusal);
+      const convId = await persistExchange(ctx, args.conversationId, profile._id, userText, inputRefusal);
       return { reply: inputRefusal, conversationId: convId };
     }
 
@@ -623,7 +623,7 @@ export const sendMessage = action({
     reply = sanitizeReply(userText, reply);
 
     // 6. Persist to DB (and auto-title new conversations)
-    const convId = await persistExchange(ctx, args.conversationId, userText, reply);
+    const convId = await persistExchange(ctx, args.conversationId, profile._id, userText, reply);
 
     return { reply, conversationId: convId };
   },

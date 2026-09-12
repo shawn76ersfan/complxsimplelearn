@@ -91,12 +91,10 @@ export function InfoSessionsSection() {
       id="info-sessions"
       className="relative z-10 max-w-7xl mx-auto px-6 pb-24 scroll-mt-20"
     >
-      <div className="text-center max-w-2xl mx-auto mb-10">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3" style={{ color: "#2563EB" }}>
-          Live information sessions
-        </p>
-        <h2 className="text-3xl sm:text-4xl font-black mb-4" style={{ color: "var(--text)" }}>
-          Learn about upcoming training
+      <div className="text-center max-w-2xl mx-auto mb-12">
+        <p className="eyebrow justify-center mb-4">Open house · Live information sessions</p>
+        <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight mb-4" style={{ color: "var(--text)" }}>
+          Sit in before you sign up
         </h2>
         <p style={{ color: "var(--text-muted)" }}>
           Meet Cassandra, explore the program, and ask questions before you enroll.
@@ -106,30 +104,33 @@ export function InfoSessionsSection() {
 
       {!sessions ? (
         <div className="grid md:grid-cols-2 gap-5">
-          {[1, 2].map((item) => <div key={item} className="card h-48 animate-pulse" />)}
+          {[1, 2].map((item) => <div key={item} className="index-card h-48 animate-pulse" />)}
         </div>
       ) : sessions.length === 0 ? (
-        <div className="card p-10 text-center max-w-2xl mx-auto">
-          <CalendarDays size={38} className="mx-auto mb-3" style={{ color: "#2563EB" }} />
-          <h3 className="text-xl font-bold mb-2" style={{ color: "var(--text)" }}>New dates coming soon</h3>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="sticky-note blue p-10 text-center max-w-md mx-auto" style={{ ["--tilt" as string]: "-1.5deg" }}>
+          <CalendarDays size={38} className="mx-auto mb-3 opacity-80" />
+          <h3 className="font-serif text-2xl font-bold mb-2">New dates coming soon</h3>
+          <p className="text-sm opacity-85">
             Check back soon for the next live ComplxSimple information session.
           </p>
         </div>
       ) : (
-        <div className="grid lg:grid-cols-2 gap-5">
+        <div className="grid lg:grid-cols-2 gap-6">
           {sessions.map((session) => {
             const selected = selectedId === session._id;
             const registered = registeredId === session._id;
             return (
-              <article key={session._id} className="card p-6 sm:p-7">
-                <div className="flex items-start gap-4">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#2563EB15", color: "#2563EB" }}>
-                    <CalendarDays size={21} />
-                  </div>
+              <article key={session._id} className="index-card p-6 sm:p-7 pt-0">
+                <div className="index-card-title justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
+                    Info session
+                  </span>
+                  <CalendarDays size={16} style={{ color: "var(--primary)" }} />
+                </div>
+                <div className="flex items-start gap-4 mt-2">
                   <div className="flex-1">
-                    <h3 className="text-lg font-black" style={{ color: "var(--text)" }}>{session.title}</h3>
-                    <p className="text-sm font-semibold mt-2 flex items-start gap-2" style={{ color: "#2563EB" }}>
+                    <h3 className="font-serif text-xl font-bold" style={{ color: "var(--text)" }}>{session.title}</h3>
+                    <p className="text-sm font-semibold mt-2 flex items-start gap-2" style={{ color: "var(--primary)" }}>
                       <Clock size={15} className="mt-0.5 flex-shrink-0" />
                       {formatSessionDate(session)}
                     </p>
@@ -204,20 +205,18 @@ export function InfoSessionsSection() {
                         Registration security is not configured yet. Please contact ComplxSimple.
                       </p>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <button
                         type="submit"
                         disabled={submitting || !turnstileToken || !TURNSTILE_SITE_KEY}
-                        className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50"
-                        style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
+                        className="btn-ink btn-sm flex-1"
                       >
                         {submitting ? "Registering..." : "Confirm registration"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setSelectedId(null)}
-                        className="px-4 py-2.5 rounded-xl text-sm font-semibold"
-                        style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+                        className="btn-paper btn-sm"
                       >
                         Cancel
                       </button>
@@ -230,10 +229,9 @@ export function InfoSessionsSection() {
                       setRegisteredId(null);
                       setTurnstileToken("");
                     }}
-                    className="mt-6 w-full py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2"
-                    style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
+                    className="btn-ink mt-6 w-full"
                   >
-                    <Mail size={16} /> Register for this session
+                    <Mail size={16} /> Save me a seat
                   </button>
                 )}
               </article>

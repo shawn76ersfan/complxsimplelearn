@@ -38,11 +38,32 @@ export function ScoresDashboard() {
   const active = scores.filter((r) => r.student.status !== "dropped");
   const roster = active.length > 0 ? active : scores;
   const allTracks = roster[0]?.trackSummaries.map((t) => ({ id: t.trackId, name: t.trackName, color: t.trackColor })) ?? [];
-  const classAvg = Math.round(roster.reduce((s, r) => s + r.overall, 0) / roster.length);
+  const scored = roster.filter((r) => r.overall !== null);
+  const classAvg = scored.length
+    ? Math.round(scored.reduce((s, r) => s + (r.overall ?? 0), 0) / scored.length)
+    : null;
   const avgStreak = Math.round(
     roster.reduce((s, r) => s + (r.student.streak ?? 0), 0) / roster.length
   );
-  const sorted = [...roster].sort((a, b) => b.overall - a.overall);
+  const sorted = [...roster].sort((a, b) => {
+    if (a.overall === null && b.overall === null) {
+      return a.student.name.localeCompare(b.student.name);
+    }
+    if (a.overall === null) return 1;
+    if (b.overall === null) return -1;
+    if (b.overall !== a.overall) return b.overall - a.overall;
+    return a.student.name.localeCompare(b.student.name);
+  });
+  const topScore = scored.length ? Math.max(...scored.map((r) => r.overall ?? 0)) : null;
+  const topStudents = topScore === null
+    ? []
+    : scored
+        .filter((r) => r.overall === topScore)
+        .sort((a, b) => a.student.name.localeCompare(b.student.name));
+
+  function formatPct(value: number | null | undefined): string {
+    return value === null || value === undefined ? "—" : `${value}%`;
+  }
 
   return (
     <div className="space-y-6">
@@ -62,8 +83,8 @@ export function ScoresDashboard() {
             <TrendingUp size={16} style={{ color: "#0EA5E9" }} />
           </div>
           <div>
-            <p className={cn("text-xl font-black", percentageColor(classAvg))}>{classAvg}%</p>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>Class Avg</p>
+            <p className={cn("text-xl font-black", classAvg === null ? "" : percentageColor(classAvg))}>{formatPct(classAvg)}</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>Test Avg</p>
           </div>
         </div>
         <div className="card p-4 flex items-center gap-3">
@@ -71,10 +92,12 @@ export function ScoresDashboard() {
             <Trophy size={16} style={{ color: "#F59E0B" }} />
           </div>
           <div>
-            <p className="text-xl font-black truncate" style={{ color: "var(--text)" }}>
-              {sorted[0]?.student.name.split(" ")[0] ?? "—"}
+            <p className="text-sm font-black truncate leading-tight" style={{ color: "var(--text)" }}>
+              {topStudents.length ? topStudents.map((row) => row.student.name).join(", ") : "—"}
             </p>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>Top Student</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {topScore === null ? "Top Student" : `Top Student · ${topScore}%`}
+            </p>
           </div>
         </div>
         <div className="card p-4 flex items-center gap-3">
@@ -83,7 +106,7 @@ export function ScoresDashboard() {
           </div>
           <div>
             <p className="text-xl font-black" style={{ color: "var(--text)" }}>{avgStreak}</p>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>Avg Streak</p>
+            <p className="text-xs" title="Days in a row students completed a lesson or turned in homework" style={{ color: "var(--text-muted)" }}>Avg days in a row</p>
           </div>
         </div>
       </div>
@@ -110,19 +133,22 @@ export function ScoresDashboard() {
               </div>
               <div className="min-w-0 w-full">
                 <p className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>{row.student.name}</p>
-                <p className={cn("text-lg font-black", percentageColor(row.overall))}>{row.overall}%</p>
+                <p className={cn("text-lg font-black", row.overall === null ? "" : percentageColor(row.overall))}>{formatPct(row.overall)}</p>
+                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  Homework {formatPct(row.homeworkAvg)}
+                </p>
               </div>
-              <div className="flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+              <div className="flex items-center gap-1 text-xs" title="Days in a row they completed a lesson or turned in homework" style={{ color: "var(--text-muted)" }}>
                 <Flame size={11} style={{ color: "#F97316" }} />
-                {row.student.streak ?? 0} streak
+                {row.student.streak ?? 0}-day streak
               </div>
               <div
                 className="w-full h-1 rounded-full overflow-hidden"
                 style={{ background: "var(--surface-2)" }}
               >
                 <div
-                  className={cn("h-full rounded-full", percentageBg(row.overall))}
-                  style={{ width: `${row.overall}%` }}
+                  className={cn("h-full rounded-full", row.overall === null ? "" : percentageBg(row.overall))}
+                  style={{ width: `${row.overall ?? 0}%` }}
                 />
               </div>
               <span className="flex items-center gap-1 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "#2563EB" }}>
@@ -166,11 +192,23 @@ export function ScoresDashboard() {
 
         {/* Ranked student rows */}
         <div className="space-y-2">
-          {sorted.map((row, idx) => {
+          {[...sorted].sort((a, b) => {
+            const scoreOf = (row: typeof a) =>
+              selectedTrack === "all"
+                ? row.overall
+                : row.trackSummaries.find((t) => t.trackId === selectedTrack)?.percentage ?? null;
+            const aScore = scoreOf(a);
+            const bScore = scoreOf(b);
+            if (aScore === null && bScore === null) return a.student.name.localeCompare(b.student.name);
+            if (aScore === null) return 1;
+            if (bScore === null) return -1;
+            if (bScore !== aScore) return bScore - aScore;
+            return a.student.name.localeCompare(b.student.name);
+          }).map((row, idx) => {
             const displayScore =
               selectedTrack === "all"
                 ? row.overall
-                : row.trackSummaries.find((t) => t.trackId === selectedTrack)?.percentage ?? 0;
+                : row.trackSummaries.find((t) => t.trackId === selectedTrack)?.percentage ?? null;
             const trackData =
               selectedTrack !== "all"
                 ? row.trackSummaries.find((t) => t.trackId === selectedTrack)
@@ -221,9 +259,9 @@ export function ScoresDashboard() {
                   <div className="hidden sm:flex gap-2">
                     {row.trackSummaries.map((t) => (
                       <div key={t.trackId} className="text-center">
-                        <div className="text-xs font-bold mb-1" style={{ color: t.trackColor }}>{t.percentage}%</div>
+                        <div className="text-xs font-bold mb-1" style={{ color: t.trackColor }}>{formatPct(t.percentage)}</div>
                         <div className="w-1.5 h-10 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
-                          <div className="w-full rounded-full" style={{ height: `${t.percentage}%`, background: t.trackColor }} />
+                          <div className="w-full rounded-full" style={{ height: `${t.percentage ?? 0}%`, background: t.trackColor }} />
                         </div>
                       </div>
                     ))}
@@ -233,8 +271,8 @@ export function ScoresDashboard() {
                 {/* Score + arrow */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <div className="text-right">
-                    <p className={cn("text-lg font-black", percentageColor(displayScore))}>{displayScore}%</p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{selectedTrack === "all" ? "Overall" : "Track"}</p>
+                    <p className={cn("text-lg font-black", displayScore === null ? "" : percentageColor(displayScore))}>{formatPct(displayScore)}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{selectedTrack === "all" ? "Test avg" : "Track"}</p>
                   </div>
                   <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "#2563EB" }} />
                 </div>

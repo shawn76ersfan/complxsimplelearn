@@ -12,9 +12,11 @@ import { InfoSessionManager } from "@/components/teacher/InfoSessionManager";
 import { InviteStudentPanel } from "@/components/teacher/InviteStudentPanel";
 import { CohortsManager } from "@/components/teacher/CohortsManager";
 import { AnnouncementsPanel } from "@/components/teacher/AnnouncementsPanel";
+import { AttendanceRoster } from "@/components/teacher/AttendanceRoster";
+import { BoardPanel } from "@/components/teacher/BoardPanel";
 import { CohortSwitcher } from "@/components/teacher/CohortSwitcher";
 import { CohortScopeProvider, useCohortScope } from "@/components/teacher/CohortContext";
-import { BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck } from "lucide-react";
+import { BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck, ClipboardCheck, MessageSquare } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
@@ -27,6 +29,8 @@ const PRIMARY_TABS = [
   { id: "students", label: "Students", icon: Users },
   { id: "homework", label: "Homework", icon: BookMarked },
   { id: "announcements", label: "Announcements", icon: Megaphone },
+  { id: "board", label: "Board", icon: MessageSquare },
+  { id: "attendance", label: "Attendance", icon: ClipboardCheck },
   { id: "cohorts", label: "Cohorts", icon: Layers, adminOnly: true },
 ] as const satisfies readonly Tab[];
 
@@ -43,7 +47,7 @@ const MORE_TABS = [
 type TabId = (typeof PRIMARY_TABS)[number]["id"] | (typeof MORE_TABS)[number]["id"];
 
 /** Tabs whose content depends on the selected cohort (shown with the switcher). */
-const SCOPED_TABS: ReadonlySet<string> = new Set(["scores", "students", "homework", "announcements", "calendar", "videos", "email"]);
+const SCOPED_TABS: ReadonlySet<string> = new Set(["scores", "students", "homework", "announcements", "board", "attendance", "calendar", "videos", "email"]);
 
 function QuoteEditor() {
   const current = useQuery(api.quotes.getCurrent);
@@ -275,10 +279,10 @@ function TeacherHub() {
 
   function tabStyle(active: boolean) {
     return {
-      background: active ? "linear-gradient(135deg, var(--primary), var(--accent))" : "var(--surface-2)",
-      color: active ? "white" : "var(--text)",
-      border: `1px solid ${active ? "transparent" : "var(--border)"}`,
-      boxShadow: active ? "0 4px 15px rgba(37,99,235,0.3)" : "none",
+      background: active ? "var(--ink)" : "var(--surface)",
+      color: active ? "var(--paper)" : "var(--text)",
+      border: `1px solid ${active ? "var(--ink)" : "var(--border)"}`,
+      boxShadow: active ? "3px 3px 0 var(--accent)" : "none",
     } as const;
   }
 
@@ -287,15 +291,15 @@ function TeacherHub() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] mb-1 flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
-            Teacher Hub
+          <p className="eyebrow mb-2">
+            Teacher&apos;s lounge
             {isAdmin && (
-              <span className="inline-flex items-center gap-1 normal-case tracking-normal px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: "#2563EB15", color: "#2563EB" }}>
+              <span className="inline-flex items-center gap-1 normal-case tracking-normal px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: "#2563EB15", color: "var(--primary)" }}>
                 <ShieldCheck size={10} /> Admin
               </span>
             )}
           </p>
-          <h1 className="text-3xl font-black leading-tight" style={{ color: "var(--text)" }}>
+          <h1 className="font-serif text-4xl font-bold leading-tight tracking-tight" style={{ color: "var(--text)" }}>
             {hello}{profile?.name ? `, ${profile.name.split(" ")[0]}` : ""}
           </h1>
           {showSwitcher && (
@@ -405,6 +409,30 @@ function TeacherHub() {
       )}
 
       {activeTab === "cohorts" && isAdmin && <CohortsManager />}
+
+      {activeTab === "board" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>The Board</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              One live class thread. Only people in this cohort can read or post. Photos and links are allowed; repeat-send is throttled.
+            </p>
+          </div>
+          <BoardPanel />
+        </div>
+      )}
+
+      {activeTab === "attendance" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Attendance</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Pick the class date, then go down the roster and tick who showed up. Unticked means absent. Students never see this sheet.
+            </p>
+          </div>
+          <AttendanceRoster />
+        </div>
+      )}
 
       {activeTab === "announcements" && (
         <div>

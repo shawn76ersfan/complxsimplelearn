@@ -34,7 +34,7 @@ type EditableBlock =
   | { type: "playground"; language: "html" | "js"; code: string };
 
 function blocksToEditable(blocks: LessonBlock[]): EditableBlock[] {
-  return blocks.map((b) => {
+  return blocks.map((b): EditableBlock => {
     switch (b.type) {
       case "heading":
       case "paragraph":
@@ -43,18 +43,20 @@ function blocksToEditable(blocks: LessonBlock[]): EditableBlock[] {
         return { type: b.type, content: b.content };
       case "flashcard":
         return { type: "flashcard", front: b.front, back: b.back };
-      case "fillblank":
+      case "fillblank": {
+        const acceptedGroups = b.accepted ?? [];
         return {
           type: "fillblank",
           prompt: b.prompt,
-          accepted: b.accepted.map((group) => group.join("|")).join("\n"),
+          accepted: acceptedGroups.map((group) => group.join("|")).join("\n"),
         };
+      }
       case "quiz":
         return {
           type: "quiz",
           question: b.question,
           options: b.options.join("\n"),
-          correctIndex: b.correctIndex,
+          correctIndex: b.correctIndex ?? 0,
           explanation: b.explanation ?? "",
         };
       case "match":

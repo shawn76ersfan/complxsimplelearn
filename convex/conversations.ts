@@ -1,6 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "./_lib/auth";
+import type { Id } from "./_generated/dataModel";
 
 // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -100,11 +101,10 @@ export const updateTitle = mutation({
   },
 });
 
-/** Append a single message to a conversation. */
+/** Append a single user message to a conversation. */
 export const addMessage = mutation({
   args: {
     conversationId: v.id("starkConversations"),
-    role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
   },
   handler: async (ctx, args) => {
@@ -115,12 +115,84 @@ export const addMessage = mutation({
     await ctx.db.insert("starkMessages", {
       conversationId: args.conversationId,
       userId: user._id,
-      role: args.role,
+      role: "user",
       content: args.content,
       createdAt: now,
     });
-    // Touch updatedAt so the convo bubbles to the top
     await ctx.db.patch(args.conversationId, { updatedAt: now });
+  },
+});
+
+async function insertMessage(
+  ctx: MutationCtx,
+  args: {
+    conversationId: Id<"starkConversations">;
+    userId: Id<"users">;
+    role: "user" | "assistant";
+    content: string;
+    now: number;
+  },
+) {
+  await ctx.db.insert("starkMessages", {
+    conversationId: args.conversationId,
+    userId: args.userId,
+    role: args.role,
+    content: args.content,
+    createdAt: args.now,
+  });
+}
+
+export const appendExchange = internalMutation({
+  args: {
+    conversationId: v.id("starkConversations"),
+    userId: v.id("users"),
+    userText: v.string(),
+    assistantText: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const convo = await ctx.db.get(args.conversationId);
+    if (!convo || convo.userId !== args.userId) throw new Error("Not found");
+    const now = Date.now();
+    await insertMessage(ctx, {
+      conversationId: args.conversationId,
+      userId: args.userId,
+      role: "user",
+      content: args.userText,
+      now,
+    });
+    await insertMessage(ctx, {
+      conversationId: args.conversationId,
+      userId: args.userId,
+      role: "assistant",
+      content: args.assistantText,
+      now: now + 1,
+    });
+    await ctx.db.patch(args.conversationId, { updatedAt: now + 1 });
+    return null;
+  },
+});
+
+export const addAssistantMessage = internalMutation({
+  args: {
+    conversationId: v.id("starkConversations"),
+    userId: v.id("users"),
+    content: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const convo = await ctx.db.get(args.conversationId);
+    if (!convo || convo.userId !== args.userId) throw new Error("Not found");
+    const now = Date.now();
+    await insertMessage(ctx, {
+      conversationId: args.conversationId,
+      userId: args.userId,
+      role: "assistant",
+      content: args.content,
+      now,
+    });
+    await ctx.db.patch(args.conversationId, { updatedAt: now });
+    return null;
   },
 });
 

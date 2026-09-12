@@ -9,16 +9,19 @@ import { Edit3, Save, X, BookOpen, Trophy, GraduationCap, Mail, User, Volume2, V
 import { cn, percentageColor, formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { CalendarWidget } from "@/components/teacher/CalendarWidget";
+import { US_STATES } from "@/lib/usStates";
 
 export default function ProfilePage() {
   const { user } = useUser();
   const profile = useQuery(api.users.getMyProfile);
-  const myAttempts = useQuery(api.attempts.getMyAttempts);
+  const scores = useQuery(api.attempts.getMyScoreSummary);
   const tracks = useQuery(api.tracks.list);
   const updateProfile = useMutation(api.users.updateProfile);
 
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [state, setState] = useState("");
   const [soundOn, setSoundOn] = useState(false);
 
   useEffect(() => {
@@ -33,20 +36,31 @@ export default function ProfilePage() {
   }
 
   function startEdit() {
-    setName(profile?.name ?? "");
+    setFirstName(profile?.firstName ?? profile?.name?.split(" ")[0] ?? "");
+    setLastName(profile?.lastName ?? profile?.name?.split(" ").slice(1).join(" ") ?? "");
+    setState(profile?.state ?? "");
     setEditing(true);
   }
 
   async function handleSave() {
-    if (!name.trim()) return;
-    await updateProfile({ name: name.trim() });
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error("First and last name are required");
+      return;
+    }
+    if (profile?.role === "student" && !state) {
+      toast.error("Pick the state you join class from");
+      return;
+    }
+    await updateProfile({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      ...(state ? { state } : {}),
+    });
     toast.success("Profile updated!");
     setEditing(false);
   }
 
-  const totalScore = myAttempts?.reduce((s, a) => s + a.score, 0) ?? 0;
-  const totalMax = myAttempts?.reduce((s, a) => s + a.maxScore, 0) ?? 0;
-  const overallPct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
+  const testAvg = scores?.testAvg ?? null;
   const isTeacher = profile?.role === "teacher";
 
   return (
@@ -75,25 +89,51 @@ export default function ProfilePage() {
           {/* Info */}
           <div className="flex-1">
             {editing ? (
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="px-3 py-2 rounded-xl text-lg font-bold outline-none transition-all"
-                  style={{ background: "var(--surface-2)", border: "2px solid #2563EB", color: "var(--text)" }}
-                  onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                  autoFocus
-                />
-                <button onClick={handleSave} className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-500 text-white hover:opacity-80 transition-opacity">
-                  <Save size={16} />
-                </button>
-                <button onClick={() => setEditing(false)} className="w-9 h-9 rounded-xl flex items-center justify-center hover:opacity-70 transition-opacity" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-                  <X size={16} />
-                </button>
+              <div className="space-y-3 mb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="First name"
+                    className="px-3 py-2 rounded-xl text-lg font-bold outline-none transition-all"
+                    style={{ background: "var(--surface-2)", border: "2px solid #2563EB", color: "var(--text)" }}
+                    autoFocus
+                  />
+                  <input
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Last name"
+                    className="px-3 py-2 rounded-xl text-lg font-bold outline-none transition-all"
+                    style={{ background: "var(--surface-2)", border: "2px solid #2563EB", color: "var(--text)" }}
+                  />
+                </div>
+                <select
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  className="w-full sm:w-64 px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+                >
+                  <option value="">State you join from</option>
+                  {US_STATES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSave} className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-500 text-white hover:opacity-80 transition-opacity">
+                    <Save size={16} />
+                  </button>
+                  <button onClick={() => setEditing(false)} className="w-9 h-9 rounded-xl flex items-center justify-center hover:opacity-70 transition-opacity" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-2xl font-black" style={{ color: "var(--text)" }}>{profile?.name ?? user?.fullName}</h1>
+                <h1 className="text-2xl font-black" style={{ color: "var(--text)" }}>
+                  {profile?.firstName && profile?.lastName
+                    ? `${profile.firstName} ${profile.lastName}`
+                    : (profile?.name ?? user?.fullName)}
+                </h1>
                 <button onClick={startEdit} className="w-7 h-7 rounded-lg flex items-center justify-center hover:opacity-70 transition-opacity" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                   <Edit3 size={12} style={{ color: "var(--text-muted)" }} />
                 </button>
@@ -118,6 +158,11 @@ export default function ProfilePage() {
                 <User size={13} />
                 Joined {profile ? formatDate(profile.createdAt) : "—"}
               </div>
+              {profile?.state && (
+                <div className="flex items-center gap-1.5">
+                  {profile.state}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -127,8 +172,8 @@ export default function ProfilePage() {
       {!isTeacher && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {[
-            { label: "Overall Score", value: `${overallPct}%`, icon: Trophy, color: "#2563EB" },
-            { label: "Lessons Done", value: myAttempts?.length ?? 0, icon: BookOpen, color: "#0EA5E9" },
+            { label: "Test avg", value: testAvg === null ? "—" : `${testAvg}%`, icon: Trophy, color: "#2563EB" },
+            { label: "Lessons Done", value: scores?.completedLessons ?? 0, icon: BookOpen, color: "#0EA5E9" },
             { label: "Tracks Enrolled", value: tracks?.length ?? 0, icon: GraduationCap, color: "#F59E0B" },
           ].map((stat) => (
             <div key={stat.label} className="card p-5 flex items-center gap-3">
@@ -136,7 +181,7 @@ export default function ProfilePage() {
                 <stat.icon size={18} style={{ color: stat.color }} />
               </div>
               <div>
-                <p className={cn("text-2xl font-black", stat.label === "Overall Score" ? percentageColor(overallPct) : "")} style={{ color: stat.label !== "Overall Score" ? "var(--text)" : undefined }}>
+                <p className={cn("text-2xl font-black", stat.label === "Test avg" && testAvg !== null ? percentageColor(testAvg) : "")} style={{ color: stat.label !== "Test avg" ? "var(--text)" : undefined }}>
                   {stat.value}
                 </p>
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>{stat.label}</p>

@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser, getCurrentUserOrNull, requireAdmin } from "./_lib/auth";
-import { envRoleForEmail } from "./lib/teacherEmails";
+import { envRoleForEmail, normalizeEmail } from "./lib/teacherEmails";
 import { isStaffRole } from "./lib/roles";
 import {
   emailHasActiveEnrollment,
@@ -10,7 +10,9 @@ import {
 } from "./lib/enrollmentAccess";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { addStudentToCohort, visibleStudents } from "./lib/cohortAccess";
+import { addMember, addStudentToCohort, visibleStudents } from "./lib/cohortAccess";
+import { splitDisplayName } from "./lib/names";
+import { isUsState } from "./lib/usStates";
 
 const roleValidator = v.union(v.literal("admin"), v.literal("teacher"), v.literal("student"));
 
@@ -27,22 +29,31 @@ function resolveDisplayName(
 
 export const store = mutation({
   args: {
-    clerkId: v.string(),
-    email: v.string(),
     name: v.string(),
     imageUrl: v.optional(v.string()),
   },
   returns: v.id("users"),
   handler: async (ctx, args): Promise<Id<"users">> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const clerkId = identity.subject;
+    const email = identity.email ? normalizeEmail(identity.email) : "";
+
     const existing = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
       .unique();
 
-    const enrollment = await getEnrollmentByEmail(ctx, args.email);
+    if (!email) {
+      if (existing) return existing._id;
+      throw new Error("Your account has no email address");
+    }
+
+    const enrollment = await getEnrollmentByEmail(ctx, email);
     // ADMIN_EMAILS / TEACHER_EMAILS win; otherwise an invited teacher becomes
-    // a teacher; everyone else is a student.
-    const envRole = envRoleForEmail(args.email);
+    // a teacher; everyone else is a student. Role is taken from the JWT email
+    // only — never from client-supplied fields.
+    const envRole = envRoleForEmail(email);
     const role: "admin" | "teacher" | "student" =
       envRole ?? (enrollment?.role === "teacher" && enrollment.status !== "revoked" ? "teacher" : "student");
     const name = resolveDisplayName(
@@ -52,52 +63,90 @@ export const store = mutation({
     );
 
     if (existing) {
-      const patch: { name?: string; imageUrl?: string; role?: "admin" | "teacher" } = {
+      const patch: {
+        email?: string;
+        name?: string;
+        firstName?: string;
+        lastName?: string;
+        imageUrl?: string;
+        role?: "admin" | "teacher";
+      } = {
         imageUrl: args.imageUrl,
       };
+      if (existing.email !== email) patch.email = email;
       // Never overwrite a real name with the placeholder "Student"
       if (!isPlaceholderName(name) || isPlaceholderName(existing.name)) {
         patch.name = name;
+        if (!existing.firstName || !existing.lastName) {
+          const parts = splitDisplayName(name);
+          if (parts.firstName && !existing.firstName) patch.firstName = parts.firstName;
+          if (parts.lastName && !existing.lastName) patch.lastName = parts.lastName;
+        }
       }
       // Promote when the env config outranks the stored role (teacher -> admin,
       // student -> staff). Never demote automatically.
       if (envRole === "admin" && existing.role !== "admin") patch.role = "admin";
       else if (envRole === "teacher" && existing.role === "student") patch.role = "teacher";
       await ctx.db.patch(existing._id, patch);
+
+      // Existing accounts who were later invited into a cohort join on next sign-in.
+      if (
+        existing.status !== "dropped" &&
+        enrollment?.status === "invited" &&
+        enrollment.cohortId
+      ) {
+        if (!envRole && existing.role === "student") {
+          await addStudentToCohort(ctx, enrollment.cohortId, existing._id, enrollment.invitedBy);
+          await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email });
+        } else if (isStaffRole(existing.role) || envRole) {
+          await addMember(ctx, enrollment.cohortId, existing._id, "teacher", enrollment.invitedBy);
+          await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email });
+        }
+      }
+
       return existing._id;
     }
 
     if (isStaffRole(role)) {
+      const staffParts = splitDisplayName(name);
       const userId = await ctx.db.insert("users", {
-        clerkId: args.clerkId,
-        email: args.email,
+        clerkId,
+        email,
         name,
+        firstName: staffParts.firstName || undefined,
+        lastName: staffParts.lastName || undefined,
         imageUrl: args.imageUrl,
         role,
         createdAt: Date.now(),
       });
       if (enrollment) {
-        await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email: args.email });
+        await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, { email });
+        if (enrollment.cohortId) {
+          await addMember(ctx, enrollment.cohortId, userId, "teacher", enrollment.invitedBy);
+        }
       }
       return userId;
     }
 
-    const allowed = await emailHasActiveEnrollment(ctx, args.email);
+    const allowed = await emailHasActiveEnrollment(ctx, email);
     if (!allowed) {
       throw new Error("NOT_ENROLLED");
     }
 
+    const studentParts = splitDisplayName(name);
     const userId = await ctx.db.insert("users", {
-      clerkId: args.clerkId,
-      email: args.email,
+      clerkId,
+      email,
       name,
+      firstName: studentParts.firstName || undefined,
+      lastName: studentParts.lastName || undefined,
       imageUrl: args.imageUrl,
       role: "student",
       createdAt: Date.now(),
     });
 
     await ctx.runMutation(internal.enrollments.markEnrollmentAccepted, {
-      email: args.email,
+      email,
     });
 
     // Drop them straight into the cohort they were invited to.
@@ -137,11 +186,51 @@ export const listStudents = query({
 
 export const updateProfile = mutation({
   args: {
-    name: v.string(),
+    name: v.optional(v.string()),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    state: v.optional(v.string()),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
-    await ctx.db.patch(user._id, { name: args.name });
+    const first = args.firstName?.trim();
+    const last = args.lastName?.trim();
+    const state = args.state?.trim();
+    let display = args.name?.trim();
+    if (first && last) display = `${first} ${last}`;
+    else if (first) display = first;
+
+    if (display !== undefined) {
+      if (display.length < 2 || display.toLowerCase() === "student") {
+        throw new Error("Please enter your real first and last name");
+      }
+    }
+    if (state !== undefined && !isUsState(state)) {
+      throw new Error("Pick a valid state");
+    }
+
+    const patch: {
+      name?: string;
+      firstName?: string;
+      lastName?: string;
+      state?: string;
+    } = {};
+    if (display) patch.name = display;
+    if (first !== undefined) {
+      if (!first) throw new Error("First name is required");
+      patch.firstName = first;
+    }
+    if (last !== undefined) {
+      if (!last) throw new Error("Last name is required");
+      patch.lastName = last;
+    }
+    if (state !== undefined) patch.state = state;
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(user._id, patch);
+    }
+    return null;
   },
 });
 
