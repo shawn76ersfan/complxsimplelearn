@@ -72,7 +72,7 @@ const BENEFITS = [
   { icon: Terminal, title: "Hands-On Labs", desc: "Practice in real cloud environments." },
   { icon: BriefcaseBusiness, title: "Real Projects", desc: "Build production-grade infrastructure for your portfolio." },
   { icon: Trophy, title: "Career Support", desc: "Get resume optimization and interview preparation." },
-  { icon: Users, title: "Live Mentorship", desc: "Learn directly from an experienced instructor." },
+  { icon: Users, title: "Live Mentorship", desc: "Learn in live, interactive sessions with dedicated instructors." },
   { icon: Video, title: "Recorded Sessions", desc: "Review every class inside the learning platform." },
   { icon: MessageCircle, title: "Community Support", desc: "Learn alongside an active student community." },
   { icon: BookOpen, title: "Beginner Friendly", desc: "Start with the fundamentals—no previous experience required." },
@@ -289,14 +289,14 @@ export default async function LandingPage() {
               <span className="highlighter">DevOps &amp; Cloud</span> Engineer.
             </h1>
             <p className="text-lg sm:text-xl max-w-xl mb-9 leading-relaxed" style={{ color: "var(--text-muted)" }}>
-              A small class, one instructor, ten modules, and a portfolio of real infrastructure. Live lessons, hands-on labs, and mentorship that follows you into the job hunt.
+              Live, interactive classes and modules with dedicated instructors, plus a portfolio of real infrastructure. Hands-on labs and mentorship that follows you into the job hunt.
             </p>
             <EnrollmentButtons />
             <InviteOnlyNote className="mt-6" />
 
             <dl className="mt-12 grid grid-cols-3 gap-4 max-w-md">
               {[
-                { k: "10", v: "Modules" },
+                { k: "10+", v: "Interactive modules" },
                 { k: "7", v: "Portfolio projects" },
                 { k: "1", v: "AWS voucher" },
               ].map((s) => (
