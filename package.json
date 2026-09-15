@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:webpack": "next dev --webpack",
     "dev:all": "concurrently \"npx convex dev\" \"next dev --turbopack\" --names \"convex,next\" --prefix-colors \"cyan,magenta\"",
     "build": "next build",
     "start": "next start",
