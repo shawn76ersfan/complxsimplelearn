@@ -1,22 +1,39 @@
 import { mutation, query } from "./_generated/server";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import { v } from "convex/values";
-import { R2 } from "@convex-dev/r2";
+import { R2, type R2Callbacks } from "@convex-dev/r2";
 import type { DataModel } from "./_generated/dataModel";
 import { getCurrentUser, getCurrentUserOrNull } from "./_lib/auth";
-import { assertBoardAccess, canAccessBoard, cohortIdsForUser } from "./lib/cohortAccess";
+import {
+  assertBoardAccess,
+  canAccessBoard,
+  cohortIdsForUser,
+  staffRecipients,
+  studentRecipients,
+} from "./lib/cohortAccess";
 import { rosterName } from "./lib/names";
-import { isAdminRole } from "./lib/roles";
-import { assertOwnedUpload, assertUploadAllowed, claimUpload } from "./lib/uploads";
+import { isAdminRole, isStaffRole } from "./lib/roles";
+import { notifyUsers } from "./lib/notify";
+import type { QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import {
+  assertOwnedUpload,
+  assertUploadAllowed,
+  claimUpload,
+  validateUpload,
+} from "./lib/uploads";
 
 export const r2 = new R2(components.r2);
+const callbacks: R2Callbacks = internal.board;
 
 const MAX_BODY = 2000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const RATE_WINDOW_MS = 20_000;
 const RATE_MAX = 4;
-const LIST_LIMIT = 80;
+const PAGE_SIZE = 40;
+const PAGE_MAX = 200;
+const PIN_MAX = 3;
 
 const authorReturn = v.object({
   _id: v.id("users"),
@@ -28,6 +45,12 @@ const authorReturn = v.object({
   role: v.union(v.literal("admin"), v.literal("teacher"), v.literal("student")),
 });
 
+const replyToReturn = v.object({
+  _id: v.id("boardMessages"),
+  authorName: v.string(),
+  preview: v.string(),
+});
+
 const messageReturn = v.object({
   _id: v.id("boardMessages"),
   cohortId: v.id("cohorts"),
@@ -35,20 +58,107 @@ const messageReturn = v.object({
   body: v.string(),
   imageUrl: v.union(v.string(), v.null()),
   createdAt: v.number(),
+  pinned: v.boolean(),
+  parentId: v.optional(v.id("boardMessages")),
+  replyTo: v.union(replyToReturn, v.null()),
   author: authorReturn,
 });
 
-export const { generateUploadUrl, syncMetadata } = r2.clientApi<DataModel>({
-  checkUpload: async (ctx) => {
-    await assertUploadAllowed(ctx);
-  },
-  onSyncMetadata: async (ctx, { key }) => {
-    await claimUpload(ctx, r2, key, "board", {
-      maxBytes: MAX_IMAGE_BYTES,
-      contentTypes: ALLOWED_IMAGE_TYPES,
+async function hydrateMessages(
+  ctx: QueryCtx,
+  rows: Doc<"boardMessages">[],
+): Promise<
+  Array<{
+    _id: Id<"boardMessages">;
+    cohortId: Id<"cohorts">;
+    authorId: Id<"users">;
+    body: string;
+    imageUrl: string | null;
+    createdAt: number;
+    pinned: boolean;
+    parentId?: Id<"boardMessages">;
+    replyTo: { _id: Id<"boardMessages">; authorName: string; preview: string } | null;
+    author: {
+      _id: Id<"users">;
+      name: string;
+      firstName?: string;
+      lastName?: string;
+      state?: string;
+      imageUrl?: string;
+      role: "admin" | "teacher" | "student";
+    };
+  }>
+> {
+  const messages = [];
+  for (const row of rows) {
+    const author = await ctx.db.get(row.authorId);
+    if (!author) continue;
+    let imageUrl: string | null = null;
+    if (row.imageKey) {
+      try {
+        imageUrl = await r2.getUrl(row.imageKey, { expiresIn: 60 * 60 * 12 });
+      } catch {
+        imageUrl = null;
+      }
+    }
+    let replyTo: { _id: Id<"boardMessages">; authorName: string; preview: string } | null = null;
+    if (row.parentId) {
+      const parent = await ctx.db.get(row.parentId);
+      if (parent) {
+        const parentAuthor = await ctx.db.get(parent.authorId);
+        replyTo = {
+          _id: parent._id,
+          authorName: parentAuthor ? rosterName(parentAuthor) : "Classmate",
+          preview: parent.body.trim()
+            ? parent.body.trim().slice(0, 80)
+            : parent.imageKey
+              ? "Photo"
+              : "Original post",
+        };
+      } else {
+        replyTo = { _id: row.parentId, authorName: "Classmate", preview: "Original post removed" };
+      }
+    }
+    messages.push({
+      _id: row._id,
+      cohortId: row.cohortId,
+      authorId: row.authorId,
+      body: row.body,
+      imageUrl,
+      createdAt: row.createdAt,
+      pinned: row.pinned === true,
+      parentId: row.parentId,
+      replyTo,
+      author: {
+        _id: author._id,
+        name: rosterName(author),
+        firstName: author.firstName,
+        lastName: author.lastName,
+        state: author.state,
+        imageUrl: author.imageUrl,
+        role: author.role,
+      },
     });
-  },
-});
+  }
+  return messages;
+}
+
+export const { generateUploadUrl, syncMetadata, onSyncMetadata } =
+  r2.clientApi<DataModel>({
+    checkUpload: async (ctx) => {
+      await assertUploadAllowed(ctx);
+    },
+    onUpload: async (ctx, _bucket, key) => {
+      await claimUpload(ctx, key, "board");
+    },
+    callbacks,
+    onSyncMetadata: async (ctx, { key }) => {
+      await validateUpload(ctx, r2, key, {
+        maxBytes: MAX_IMAGE_BYTES,
+        contentTypes: ALLOWED_IMAGE_TYPES,
+      });
+    },
+  });
 
 export const myBoards = query({
   args: {},
@@ -83,50 +193,59 @@ export const myBoards = query({
 });
 
 export const list = query({
-  args: { cohortId: v.id("cohorts") },
-  returns: v.array(messageReturn),
+  args: {
+    cohortId: v.id("cohorts"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.object({
+    pinned: v.array(messageReturn),
+    messages: v.array(messageReturn),
+    hasMore: v.boolean(),
+  }),
   handler: async (ctx, args) => {
+    const empty = { pinned: [], messages: [], hasMore: false };
     const me = await getCurrentUserOrNull(ctx);
-    if (!me) return [];
-    if (!(await canAccessBoard(ctx, me, args.cohortId))) return [];
+    if (!me) return empty;
+    if (!(await canAccessBoard(ctx, me, args.cohortId))) return empty;
 
-    const rows = await ctx.db
+    const limit = Math.min(Math.max(args.limit ?? PAGE_SIZE, 10), PAGE_MAX);
+    const recent = await ctx.db
       .query("boardMessages")
       .withIndex("by_cohort_created", (q) => q.eq("cohortId", args.cohortId))
       .order("desc")
-      .take(LIST_LIMIT);
+      .take(limit + 1);
+    const hasMore = recent.length > limit;
+    const page = hasMore ? recent.slice(0, limit) : recent;
 
-    const messages = [];
-    for (const row of rows.reverse()) {
-      const author = await ctx.db.get(row.authorId);
-      if (!author) continue;
-      let imageUrl: string | null = null;
-      if (row.imageKey) {
-        try {
-          imageUrl = await r2.getUrl(row.imageKey, { expiresIn: 60 * 60 * 12 });
-        } catch {
-          imageUrl = null;
-        }
-      }
-      messages.push({
-        _id: row._id,
-        cohortId: row.cohortId,
-        authorId: row.authorId,
-        body: row.body,
-        imageUrl,
-        createdAt: row.createdAt,
-        author: {
-          _id: author._id,
-          name: rosterName(author),
-          firstName: author.firstName,
-          lastName: author.lastName,
-          state: author.state,
-          imageUrl: author.imageUrl,
-          role: author.role,
-        },
-      });
-    }
-    return messages;
+    const pinnedRows = (
+      await ctx.db
+        .query("boardMessages")
+        .withIndex("by_cohort_pinned", (q) =>
+          q.eq("cohortId", args.cohortId).eq("pinned", true),
+        )
+        .order("desc")
+        .take(PIN_MAX)
+    ).reverse();
+
+    return {
+      pinned: await hydrateMessages(ctx, pinnedRows),
+      messages: await hydrateMessages(ctx, page.reverse()),
+      hasMore,
+    };
+  },
+});
+
+export const unreadCount = query({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const me = await getCurrentUserOrNull(ctx);
+    if (!me) return 0;
+    const unread = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_read", (q) => q.eq("userId", me._id).eq("isRead", false))
+      .take(80);
+    return unread.filter((n) => n.type === "board_post").length;
   },
 });
 
@@ -137,6 +256,7 @@ export const post = mutation({
     imageKey: v.optional(v.string()),
     imageContentType: v.optional(v.string()),
     imageSize: v.optional(v.number()),
+    parentId: v.optional(v.id("boardMessages")),
   },
   returns: v.id("boardMessages"),
   handler: async (ctx, args) => {
@@ -181,14 +301,49 @@ export const post = mutation({
       throw new Error("Slow down — wait a few seconds before sending more");
     }
 
-    return await ctx.db.insert("boardMessages", {
+    let parentId: Id<"boardMessages"> | undefined;
+    let parentAuthorId: Id<"users"> | undefined;
+    if (args.parentId) {
+      const parent = await ctx.db.get(args.parentId);
+      if (!parent || parent.cohortId !== args.cohortId) {
+        throw new Error("That post is gone");
+      }
+      parentId = parent._id;
+      parentAuthorId = parent.authorId;
+    }
+
+    const id = await ctx.db.insert("boardMessages", {
       cohortId: args.cohortId,
       authorId: me._id,
       body,
       imageKey: args.imageKey,
       imageContentType: args.imageContentType,
       createdAt: Date.now(),
+      parentId,
     });
+
+    const snippet = body
+      ? body.length > 140
+        ? `${body.slice(0, 137).trimEnd()}…`
+        : body
+      : "Posted a photo";
+    const students = await studentRecipients(ctx, args.cohortId);
+    const staff = await staffRecipients(ctx, args.cohortId);
+    const recipients = new Set<Id<"users">>([...students, ...staff]);
+    if (parentAuthorId) recipients.add(parentAuthorId);
+
+    await notifyUsers(ctx, recipients, {
+      type: "board_post",
+      title: parentId
+        ? `${rosterName(me)} replied on the Board`
+        : `${rosterName(me)} posted on the Board`,
+      body: snippet,
+      href: "/board",
+      actorId: me._id,
+      skipEmail: true,
+    });
+
+    return id;
   },
 });
 
@@ -200,7 +355,7 @@ export const remove = mutation({
     const row = await ctx.db.get(args.messageId);
     if (!row) return null;
     await assertBoardAccess(ctx, me, row.cohortId);
-    if (row.authorId !== me._id && !isAdminRole(me.role)) {
+    if (row.authorId !== me._id && !isStaffRole(me.role)) {
       throw new Error("You can only remove your own posts");
     }
     if (row.imageKey) {
@@ -211,6 +366,36 @@ export const remove = mutation({
       }
     }
     await ctx.db.delete(args.messageId);
+    return null;
+  },
+});
+
+export const setPinned = mutation({
+  args: {
+    messageId: v.id("boardMessages"),
+    pinned: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const me = await getCurrentUser(ctx);
+    if (!isStaffRole(me.role)) throw new Error("Only instructors can pin posts");
+    const row = await ctx.db.get(args.messageId);
+    if (!row) throw new Error("Post not found");
+    await assertBoardAccess(ctx, me, row.cohortId);
+
+    if (args.pinned) {
+      const already = await ctx.db
+        .query("boardMessages")
+        .withIndex("by_cohort_pinned", (q) =>
+          q.eq("cohortId", row.cohortId).eq("pinned", true),
+        )
+        .take(PIN_MAX);
+      if (already.length >= PIN_MAX && !already.some((p) => p._id === row._id)) {
+        throw new Error(`You can pin up to ${PIN_MAX} posts`);
+      }
+    }
+
+    await ctx.db.patch(args.messageId, { pinned: args.pinned });
     return null;
   },
 });

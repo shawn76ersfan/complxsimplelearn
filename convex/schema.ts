@@ -9,6 +9,8 @@ export default defineSchema({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     state: v.optional(v.string()),
+    // IANA zone so live class times make sense for students anywhere in the US.
+    timezone: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     // admin = runs the school (Cassandra + dev); teacher = instructor scoped to
     // their cohorts; student = learner. See convex/lib/roles.ts.
@@ -41,6 +43,7 @@ export default defineSchema({
       v.literal("video_posted"),
       v.literal("calendar_event"),
       v.literal("announcement"),
+      v.literal("board_post"),
     ),
     title: v.string(),
     body: v.optional(v.string()),
@@ -85,6 +88,7 @@ export default defineSchema({
     startDate: v.string(),          // "YYYY-MM-DD"
     endDate: v.optional(v.string()),// "YYYY-MM-DD"
     schedule: v.optional(v.string()),   // "Tue & Thu · 6–8pm ET"
+    scheduleTimezone: v.optional(v.string()), // IANA, default America/New_York
     meetingUrl: v.optional(v.string()),
     color: v.string(),
     status: v.union(
@@ -151,6 +155,19 @@ export default defineSchema({
     .index("by_slug", ["slug"])
     .index("by_published", ["published"]),
 
+  // Instructors open a published track for a cohort (or school-wide when
+  // cohortId is unset). Unpublished CMS drafts stay hidden regardless.
+  trackReleases: defineTable({
+    trackId: v.id("tracks"),
+    cohortId: v.optional(v.id("cohorts")),
+    open: v.boolean(),
+    releasedBy: v.id("users"),
+    releasedAt: v.number(),
+  })
+    .index("by_track_cohort", ["trackId", "cohortId"])
+    .index("by_cohort", ["cohortId"])
+    .index("by_track", ["trackId"]),
+
   lessons: defineTable({
     trackId: v.id("tracks"),
     title: v.string(),
@@ -196,10 +213,18 @@ export default defineSchema({
     maxScore: v.number(),
     answers: v.optional(v.array(v.number())),
     completedAt: v.number(),
+    // Quizzes and mandatory work wait for an instructor grade before they
+    // count toward test average. `score`/`maxScore` stay as the auto suggestion.
+    gradeStatus: v.optional(v.union(v.literal("pending"), v.literal("graded"))),
+    teacherGrade: v.optional(v.number()),
+    teacherFeedback: v.optional(v.string()),
+    gradedBy: v.optional(v.id("users")),
+    gradedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_lesson", ["userId", "lessonId"])
-    .index("by_user_track", ["userId", "trackId"]),
+    .index("by_user_track", ["userId", "trackId"])
+    .index("by_grade_status", ["gradeStatus"]),
 
   calendarEvents: defineTable({
     date: v.string(),
@@ -419,9 +444,12 @@ export default defineSchema({
     imageKey: v.optional(v.string()),
     imageContentType: v.optional(v.string()),
     createdAt: v.number(),
+    pinned: v.optional(v.boolean()),
+    parentId: v.optional(v.id("boardMessages")),
   })
     .index("by_cohort_created", ["cohortId", "createdAt"])
-    .index("by_author_created", ["authorId", "createdAt"]),
+    .index("by_author_created", ["authorId", "createdAt"])
+    .index("by_cohort_pinned", ["cohortId", "pinned", "createdAt"]),
 
   // Who uploaded an R2 object. Keys are claimed at sync time so later
   // posts/extracts can reject files the caller does not own.
@@ -457,4 +485,35 @@ export default defineSchema({
     .index("by_cohort_date", ["cohortId", "date"])
     .index("by_student_date", ["studentId", "date"])
     .index("by_cohort_student_date", ["cohortId", "studentId", "date"]),
+
+  // Topic-only Stark usage for teachers. Never stores message text.
+  starkHelpEvents: defineTable({
+    userId: v.id("users"),
+    conversationId: v.optional(v.id("starkConversations")),
+    mode: v.union(v.literal("default"), v.literal("coach")),
+    kind: v.union(
+      v.literal("chat"),
+      v.literal("quiz_followup"),
+      v.literal("career"),
+      v.literal("platform"),
+      v.literal("refused"),
+    ),
+    topic: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_created", ["createdAt"]),
+
+  // Coach Mode career kit: rewrite plan + interview prep + portfolio map.
+  coachPlans: defineTable({
+    userId: v.id("users"),
+    conversationId: v.id("starkConversations"),
+    versionId: v.id("resumeVersions"),
+    rewritePlanJson: v.string(),
+    interviewJson: v.string(),
+    portfolioJson: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_conversation", ["conversationId"])
+    .index("by_user_created", ["userId", "createdAt"]),
 });

@@ -3,7 +3,7 @@
 export const PLATFORM_FACTS = `ComplxSimple is Cassandra Carter's interactive DevOps and cloud engineering learning platform. Enrollment is invite-only.
 
 PROGRAMS (they are separate):
-- DevOps & Cloud Engineering Bootcamp: the full career program. Includes live classes, recorded sessions, hands-on labs, real-world projects, live mentorship, community support, resume optimization, interview preparation, certificate of completion, AWS SAA-C03 certification prep, a free AWS Solutions Architect Associate exam voucher, and Stark AI. Bootcamp tuition is by cohort — students should schedule a free consultation for current pricing, installments, and seats. Next cohort date is announced on the site.
+- DevOps & Cloud Engineering Bootcamp: the full career program. Includes live classes, recorded sessions, hands-on labs, real-world projects, live mentorship, community support, resume optimization, interview preparation, certificate of completion, AWS SAA-C03 certification prep, a free AWS Solutions Architect Associate exam voucher, and Stark AI. Bootcamp tuition is by cohort — book a 1:1 with Cassandra on Calendly (dashboard / My Class office hours) for current pricing, installments, and seats. Next cohort date is announced on the site.
 - Instructor course: Cassandra's separate instructor-focused program. It is NOT the bootcamp. Tuition is $1,600+ one-time; installments are available. Inquire via info sessions / the administrator.
 
 PUBLIC WEBSITE:
@@ -12,9 +12,11 @@ PUBLIC WEBSITE:
 - Info sessions: visitors can meet Cassandra, explore the program, and ask questions before enrolling.
 
 STUDENT APP PAGES:
-- /dashboard — home, continue learning, learning-track cards, homework preview, Cassandra's feedback/warnings
-- /learn — all published learning tracks; Watch Party section is coming soon
-- /learn/{track-slug} — lessons inside a track
+- /dashboard — home, continue learning, 1:1 office hours with Cassandra (Calendly), learning-track cards, homework preview, Cassandra's feedback/warnings
+- /cohort — My Class: roster, announcements, calendar, and Book 15 min with Cassandra
+- /board — live class Board: cohort-only chat with photos, replies, pinned instructor posts, and notifications
+- /learn — learning tracks your instructor has opened; Watch Party section is coming soon
+- /learn/{track-slug} — lessons inside an open track
 - /videos — recorded class / training videos
 - /homework — assignments with due dates and submissions
 - /feedback (Messages) — feedback, notices, and warnings from Cassandra
@@ -26,8 +28,10 @@ STARK:
 - Coach Mode (beta): paste or upload a resume; Stark scores it with Cassandra's structured rubric and coaches bullet-by-bullet. Optional job-description keyword gap analysis.
 
 HOW LEARNING WORKS:
-- Students follow the Learn-page roadmap in order: lessons, quizzes, Mandatory Work crosswords, homework, and portfolio projects.
-- Completing homework raises student level by one. Lessons count toward track progress and daily streaks.
+- Instructors open one learning track at a time so students follow class pace instead of rushing the catalog.
+- Students complete lessons, quizzes, Mandatory Work, homework, and portfolio projects in the open tracks.
+- Quizzes and mandatory tests are graded by instructors. Auto-score is only a suggestion and does not count toward test average until graded.
+- Lessons count toward track progress and daily streaks. There is no student level system.
 - Cassandra can send feedback, notices, and warnings. Warnings appear as a dashboard banner until acknowledged.
 
 BOOTCAMP ROADMAP (as advertised on the website):

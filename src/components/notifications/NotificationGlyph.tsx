@@ -1,6 +1,6 @@
 "use client";
 
-import { BookMarked, Calendar, ClipboardCheck, Clock, Inbox, Megaphone, Video } from "lucide-react";
+import { BookMarked, Calendar, ClipboardCheck, Clock, Inbox, Megaphone, Pin, Video } from "lucide-react";
 
 export type NotificationType =
   | "assignment_posted"
@@ -9,7 +9,8 @@ export type NotificationType =
   | "submission_received"
   | "video_posted"
   | "calendar_event"
-  | "announcement";
+  | "announcement"
+  | "board_post";
 
 const META: Record<NotificationType, { icon: React.ElementType; accent: string; label: string }> = {
   assignment_posted:   { icon: BookMarked,     accent: "#2563EB", label: "Assignment" },
@@ -19,6 +20,7 @@ const META: Record<NotificationType, { icon: React.ElementType; accent: string; 
   video_posted:        { icon: Video,          accent: "#E11D48", label: "Recording" },
   calendar_event:      { icon: Calendar,       accent: "#10B981", label: "Event" },
   announcement:        { icon: Megaphone,      accent: "#F97316", label: "Announcement" },
+  board_post:          { icon: Pin,            accent: "#2563EB", label: "Board" },
 };
 
 export function notificationAccent(type: string): string {

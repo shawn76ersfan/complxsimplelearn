@@ -15,6 +15,7 @@ const notificationDoc = v.object({
     v.literal("video_posted"),
     v.literal("calendar_event"),
     v.literal("announcement"),
+    v.literal("board_post"),
   ),
   title: v.string(),
   body: v.optional(v.string()),
@@ -81,6 +82,36 @@ export const markAllRead = mutation({
       await ctx.db.patch(row._id, { isRead: true });
     }
     return unread.length;
+  },
+});
+
+export const markTypeRead = mutation({
+  args: {
+    type: v.union(
+      v.literal("assignment_posted"),
+      v.literal("assignment_due_soon"),
+      v.literal("submission_graded"),
+      v.literal("submission_received"),
+      v.literal("video_posted"),
+      v.literal("calendar_event"),
+      v.literal("announcement"),
+      v.literal("board_post"),
+    ),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    const unread = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_read", (q) => q.eq("userId", user._id).eq("isRead", false))
+      .collect();
+    let n = 0;
+    for (const row of unread) {
+      if (row.type !== args.type) continue;
+      await ctx.db.patch(row._id, { isRead: true });
+      n += 1;
+    }
+    return n;
   },
 });
 

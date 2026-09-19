@@ -14,15 +14,17 @@ import { isStaff } from "@/lib/roles";
 export function Navbar() {
   const profile = useQuery(api.users.getMyProfile);
   const unreadFeedback = useQuery(api.feedback.getUnreadCount);
+  const unreadBoard = useQuery(api.board.unreadCount);
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isTeacher = isStaff(profile?.role);
   const unreadCount = !isTeacher ? (unreadFeedback ?? 0) : 0;
+  const boardBadge = unreadBoard ?? 0;
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     ...(!isTeacher ? [{ href: "/cohort", label: "My Class", icon: Users }] : []),
-    { href: "/board", label: "Board", icon: Pin },
+    { href: "/board", label: "Board", icon: Pin, badge: boardBadge },
     { href: "/learn",     label: "Learn",     icon: BookOpen },
     { href: "/videos",    label: "Videos",    icon: Video },
     ...(!isTeacher
