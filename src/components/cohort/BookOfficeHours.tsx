@@ -5,13 +5,12 @@ type Variant = "card" | "button";
 
 export function BookOfficeHours({
   variant = "card",
-  instructorName = "Cassandra",
   className = "",
 }: {
   variant?: Variant;
-  instructorName?: string;
   className?: string;
 }) {
+  const instructorName = "Cassandra";
   const label = `Book 15 min with ${instructorName}`;
 
   if (variant === "button") {

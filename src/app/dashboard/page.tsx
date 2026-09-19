@@ -304,10 +304,7 @@ export default function StudentDashboard() {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 pl-7">
-                <BookOfficeHours
-                  variant="button"
-                  instructorName={w.authorName ?? instructor.short}
-                />
+                <BookOfficeHours variant="button" />
                 <button
                   onClick={() => acknowledgeWarning({ feedbackId: w._id })}
                   className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold transition-all hover:opacity-80"
@@ -323,7 +320,7 @@ export default function StudentDashboard() {
 
       <MyCohortCard className="mb-6" />
 
-      <BookOfficeHours className="mb-6" instructorName={instructor.short} />
+      <BookOfficeHours className="mb-6" />
 
       <div className="mb-6">
         <QuoteCard />
