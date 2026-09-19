@@ -9,11 +9,18 @@ import { formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
 
 function formatFileSize(bytes?: number): string | null {
-  if (!bytes || bytes <= 0) return null;
-  const mb = bytes / (1024 * 1024);
-  if (mb < 1024) return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
-  return `${(mb / 1024).toFixed(1)} GB`;
+  if (bytes == null || bytes <= 0) return null
+
+  const mb = bytes / (1024 ** 2)
+
+  if (mb < 1024) {
+    return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`
+  }
+
+  const gb = mb / 1024
+  return `${gb.toFixed(1)} GB`
 }
+
 
 export function VideoLibrary({
   canManage = false,
@@ -21,9 +28,9 @@ export function VideoLibrary({
   cohortBadge,
 }: {
   canManage?: boolean;
-  /** Staff-only: restrict to one cohort (undefined = everything the viewer can see). */
+  /** Staff-only: TO DO: RESTRICT to one cohort (undefined = everything the viewer can see!). */
   cohortId?: Id<"cohorts">;
-  /** Staff-only: render a cohort label for a video. */
+  /** Staff-only: render a cohort label for a videooooooo */
   cohortBadge?: (cohortId: Id<"cohorts"> | undefined) => { name: string; color: string } | null;
 }) {
   const videos = useQuery(api.videos.list, { cohortId });

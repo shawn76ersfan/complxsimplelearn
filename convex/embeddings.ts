@@ -212,7 +212,7 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
       },
       {
         title: "How learning works",
-        text: "Students follow a structured DevOps and cloud roadmap on the Learn page, complete lessons in order, take quizzes, finish Mandatory Work crosswords, submit homework, and build production-style portfolio projects. Completing each homework assignment raises their level by one, and lessons count toward track progress and daily streaks. Recorded sessions live on the Videos page.",
+        text: "Students follow instructor-released learning tracks on the Learn page. Instructors open tracks when the class is ready so students cannot rush the whole catalog. They complete lessons, take quizzes, finish Mandatory Work, submit homework, and build production-style portfolio projects. Quizzes and mandatory tests are graded by instructors. Lessons count toward track progress and daily streaks. There is no student level system. Recorded sessions live on the Videos page.",
       },
       {
         title: "Programs and pricing",

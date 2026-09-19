@@ -4,10 +4,11 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Calendar, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge, Play } from "lucide-react";
+import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge, Play, Lock } from "lucide-react";
 import { StudentHomework } from "@/components/learn/StudentHomework";
 import { FeedbackPreviewCard } from "@/components/learn/FeedbackPreviewCard";
 import { MyCohortCard } from "@/components/cohort/MyCohortCard";
+import { BookOfficeHours } from "@/components/cohort/BookOfficeHours";
 import { useInstructorName } from "@/components/cohort/useInstructorName";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
@@ -62,7 +63,29 @@ function ContinueLearningCard() {
     return <div className="card p-8 mb-6 animate-pulse h-40" style={{ background: "var(--surface-2)" }} />;
   }
 
-  if (next === null || next.allComplete) {
+  if (next === null) {
+    return (
+      <div className="index-card p-6 sm:p-8 pt-0 mb-6 relative overflow-hidden">
+        <Bookmark color="var(--primary)" />
+        <div className="index-card-title">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>Bookmark · Where you left off</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mt-2">
+          <ProgressRing percentage={0} color="var(--primary)" size={96} />
+          <div className="flex-1 min-w-0">
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold mb-2" style={{ color: "var(--text)" }}>
+              Waiting on class
+            </h2>
+            <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+              Your instructor opens each learning track when the class is ready — you won&apos;t see the whole catalog at once.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (next.allComplete) {
     return (
       <div className="index-card p-6 sm:p-8 pt-0 mb-6 relative overflow-hidden">
         <Bookmark color="var(--primary)" />
@@ -73,12 +96,10 @@ function ContinueLearningCard() {
           <ProgressRing percentage={next?.percentage ?? 100} color="var(--primary)" size={96} />
           <div className="flex-1 min-w-0">
             <h2 className="font-serif text-2xl sm:text-3xl font-bold mb-2" style={{ color: "var(--text)" }}>
-              {next?.allComplete ? "Every chapter read" : "Open your first chapter"}
+              Every chapter read
             </h2>
             <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-              {next?.allComplete
-                ? "Nice work — browse the shelf anytime to review material."
-                : "Pick a textbook and begin building job-ready skills."}
+              Nice work — browse the shelf anytime to review material.
             </p>
             <Link href="/learn" className="btn-ink btn-sm">
               Browse the shelf <ArrowRight size={16} />
@@ -130,10 +151,58 @@ function Bookmark({ color }: { color: string }) {
   );
 }
 
-function TrackCard({ track }: { track: { _id: string; name: string; slug: string; description: string; color: string; icon: string } }) {
-  const progress = useQuery(api.attempts.getTrackProgress, { trackId: track._id as never });
+function TrackCard({ track }: { track: { _id: string; name: string; slug: string; description: string; color: string; icon: string; open?: boolean } }) {
+  const locked = track.open === false;
+  const progress = useQuery(api.attempts.getTrackProgress, locked ? "skip" : { trackId: track._id as never });
   const Icon = TRACK_ICONS[track.slug] ?? BookOpen;
   const pct = progress?.percentage ?? 0;
+
+  const inner = (
+      <div className="relative z-10 p-5 flex flex-col gap-4 flex-1 min-w-0">
+        <div className="flex items-start justify-between">
+          <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: `${track.color}18`, border: `1px solid ${track.color}44` }}>
+            <Icon size={20} style={{ color: track.color }} />
+          </div>
+          {locked ? (
+            <span className="text-xs font-bold px-2 py-1 rounded font-serif inline-flex items-center gap-1" style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}>
+              <Lock size={11} /> Closed
+            </span>
+          ) : (
+            <span className="text-xs font-bold px-2 py-1 rounded font-serif" style={{ background: `${track.color}14`, color: track.color }}>{pct}%</span>
+          )}
+        </div>
+        <div>
+          <h3 className="font-serif font-bold text-lg leading-tight mb-1" style={{ color: "var(--text)" }}>{track.name}</h3>
+          <p className="text-sm leading-relaxed line-clamp-2" style={{ color: "var(--text-muted)" }}>
+            {locked ? "Your instructor will open this track when the class is ready." : track.description}
+          </p>
+        </div>
+        {!locked && (
+          <>
+            <div className="mt-auto">
+              <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
+                <span>{progress?.completed ?? 0}/{progress?.total ?? 0} chapters</span>
+                <span>{pct}% read</span>
+              </div>
+              <div className="w-full rounded-full overflow-hidden" style={{ height: "6px", background: "var(--surface-2)" }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: track.color }} />
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-sm font-semibold group-hover:gap-2 transition-all" style={{ color: track.color }}>
+              Open book <ArrowRight size={14} />
+            </div>
+          </>
+        )}
+      </div>
+  );
+
+  if (locked) {
+    return (
+      <div className="book-cover opacity-80" style={{ ["--book-color" as string]: track.color }}>
+        {inner}
+      </div>
+    );
+  }
 
   return (
     <Link
@@ -141,40 +210,15 @@ function TrackCard({ track }: { track: { _id: string; name: string; slug: string
       className="book-cover hover:-translate-y-1 transition-transform group cursor-pointer"
       style={{ ["--book-color" as string]: track.color }}
     >
-      <div className="relative z-10 p-5 flex flex-col gap-4 flex-1 min-w-0">
-        <div className="flex items-start justify-between">
-          <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: `${track.color}18`, border: `1px solid ${track.color}44` }}>
-            <Icon size={20} style={{ color: track.color }} />
-          </div>
-          <span className="text-xs font-bold px-2 py-1 rounded font-serif" style={{ background: `${track.color}14`, color: track.color }}>{pct}%</span>
-        </div>
-        <div>
-          <h3 className="font-serif font-bold text-lg leading-tight mb-1" style={{ color: "var(--text)" }}>{track.name}</h3>
-          <p className="text-sm leading-relaxed line-clamp-2" style={{ color: "var(--text-muted)" }}>{track.description}</p>
-        </div>
-        <div className="mt-auto">
-          <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
-            <span>{progress?.completed ?? 0}/{progress?.total ?? 0} chapters</span>
-            <span>{pct}% read</span>
-          </div>
-          <div className="w-full rounded-full overflow-hidden" style={{ height: "6px", background: "var(--surface-2)" }}>
-            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: track.color }} />
-          </div>
-        </div>
-        <div className="flex items-center gap-1 text-sm font-semibold group-hover:gap-2 transition-all" style={{ color: track.color }}>
-          Open book <ArrowRight size={14} />
-        </div>
-      </div>
+      {inner}
     </Link>
   );
 }
 
-function DenseLevel({
-  level,
+function HomeworkProgress({
   completedCount,
   totalCount,
 }: {
-  level: number;
   completedCount: number;
   totalCount: number;
 }) {
@@ -183,10 +227,10 @@ function DenseLevel({
     <div className="card p-3.5 h-full">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold font-serif" style={{ background: "var(--ink)", color: "var(--paper)" }}>
-            {level}
+          <span className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "var(--ink)", color: "var(--paper)" }}>
+            <Star size={12} />
           </span>
-          <span className="font-semibold text-xs" style={{ color: "var(--text)" }}>Level {level}</span>
+          <span className="font-semibold text-xs" style={{ color: "var(--text)" }}>Homework</span>
         </div>
         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{completedCount}/{totalCount}</span>
       </div>
@@ -228,7 +272,6 @@ export default function StudentDashboard() {
   const instructor = useInstructorName();
 
   const testAvg = scores?.testAvg ?? null;
-  const level = progress?.level ?? 0;
   const completedCount = progress?.completedCount ?? 0;
   const totalCount = progress?.totalCount ?? 0;
   const streak = profile?.streak ?? 0;
@@ -261,15 +304,10 @@ export default function StudentDashboard() {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 pl-7">
-                <a
-                  href="https://calendly.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ border: "1px solid var(--primary)", color: "var(--primary)", borderRadius: "8px", background: "transparent" }}
-                >
-                  <Calendar size={13} /> Schedule a meeting with {w.authorName ?? instructor.short}
-                </a>
+                <BookOfficeHours
+                  variant="button"
+                  instructorName={w.authorName ?? instructor.short}
+                />
                 <button
                   onClick={() => acknowledgeWarning({ feedbackId: w._id })}
                   className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold transition-all hover:opacity-80"
@@ -285,6 +323,8 @@ export default function StudentDashboard() {
 
       <MyCohortCard className="mb-6" />
 
+      <BookOfficeHours className="mb-6" instructorName={instructor.short} />
+
       <div className="mb-6">
         <QuoteCard />
       </div>
@@ -292,14 +332,13 @@ export default function StudentDashboard() {
       <ContinueLearningCard />
 
       {/* Secondary dense row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">
         <div className="col-span-2 sm:col-span-1">
-          <DenseLevel level={level} completedCount={completedCount} totalCount={totalCount} />
+          <HomeworkProgress completedCount={completedCount} totalCount={totalCount} />
         </div>
         {[
           { label: "Test avg", value: testAvg === null ? "—" : `${testAvg}%`, icon: Trophy, color: "var(--primary)" },
           { label: "Lessons", value: scores?.completedLessons ?? 0, icon: BookOpen, color: "var(--secondary)" },
-          { label: "Homework", value: completedCount, icon: Star, color: "var(--accent)" },
           { label: streak === 1 ? "1-day streak" : `${streak}-day streak`, value: streak, icon: Flame, color: "var(--accent)", title: "Days in a row you completed a lesson or turned in homework" },
         ].map((stat) => (
           <div key={stat.label} className="card flex items-center gap-2.5 p-3.5" title={"title" in stat ? stat.title : undefined}>

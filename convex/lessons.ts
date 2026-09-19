@@ -4,6 +4,7 @@ import { getCurrentUser, getCurrentUserOrNull } from "./_lib/auth";
 import { isStaffEmail } from "./lib/teacherEmails";
 import { isStaffRole } from "./lib/roles";
 import { gradeContentBlock, redactLessonContent } from "./lib/lessonContent";
+import { assertTrackOpenForStudent, isTrackOpenForUser } from "./lib/trackAccess";
 
 const lessonType = v.union(
   v.literal("content"),
@@ -30,6 +31,9 @@ export const listByTrack = query({
     const user = await getCurrentUserOrNull(ctx);
     if (!user) return [];
     const staff = isStaffRole(user.role) || isStaffEmail(user.email);
+    if (!staff && !(await isTrackOpenForUser(ctx, user, args.trackId))) {
+      return [];
+    }
     const lessons = await ctx.db
       .query("lessons")
       .withIndex("by_track_published", (q) =>
@@ -54,6 +58,9 @@ export const getById = query({
     if (!lesson) return null;
     const staff = isStaffRole(user.role) || isStaffEmail(user.email);
     if (!lesson.published && !staff) return null;
+    if (!staff && !(await isTrackOpenForUser(ctx, user, lesson.trackId))) {
+      return null;
+    }
     if (staff) return lesson;
     return { ...lesson, content: redactLessonContent(lesson.content) };
   },
@@ -75,6 +82,7 @@ export const getQuestions = query({
     if (!user) return [];
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson || !lesson.published) return [];
+    if (!(await isTrackOpenForUser(ctx, user, lesson.trackId))) return [];
     const questions = await ctx.db
       .query("quizQuestions")
       .withIndex("by_lesson", (q) => q.eq("lessonId", args.lessonId))
@@ -103,11 +111,14 @@ export const checkQuestion = mutation({
     explanation: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
-    await getCurrentUser(ctx);
+    const user = await getCurrentUser(ctx);
     const question = await ctx.db.get(args.questionId);
     if (!question || question.lessonId !== args.lessonId) {
       throw new Error("Question not found");
     }
+    const lesson = await ctx.db.get(question.lessonId);
+    if (!lesson || !lesson.published) throw new Error("Lesson not found");
+    await assertTrackOpenForStudent(ctx, user, lesson.trackId);
     return {
       correct: args.selected === question.correctIndex,
       correctIndex: question.correctIndex,
@@ -133,9 +144,10 @@ export const checkBlock = mutation({
     results: v.optional(v.array(v.boolean())),
   }),
   handler: async (ctx, args) => {
-    await getCurrentUser(ctx);
+    const user = await getCurrentUser(ctx);
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson || !lesson.published) throw new Error("Lesson not found");
+    await assertTrackOpenForStudent(ctx, user, lesson.trackId);
     return gradeContentBlock(lesson.content, args.blockIndex, {
       selected: args.selected,
       texts: args.texts,

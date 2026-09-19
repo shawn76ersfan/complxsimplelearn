@@ -23,6 +23,11 @@ export function isScoredType(type: LessonType): boolean {
   return type !== "content";
 }
 
+/** Quizzes and mandatory work wait for an instructor before they count. */
+export function needsInstructorGrade(type: LessonType): boolean {
+  return type === "quiz" || type === "mandatory";
+}
+
 /**
  * Rough time to complete, in minutes: 200 wpm for prose plus a minute per
  * interactive block. Legacy quizzes and games get a flat estimate.

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { MyCohortCard } from "@/components/cohort/MyCohortCard";
+import { BookOfficeHours } from "@/components/cohort/BookOfficeHours";
 import { formatCohortDate } from "@/components/teacher/CohortContext";
 import { getInitials, timeAgo } from "@/lib/utils";
 import { BookOpen, CalendarDays, GraduationCap, Megaphone, Pin, Users, ArrowRight, MessageSquare } from "lucide-react";
@@ -155,7 +156,7 @@ export default function CohortPage() {
                           className="px-1.5 py-0.5 rounded-md font-semibold"
                           style={{ background: `${a.cohortColor ?? "#6B7280"}20`, color: a.cohortColor ?? "var(--text-muted)" }}
                         >
-                          {a.cohortName ?? "Whole school"}
+                          {a.cohortName ?? "Whole program"}
                         </span>
                         {a.pinned && (
                           <span className="inline-flex items-center gap-1 font-semibold" style={{ color: a.cohortColor ?? color }}>
@@ -211,6 +212,7 @@ export default function CohortPage() {
             <Link href="/feedback" className="inline-flex items-center gap-1 mt-2 text-xs font-semibold" style={{ color }}>
               Notes from your instructors <ArrowRight size={12} />
             </Link>
+            <BookOfficeHours className="mt-4" />
           </section>
 
           <section>
@@ -240,7 +242,7 @@ export default function CohortPage() {
                         <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>{e.title}</p>
                         <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
                           {isToday ? "Today" : p.dow}
-                          {e.cohortName ? ` · ${e.cohortName}` : " · Whole school"}
+                          {e.cohortName ? ` · ${e.cohortName}` : " · Whole program"}
                         </p>
                       </div>
                     </div>

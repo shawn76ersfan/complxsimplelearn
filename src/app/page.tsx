@@ -6,6 +6,7 @@ import {
   BookOpen,
   Boxes,
   BriefcaseBusiness,
+  Calendar,
   CalendarDays,
   Check,
   Cloud,
@@ -30,6 +31,7 @@ import {
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { SignInBtn, SignUpBtn, EnrollmentButtons, InviteOnlyNote } from "@/components/layout/AuthButtons";
 import { InfoSessionsSection } from "@/components/marketing/InfoSessionsSection";
+import { CASSANDRA_CALENDLY_URL } from "@/lib/calendly";
 
 const TESTIMONIALS = [
   {
@@ -710,6 +712,15 @@ export default async function LandingPage() {
                 <p className="text-sm leading-relaxed mb-8 chalk-muted">
                   Bootcamp pricing is not the same as the instructor course. Schedule a free consultation for current tuition, installment plans, and seat availability.
                 </p>
+                <a
+                  href={CASSANDRA_CALENDLY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-ink w-full mb-3 inline-flex items-center justify-center gap-2"
+                  style={{ ["--ink" as string]: "#E9F1EB", ["--paper" as string]: "#1F3B32", ["--accent" as string]: "#fde68a" }}
+                >
+                  <Calendar size={15} /> Book a consult with Cassandra
+                </a>
                 <SignUpBtn className="btn-ink w-full" style={{ ["--ink" as string]: "#E9F1EB", ["--paper" as string]: "#1F3B32", ["--accent" as string]: "#fde68a" }}>
                   Sign in (invite only)
                 </SignUpBtn>

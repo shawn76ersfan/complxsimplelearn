@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { LogOut, AlertTriangle, Mail } from "lucide-react";
 import { US_STATES } from "@/lib/usStates";
+import { US_TIMEZONES, guessTimezone } from "@/lib/timezones";
 
 function DroppedLockoutPage({ reason }: { reason?: string }) {
   const { signOut } = useClerk();
@@ -103,12 +104,14 @@ function NameSetupPage({
   initialFirst,
   initialLast,
   initialState,
+  initialTimezone,
   requireState,
 }: {
   initialName?: string;
   initialFirst?: string;
   initialLast?: string;
   initialState?: string;
+  initialTimezone?: string;
   requireState: boolean;
 }) {
   const { user } = useUser();
@@ -117,6 +120,7 @@ function NameSetupPage({
   const [firstName, setFirstName] = useState(initialFirst || split.first);
   const [lastName, setLastName] = useState(initialLast || split.last);
   const [state, setState] = useState(initialState ?? "");
+  const [timezone, setTimezone] = useState(initialTimezone || guessTimezone());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,6 +140,10 @@ function NameSetupPage({
       setError("Please pick the state you attend from.");
       return;
     }
+    if (requireState && !timezone) {
+      setError("Please pick the timezone you attend from.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -153,6 +161,7 @@ function NameSetupPage({
         firstName: first,
         lastName: last,
         ...(requireState || state ? { state } : {}),
+        ...(requireState || timezone ? { timezone } : {}),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save your name");
@@ -174,7 +183,7 @@ function NameSetupPage({
           </h1>
           <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
             First and last name show on the Board and roll book
-            {requireState ? ", along with the state you join class from." : "."}
+            {requireState ? ", along with the state and timezone you join class from." : "."}
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -209,22 +218,41 @@ function NameSetupPage({
           </div>
         </div>
         {requireState && (
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-muted)" }}>
-              State
-            </label>
-            <select
-              required
-              value={state}
-              onChange={(e) => setState(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg text-base outline-none"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderBottom: "2px solid var(--ink)", color: "var(--text)" }}
-            >
-              <option value="">Where you join class from</option>
-              {US_STATES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-muted)" }}>
+                State
+              </label>
+              <select
+                required
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg text-base outline-none"
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderBottom: "2px solid var(--ink)", color: "var(--text)" }}
+              >
+                <option value="">Where you join class from</option>
+                {US_STATES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--text-muted)" }}>
+                Timezone
+              </label>
+              <select
+                required
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg text-base outline-none"
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderBottom: "2px solid var(--ink)", color: "var(--text)" }}
+              >
+                <option value="">Your local clock</option>
+                {US_TIMEZONES.map((z) => (
+                  <option key={z.id} value={z.id}>{z.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
         {error && (
@@ -297,6 +325,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       !profile.firstName?.trim() ||
       !profile.lastName?.trim() ||
       (profile.role === "student" && !profile.state?.trim()) ||
+      (profile.role === "student" && !profile.timezone?.trim()) ||
       needsDisplayName(profile.name)
     ),
   );
@@ -308,6 +337,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         initialFirst={profile.firstName}
         initialLast={profile.lastName}
         initialState={profile.state}
+        initialTimezone={profile.timezone}
         requireState={profile.role === "student"}
       />
     );

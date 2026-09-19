@@ -105,7 +105,7 @@ export async function assertContentAccess(
 ): Promise<void> {
   if (cohortId === undefined) {
     if (!isAdminRole(staff.role)) {
-      throw new Error("Pick a cohort. Only admins can post school-wide.");
+      throw new Error("Pick a cohort. Only admins can post program-wide.");
     }
     return;
   }

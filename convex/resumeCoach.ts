@@ -1283,6 +1283,14 @@ If the student asks to re-score after edits, tell them to paste the updated resu
     );
 
     await writeExchange(ctx, args.conversationId, profile._id, userText, reply);
+    await ctx.runMutation(internal.analytics.logEvent, {
+      userId: profile._id,
+      conversationId: args.conversationId,
+      mode: "coach",
+      kind: "career",
+      topic: "Resume coach",
+      createdAt: Date.now(),
+    });
 
     return { reply, conversationId: args.conversationId };
   },

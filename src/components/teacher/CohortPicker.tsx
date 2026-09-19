@@ -5,7 +5,7 @@ import { useCohortScope } from "./CohortContext";
 
 /**
  * Select used in create forms (assignment, video, event, invite). Defaults to
- * the header switcher's cohort. "Whole school" is only offered to admins;
+ * the header switcher's cohort. "Whole program" is only offered to admins;
  * teachers must target one of their cohorts.
  */
 export function CohortPicker({
@@ -13,7 +13,7 @@ export function CohortPicker({
   onChange,
   label = "Cohort",
   allowSchoolWide = true,
-  schoolWideLabel = "Whole school (every cohort)",
+  schoolWideLabel = "Whole program (every cohort)",
   required,
   className,
 }: {

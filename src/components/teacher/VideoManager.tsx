@@ -245,7 +245,7 @@ export function VideoManager() {
           cohortId={scopeCohortId}
           cohortBadge={(id) => {
             const c = cohorts?.find((x) => x.cohort._id === id)?.cohort;
-            return c ? { name: c.name, color: c.color } : { name: "Whole school", color: "#6B7280" };
+            return c ? { name: c.name, color: c.color } : { name: "Whole program", color: "#6B7280" };
           }}
         />
       </div>

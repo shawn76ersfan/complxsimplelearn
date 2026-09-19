@@ -10,6 +10,7 @@ import { cn, percentageColor, formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { CalendarWidget } from "@/components/teacher/CalendarWidget";
 import { US_STATES } from "@/lib/usStates";
+import { US_TIMEZONES, guessTimezone, timezoneLabel } from "@/lib/timezones";
 
 export default function ProfilePage() {
   const { user } = useUser();
@@ -22,6 +23,7 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [state, setState] = useState("");
+  const [timezone, setTimezone] = useState("");
   const [soundOn, setSoundOn] = useState(false);
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export default function ProfilePage() {
     setFirstName(profile?.firstName ?? profile?.name?.split(" ")[0] ?? "");
     setLastName(profile?.lastName ?? profile?.name?.split(" ").slice(1).join(" ") ?? "");
     setState(profile?.state ?? "");
+    setTimezone(profile?.timezone ?? guessTimezone());
     setEditing(true);
   }
 
@@ -51,10 +54,15 @@ export default function ProfilePage() {
       toast.error("Pick the state you join class from");
       return;
     }
+    if (profile?.role === "student" && !timezone) {
+      toast.error("Pick the timezone you join class from");
+      return;
+    }
     await updateProfile({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       ...(state ? { state } : {}),
+      ...(timezone ? { timezone } : {}),
     });
     toast.success("Profile updated!");
     setEditing(false);
@@ -118,6 +126,17 @@ export default function ProfilePage() {
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="w-full sm:w-64 px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+                >
+                  <option value="">Timezone you join from</option>
+                  {US_TIMEZONES.map((z) => (
+                    <option key={z.id} value={z.id}>{z.label}</option>
+                  ))}
+                </select>
                 <div className="flex items-center gap-2">
                   <button onClick={handleSave} className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-500 text-white hover:opacity-80 transition-opacity">
                     <Save size={16} />
@@ -161,6 +180,7 @@ export default function ProfilePage() {
               {profile?.state && (
                 <div className="flex items-center gap-1.5">
                   {profile.state}
+                  {profile.timezone ? ` · ${timezoneLabel(profile.timezone)}` : ""}
                 </div>
               )}
             </div>

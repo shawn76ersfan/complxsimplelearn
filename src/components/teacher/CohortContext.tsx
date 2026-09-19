@@ -15,6 +15,7 @@ export type CohortSummary = {
     startDate: string;
     endDate?: string;
     schedule?: string;
+    scheduleTimezone?: string;
     meetingUrl?: string;
     color: string;
     status: "upcoming" | "active" | "completed" | "archived";

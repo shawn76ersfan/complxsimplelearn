@@ -7,6 +7,7 @@ import { ArrowRight, CalendarDays, Clock, Megaphone, Users, Video } from "lucide
 import { api } from "../../../convex/_generated/api";
 import { cohortWeek, formatCohortDate } from "@/components/teacher/CohortContext";
 import { getInitials, timeAgo } from "@/lib/utils";
+import { DEFAULT_CLASS_TIMEZONE, formatClock } from "@/lib/timezones";
 
 function todayISO(d = new Date()): string {
   const y = d.getFullYear();
@@ -74,6 +75,7 @@ function InstructorStack({
 export function MyCohortCard({ compact = false, className = "" }: { compact?: boolean; className?: string }) {
   const [today, setToday] = useState(() => todayISO());
   const [now, setNow] = useState(() => Date.now());
+  const profile = useQuery(api.users.getMyProfile);
   useEffect(() => {
     const id = setInterval(() => {
       setToday(todayISO());
@@ -119,7 +121,7 @@ export function MyCohortCard({ compact = false, className = "" }: { compact?: bo
     >
       <div className="relative flex-1 p-5 sm:p-6 min-w-0">
         {/* Header row */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="flex items-start gap-3 min-w-0">
             <div
               className="w-12 h-14 rounded-r-md flex items-center justify-center font-black text-white text-sm tracking-wide flex-shrink-0"
@@ -144,42 +146,58 @@ export function MyCohortCard({ compact = false, className = "" }: { compact?: bo
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1">
+                  <Clock size={12} />
+                  Class: {formatClock(now, cohort.scheduleTimezone ?? DEFAULT_CLASS_TIMEZONE)}
+                  {profile?.timezone && profile.timezone !== (cohort.scheduleTimezone ?? DEFAULT_CLASS_TIMEZONE)
+                    ? ` · You: ${formatClock(now, profile.timezone)}`
+                    : ""}
+                </span>
+                <span className="inline-flex items-center gap-1">
                   <Users size={12} /> {classSize} classmate{classSize === 1 ? "" : "s"}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {cohort.meetingUrl && (
-              <a
-                href={cohort.meetingUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
-                style={{ background: color }}
-              >
-                <Video size={14} /> Join class
-              </a>
-            )}
-            {!compact && (
-              <>
-                <Link
-                  href="/board"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
+          <div className="relative min-w-0 w-full sm:w-auto">
+            <div
+              className="flex items-center gap-2 overflow-x-auto overscroll-x-contain snap-x snap-mandatory touch-pan-x pb-1 -mb-1 pr-8 [scrollbar-width:thin] sm:overflow-visible sm:snap-none sm:pb-0 sm:mb-0 sm:pr-0"
+            >
+              {cohort.meetingUrl && (
+                <a
+                  href={cohort.meetingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 shrink-0 snap-start whitespace-nowrap"
                   style={{ background: color }}
                 >
-                  Open Board <ArrowRight size={14} />
-                </Link>
-                <Link
-                  href="/cohort"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors"
-                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
-                >
-                  Class page <ArrowRight size={14} />
-                </Link>
-              </>
-            )}
+                  <Video size={14} /> Join class
+                </a>
+              )}
+              {!compact && (
+                <>
+                  <Link
+                    href="/board"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white shrink-0 snap-start whitespace-nowrap"
+                    style={{ background: color }}
+                  >
+                    Open Board <ArrowRight size={14} />
+                  </Link>
+                  <Link
+                    href="/cohort"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors shrink-0 snap-start whitespace-nowrap"
+                    style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+                  >
+                    Class page <ArrowRight size={14} />
+                  </Link>
+                </>
+              )}
+            </div>
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 w-8 sm:hidden"
+              style={{ background: "linear-gradient(to left, var(--surface), transparent)" }}
+              aria-hidden
+            />
           </div>
         </div>
 

@@ -1,15 +1,15 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../../../../convex/_generated/api";
-import { Id } from "../../../../../../convex/_generated/dataModel";
+import { api } from "../../../../../convex/_generated/api";
+import { Id } from "../../../../../convex/_generated/dataModel";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   ArrowLeft, BookOpen, CheckCircle, Clock, Flame,
-  Star, Trophy, Cpu, Brain, Shield, TrendingUp,
+  Star, Trophy, Cpu, Brain, Shield,
   Terminal, Send, MessageSquare, AlertTriangle, UserX,
   UserCheck, Bell, AlertCircle, RotateCcw, Cloud, Container,
   Boxes, GitBranch, Layers, Wrench, Workflow, Gauge,
@@ -71,6 +71,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
   const tracks = useQuery(api.tracks.list);
   const sendFeedback = useMutation(api.feedback.send);
   const previousFeedback = useQuery(api.feedback.getForStudent, { studentId: studentId as Id<"users"> });
+  const insightWindow = useMemo(() => {
+    const now = Date.now();
+    return { now, since: now - 14 * 24 * 60 * 60 * 1000 };
+  }, []);
+  const insight = useQuery(api.analytics.getStudentInsight, {
+    studentId: studentId as Id<"users">,
+    now: insightWindow.now,
+    since: insightWindow.since,
+  });
 
   const profile = useQuery(api.users.getMyProfile);
   const dropStudent = useMutation(api.users.dropStudent);
@@ -186,7 +195,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
   }
 
   const { student, trackDetails, overall, homeworkAvg, totalAttempts } = data;
-  const level = progress?.level ?? 0;
   const completedAssignments = progress?.completedCount ?? 0;
   const totalAssignments = progress?.totalCount ?? 0;
 
@@ -250,12 +258,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
           </div>
         </div>
 
-        {/* Level = completed homework assignments */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t" style={{ borderColor: "var(--border)" }}>
+        {/* Homework and streak */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 pt-5 border-t" style={{ borderColor: "var(--border)" }}>
           {[
             { icon: Star, label: "Assignments done", value: `${completedAssignments}/${totalAssignments}`, color: "#F97316" },
             { icon: Trophy, label: "Homework avg", value: homeworkAvg === null || homeworkAvg === undefined ? "—" : `${homeworkAvg}%`, color: "#0EA5E9" },
-            { icon: TrendingUp, label: "Level", value: level, color: "#2563EB" },
             { icon: Flame, label: student.streak === 1 ? "1-day streak" : `${student.streak ?? 0}-day streak`, value: student.streak ?? 0, color: "#F97316", title: "Days in a row they completed a lesson or turned in homework" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl" title={"title" in s ? s.title : undefined} style={{ background: `${s.color}10` }}>
@@ -268,6 +275,34 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
           ))}
         </div>
       </div>
+
+      {insight && (
+        <div className="card p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Joins from</p>
+            <p style={{ color: "var(--text)" }}>{insight.state ?? "—"} · {insight.timezoneLabel}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Stark (14d)</p>
+            <p style={{ color: "var(--text)" }}>
+              {insight.starkChats} chats{insight.lastTopic ? ` · ${insight.lastTopic}` : ""}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Coach score</p>
+            <p style={{ color: "var(--text)" }}>
+              {insight.coachScore != null ? `${insight.coachScore} · ${insight.coachReady}` : "No resume yet"}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Lag</p>
+            <p style={{ color: "var(--text)" }}>
+              {insight.homeworkOverdue} overdue HW
+              {insight.attendanceRate != null ? ` · ${insight.attendanceRate}% attendance` : ""}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Actions card */}
       <div className="card p-6 space-y-5">
@@ -458,10 +493,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
               {track.lessons.length > 0 && (
                 <div className="border-t" style={{ borderColor: "var(--border)" }}>
                   {track.lessons.map((lesson, i) => {
-                    const isScoredLesson = lesson.type === "quiz" || lesson.type === "game" || lesson.type === "mandatory";
-                    const lessonPct = lesson.completed && isScoredLesson && lesson.bestMax > 0
+                    const isInstructorGraded = lesson.type === "quiz" || lesson.type === "mandatory";
+                    const lessonPct = lesson.completed && isInstructorGraded && lesson.teacherGrade != null
+                      ? lesson.teacherGrade
+                      : lesson.completed && lesson.type === "game" && lesson.bestMax > 0
                       ? Math.round((lesson.bestScore / lesson.bestMax) * 100)
                       : null;
+                    const awaitingGrade = lesson.completed && isInstructorGraded && lesson.gradeStatus !== "graded";
                     return (
                       <div key={lesson.lessonId}>
                         <div
@@ -490,6 +528,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
                           </div>
 
                           {/* Score badge */}
+                          {awaitingGrade && (
+                            <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#F59E0B" }}>
+                              Awaiting grade
+                            </span>
+                          )}
                           {lessonPct !== null && (
                             <span className={cn("text-sm font-bold flex-shrink-0", percentageColor(lessonPct))}>
                               {lessonPct}%
@@ -506,7 +549,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
                         </div>
 
                         {/* Quiz breakdown accordion — only for quiz-type lessons the student attempted */}
-                        {lesson.type === "quiz" && lesson.completed && (
+                        {(lesson.type === "quiz" || lesson.type === "mandatory") && lesson.completed && (
                           <div className="px-5 pb-3">
                             <QuizDetailAccordion
                               studentId={data!.student._id}

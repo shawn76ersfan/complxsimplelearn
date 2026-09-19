@@ -9,6 +9,7 @@
  */
 
 import type * as _lib_auth from "../_lib/auth.js";
+import type * as analytics from "../analytics.js";
 import type * as announcements from "../announcements.js";
 import type * as assignments from "../assignments.js";
 import type * as attempts from "../attempts.js";
@@ -16,6 +17,7 @@ import type * as attendance from "../attendance.js";
 import type * as board from "../board.js";
 import type * as calendar from "../calendar.js";
 import type * as chat from "../chat.js";
+import type * as coachKit from "../coachKit.js";
 import type * as cohorts from "../cohorts.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
@@ -44,16 +46,21 @@ import type * as lib_resumeRubrics from "../lib/resumeRubrics.js";
 import type * as lib_resumeScore from "../lib/resumeScore.js";
 import type * as lib_roles from "../lib/roles.js";
 import type * as lib_scoring from "../lib/scoring.js";
+import type * as lib_starkTopics from "../lib/starkTopics.js";
 import type * as lib_teacherEmails from "../lib/teacherEmails.js";
+import type * as lib_timezones from "../lib/timezones.js";
+import type * as lib_trackAccess from "../lib/trackAccess.js";
 import type * as lib_uploads from "../lib/uploads.js";
 import type * as lib_usStates from "../lib/usStates.js";
 import type * as notifications from "../notifications.js";
+import type * as progress from "../progress.js";
 import type * as quotes from "../quotes.js";
 import type * as resumeCoach from "../resumeCoach.js";
 import type * as resumePdf from "../resumePdf.js";
 import type * as seed from "../seed.js";
 import type * as starkResumeFiles from "../starkResumeFiles.js";
 import type * as submissions from "../submissions.js";
+import type * as trackReleases from "../trackReleases.js";
 import type * as tracks from "../tracks.js";
 import type * as users from "../users.js";
 import type * as videos from "../videos.js";
@@ -66,6 +73,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "_lib/auth": typeof _lib_auth;
+  analytics: typeof analytics;
   announcements: typeof announcements;
   assignments: typeof assignments;
   attempts: typeof attempts;
@@ -73,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   board: typeof board;
   calendar: typeof calendar;
   chat: typeof chat;
+  coachKit: typeof coachKit;
   cohorts: typeof cohorts;
   conversations: typeof conversations;
   crons: typeof crons;
@@ -101,16 +110,21 @@ declare const fullApi: ApiFromModules<{
   "lib/resumeScore": typeof lib_resumeScore;
   "lib/roles": typeof lib_roles;
   "lib/scoring": typeof lib_scoring;
+  "lib/starkTopics": typeof lib_starkTopics;
   "lib/teacherEmails": typeof lib_teacherEmails;
+  "lib/timezones": typeof lib_timezones;
+  "lib/trackAccess": typeof lib_trackAccess;
   "lib/uploads": typeof lib_uploads;
   "lib/usStates": typeof lib_usStates;
   notifications: typeof notifications;
+  progress: typeof progress;
   quotes: typeof quotes;
   resumeCoach: typeof resumeCoach;
   resumePdf: typeof resumePdf;
   seed: typeof seed;
   starkResumeFiles: typeof starkResumeFiles;
   submissions: typeof submissions;
+  trackReleases: typeof trackReleases;
   tracks: typeof tracks;
   users: typeof users;
   videos: typeof videos;

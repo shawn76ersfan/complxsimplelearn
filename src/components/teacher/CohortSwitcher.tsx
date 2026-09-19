@@ -29,7 +29,7 @@ export function CohortSwitcher() {
       >
         <Layers size={16} />
         {isAdmin
-          ? "No cohorts yet. Create one in the Cohorts tab; until then everything is school-wide."
+          ? "No cohorts yet. Create one in the Cohorts tab; until then everything is program-wide."
           : "You haven't been assigned to a cohort yet. Ask an admin to add you."}
       </div>
     );
@@ -46,7 +46,7 @@ export function CohortSwitcher() {
           onClick={() => setCohortId(undefined)}
           color="var(--text-muted)"
           code={<Layers size={13} />}
-          name={isAdmin ? "Whole school" : "All my cohorts"}
+          name={isAdmin ? "Whole program" : "All my cohorts"}
           meta={`${totalStudents} student${totalStudents === 1 ? "" : "s"} · ${cohorts.length} cohort${cohorts.length === 1 ? "" : "s"}`}
         />
       )}

@@ -13,6 +13,7 @@ import { Id } from "./_generated/dataModel";
 import { addMember, addStudentToCohort, visibleStudents } from "./lib/cohortAccess";
 import { splitDisplayName } from "./lib/names";
 import { isUsState } from "./lib/usStates";
+import { isUsTimezone } from "./lib/timezones";
 
 const roleValidator = v.union(v.literal("admin"), v.literal("teacher"), v.literal("student"));
 
@@ -190,6 +191,7 @@ export const updateProfile = mutation({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     state: v.optional(v.string()),
+    timezone: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -197,6 +199,7 @@ export const updateProfile = mutation({
     const first = args.firstName?.trim();
     const last = args.lastName?.trim();
     const state = args.state?.trim();
+    const timezone = args.timezone?.trim();
     let display = args.name?.trim();
     if (first && last) display = `${first} ${last}`;
     else if (first) display = first;
@@ -209,12 +212,16 @@ export const updateProfile = mutation({
     if (state !== undefined && !isUsState(state)) {
       throw new Error("Pick a valid state");
     }
+    if (timezone !== undefined && !isUsTimezone(timezone)) {
+      throw new Error("Pick a valid timezone");
+    }
 
     const patch: {
       name?: string;
       firstName?: string;
       lastName?: string;
       state?: string;
+      timezone?: string;
     } = {};
     if (display) patch.name = display;
     if (first !== undefined) {
@@ -226,6 +233,7 @@ export const updateProfile = mutation({
       patch.lastName = last;
     }
     if (state !== undefined) patch.state = state;
+    if (timezone !== undefined) patch.timezone = timezone;
 
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(user._id, patch);

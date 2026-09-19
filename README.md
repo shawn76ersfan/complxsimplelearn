@@ -124,13 +124,29 @@ There are three roles:
 
 | Role | Who | Can |
 |------|-----|-----|
-| **admin** | Cassandra + the developer (`ADMIN_EMAILS`) | Everything: create cohorts, assign instructors, invite teachers, edit curriculum, Stark knowledge, info sessions, quote of the week. Sees every cohort ("Whole school"). |
+| **admin** | Cassandra + the developer (`ADMIN_EMAILS`) | Everything: create cohorts, assign instructors, invite teachers, edit curriculum, Stark knowledge, info sessions, quote of the week. Sees every cohort ("Whole program"). |
 | **teacher** | Invited from Teacher Hub → Cohorts → Staff, or listed in `TEACHER_EMAILS` | Only the cohorts an admin assigns them to: roster, scores, homework, grading, videos, calendar, announcements, feedback, email. |
-| **student** | Invited into a cohort | Their cohort's content plus anything posted school-wide. |
+| **student** | Invited into a cohort | Their cohort's content plus anything posted program-wide. |
 
 Set `ADMIN_EMAILS` on the Convex deployment (`npx convex env set ADMIN_EMAILS "a@x.com,b@x.com"`, and again with `--prod`). If it is unset, everyone in `TEACHER_EMAILS` (or the legacy `TEACHER_EMAIL`) is treated as an admin, so an existing deployment keeps working.
 
-Students belong to **cohorts** (a class with a start/end date, schedule and meeting link). Assignments, videos, calendar events and announcements can be posted to one cohort or school-wide. Students see their class on the dashboard and at `/cohort`; staff switch cohorts from the strip at the top of the Teacher Hub.
+Students belong to **cohorts** (a class with a start/end date, schedule and meeting link). Assignments, videos, calendar events and announcements can be posted to one cohort or program-wide. Students see their class on the dashboard and at `/cohort`; staff switch cohorts from the strip at the top of the Teacher Hub.
+
+Cassandra's 1:1 office hours use `NEXT_PUBLIC_CALENDLY_URL` (defaults to `https://calendly.com` until her real link is set).
+
+---
+
+## Hosting (Vercel is fine; you are not locked in)
+
+The **website** is Next.js. The **database, auth, files, and email** live on Convex, Clerk, R2, and Gmail/Resend. If Vercel is down, students cannot load the UI, but data is still safe. If Convex is down, the UI loads but live data will not.
+
+Stay on Vercel for day-to-day. If you want a second place you can run yourself:
+
+1. `npm run build` then `node .next/standalone/server.js` (standalone output is enabled in `next.config.ts`).
+2. Point that box at the **same** Convex + Clerk env vars as Vercel (`NEXT_PUBLIC_CONVEX_URL`, Clerk keys, `NEXT_PUBLIC_APP_URL` / `SITE_URL`).
+3. Put the extra host behind your domain later (Cloudflare DNS can fail over if Vercel is unreachable).
+
+Good second hosts: **Railway**, **Fly.io**, or a cheap **VPS** (Hetzner/DigitalOcean) with Docker. Do **not** try to self-host Convex — keep the backend on Convex Cloud.
 
 ---
 

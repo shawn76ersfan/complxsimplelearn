@@ -1,28 +1,39 @@
 import { mutation, query } from "./_generated/server";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import { v } from "convex/values";
-import { R2 } from "@convex-dev/r2";
+import { R2, type R2Callbacks } from "@convex-dev/r2";
 import type { DataModel } from "./_generated/dataModel";
 import { getCurrentUser, requireStaff } from "./_lib/auth";
 import { notifyUsers, teacherIds } from "./lib/notify";
 import { assertStudentAccess, contentInScope, teachingScope, visibleToStudent, cohortIdsForUser } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
 import { bumpUserStreak } from "./lib/scoring";
-import { assertOwnedUpload, assertUploadAllowed, claimUpload } from "./lib/uploads";
+import {
+  assertOwnedUpload,
+  assertUploadAllowed,
+  claimUpload,
+  validateUpload,
+} from "./lib/uploads";
 
 export const r2 = new R2(components.r2);
+const callbacks: R2Callbacks = internal.submissions;
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 /** Students (and teachers) may upload homework attachment files. */
-export const { generateUploadUrl, syncMetadata } = r2.clientApi<DataModel>({
-  checkUpload: async (ctx) => {
-    await assertUploadAllowed(ctx);
-  },
-  onSyncMetadata: async (ctx, { key }) => {
-    await claimUpload(ctx, r2, key, "homework", { maxBytes: MAX_FILE_BYTES });
-  },
-});
+export const { generateUploadUrl, syncMetadata, onSyncMetadata } =
+  r2.clientApi<DataModel>({
+    checkUpload: async (ctx) => {
+      await assertUploadAllowed(ctx);
+    },
+    onUpload: async (ctx, _bucket, key) => {
+      await claimUpload(ctx, key, "homework");
+    },
+    callbacks,
+    onSyncMetadata: async (ctx, { key }) => {
+      await validateUpload(ctx, r2, key, { maxBytes: MAX_FILE_BYTES });
+    },
+  });
 
 const submissionReturn = v.object({
   _id: v.id("assignmentSubmissions"),

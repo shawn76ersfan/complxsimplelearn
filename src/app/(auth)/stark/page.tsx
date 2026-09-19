@@ -16,27 +16,26 @@ type StarkMode = "default" | "coach";
 const GREETING: ChatMessage = {
   role: "assistant",
   content:
-    "Hey! I'm Stark — your AI learning assistant for ComplxSimple. Ask me about your lessons, crosswords, homework, Linux, AWS, Azure, Git, Docker, Kubernetes, Terraform, Ansible, CI/CD, Prometheus, Grafana, or any other tech concept. What can I help you with?",
+    "Hey — I'm Stark, your ComplxSimple chatbot. Ask me anything: how the site works, study plans across time zones, Linux/AWS/Docker, homework, or a concept you missed on a quiz (I'll teach it, not hand you the answer key). What do you need?",
 };
 
 const COACH_GREETING: ChatMessage = {
   role: "assistant",
   content:
-    "You're in **Coach Mode (Beta)** — still being built, with more capabilities coming soon.\n\nPaste or upload your resume below. I'll parse it, score it with Cassandra's structured rubric (not a made-up number), then coach you bullet-by-bullet. Optional: paste a job description for honest keyword gap analysis.\n\nThanks for trying it early — feedback helps us improve!",
+    "You're in **Coach Mode**. Paste or upload your resume and I'll score it with Cassandra's rubric, then we can build a rewrite plan, interview prep, and portfolio map.\n\nOptional: paste a job description for honest keyword-gap analysis. I won't invent experience.",
 };
 
 const SUGGESTIONS = [
-  "What is the DevOps learning roadmap?",
-  "Explain AWS VPCs in simple terms",
-  "What is the difference between Docker and Kubernetes?",
-  "Help me understand my current homework",
+  "Help me plan this week around live class in my timezone",
+  "I missed a quiz — walk me through the concept",
+  "How do I submit homework?",
+  "Explain Docker vs Kubernetes simply",
 ];
 
 const COACH_SUGGESTIONS = [
-  "Improve my weakest bullet",
-  "Make this shorter",
-  "Make it ATS-friendly",
-  "Make this sound more technical",
+  "Build my rewrite plan",
+  "Give me interview questions from this resume",
+  "What portfolio project should I start?",
   "Tailor this to the job description",
 ];
 
@@ -89,6 +88,7 @@ export default function StarkPage() {
   const coachMessage = useAction(api.resumeCoach.coachMessage);
   const diagnoseImprovement = useAction(api.resumeCoach.diagnoseImprovement);
   const rewriteAffectedBullets = useAction(api.resumeCoach.rewriteAffectedBullets);
+  const generateCareerKit = useAction(api.coachKit.generateCareerKit);
   const conversations = useQuery(api.conversations.list);
   const careerTracks = useQuery(api.resumeCoach.listCareerTracks);
   const deleteConvo = useMutation(api.conversations.deleteConversation);
@@ -101,6 +101,7 @@ export default function StarkPage() {
   const [reviewing, setReviewing] = useState(false);
   const [diagnosingKey, setDiagnosingKey] = useState<string | null>(null);
   const [rewriting, setRewriting] = useState(false);
+  const [kitBusy, setKitBusy] = useState(false);
   const [activeDiagnosis, setActiveDiagnosis] = useState<{
     title: string;
     holdingBack: string;
@@ -123,6 +124,10 @@ export default function StarkPage() {
 
   const progress = useQuery(
     api.resumeCoach.getProgress,
+    mode === "coach" && activeConvoId ? { conversationId: activeConvoId } : "skip",
+  );
+  const careerKit = useQuery(
+    api.coachKit.getCareerKit,
     mode === "coach" && activeConvoId ? { conversationId: activeConvoId } : "skip",
   );
 
@@ -325,6 +330,19 @@ export default function StarkPage() {
       setError(err instanceof Error ? err.message : "Could not rewrite those bullets. Try again.");
     } finally {
       setRewriting(false);
+    }
+  }
+
+  async function handleGenerateKit() {
+    if (!activeConvoId || kitBusy) return;
+    setKitBusy(true);
+    setError(null);
+    try {
+      await generateCareerKit({ conversationId: activeConvoId });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not build the career kit. Try again.");
+    } finally {
+      setKitBusy(false);
     }
   }
 
@@ -693,17 +711,6 @@ export default function StarkPage() {
                     />
                   )}
                   <span className="relative">{label}</span>
-                  {id === "coach" && (
-                    <span
-                      className="relative text-[9px] font-bold uppercase tracking-wide px-1 py-0.5 rounded"
-                      style={{
-                        background: active ? "rgba(255,255,255,0.22)" : "color-mix(in srgb, var(--stark-accent) 18%, transparent)",
-                        color: active ? "#fff" : "var(--stark-accent)",
-                      }}
-                    >
-                      Beta
-                    </span>
-                  )}
                 </motion.button>
               );
             })}
@@ -714,31 +721,6 @@ export default function StarkPage() {
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
             {mode === "coach" && (
               <>
-                <div
-                  className="rounded-2xl px-4 py-3 flex items-start gap-3"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, color-mix(in srgb, var(--stark-accent) 14%, transparent), color-mix(in srgb, var(--stark-accent) 6%, transparent))",
-                    border: "1px solid color-mix(in srgb, var(--stark-accent) 35%, transparent)",
-                  }}
-                >
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md flex-shrink-0 mt-0.5"
-                    style={{ background: "var(--stark-accent)", color: "#fff" }}
-                  >
-                    Beta
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: "var(--stark-text)" }}>
-                      Coach Mode is in beta
-                    </p>
-                    <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--stark-muted)" }}>
-                      We&apos;re actively improving scoring, PDF parsing, and coaching flows.
-                      More capabilities coming soon — thanks for testing early!
-                    </p>
-                  </div>
-                </div>
-
                 <CoachSetupPanel
                   tracks={careerTracks}
                   busy={reviewing}
@@ -771,6 +753,9 @@ export default function StarkPage() {
                     activeDiagnosis={activeDiagnosis}
                     onDiagnose={handleDiagnose}
                     onRewriteAffected={handleRewriteAffected}
+                    onGenerateKit={handleGenerateKit}
+                    kitBusy={kitBusy}
+                    careerKit={careerKit}
                   />
                 )}
 
@@ -961,7 +946,7 @@ export default function StarkPage() {
                     >
                       S
                     </motion.span>
-                    {mode === "coach" ? "Coach Mode · Beta" : "Stark v1"}
+                    {mode === "coach" ? "Coach Mode" : "Stark"}
                   </div>
                   <button
                     type="button"
@@ -981,8 +966,8 @@ export default function StarkPage() {
             </div>
             <p className="text-center text-xs mt-3" style={{ color: "var(--stark-muted)" }}>
               {mode === "coach"
-                ? "Coach Mode is in beta — scores use a weighted rubric; more capabilities coming soon. Double-check important details."
-                : "Stark is AI and can make mistakes. Please double-check responses."}
+                ? "Scores use Cassandra’s weighted rubric. Career kit covers rewrite, interview, and portfolio — still double-check important details."
+                : "Stark is a helpful chatbot and can make mistakes. Please double-check responses."}
             </p>
           </div>
         </div>

@@ -7,11 +7,18 @@ export function isScoredLessonType(type: string): type is ScoredLessonType {
   return type === "quiz" || type === "game" || type === "mandatory";
 }
 
+/** Quizzes and mandatory work count toward test avg only after an instructor grades them. */
+export function needsInstructorGrade(type: string): boolean {
+  return type === "quiz" || type === "mandatory";
+}
+
 export type AttemptRow = {
   lessonId: Id<"lessons">;
   trackId: Id<"tracks">;
   score: number;
   maxScore: number;
+  gradeStatus?: "pending" | "graded";
+  teacherGrade?: number;
 };
 
 export type LessonMeta = {
@@ -27,6 +34,19 @@ export type BestAttempt = {
   maxScore: number;
 };
 
+export function scoredPointsForAttempt(
+  attempt: AttemptRow,
+  lessonType: string,
+): { score: number; maxScore: number } | null {
+  if (needsInstructorGrade(lessonType)) {
+    if (attempt.gradeStatus !== "graded" || typeof attempt.teacherGrade !== "number") {
+      return null;
+    }
+    return { score: attempt.teacherGrade, maxScore: 100 };
+  }
+  return { score: attempt.score, maxScore: attempt.maxScore };
+}
+
 export function bestScoredAttempts(
   attempts: AttemptRow[],
   lessonsById: Map<string, LessonMeta>,
@@ -36,13 +56,15 @@ export function bestScoredAttempts(
     const lesson = lessonsById.get(attempt.lessonId);
     if (!lesson || !isScoredLessonType(lesson.type)) continue;
     if (lesson.published === false) continue;
+    const points = scoredPointsForAttempt(attempt, lesson.type);
+    if (!points) continue;
     const existing = best.get(attempt.lessonId);
-    if (!existing || attempt.score > existing.score) {
+    if (!existing || points.score > existing.score) {
       best.set(attempt.lessonId, {
         lessonId: attempt.lessonId,
         trackId: attempt.trackId,
-        score: attempt.score,
-        maxScore: attempt.maxScore,
+        score: points.score,
+        maxScore: points.maxScore,
       });
     }
   }

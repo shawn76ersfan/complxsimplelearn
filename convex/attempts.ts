@@ -2,13 +2,16 @@ import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { getCurrentUser, getCurrentUserOrNull } from "./_lib/auth";
+import { getCurrentUser, getCurrentUserOrNull, requireStaff } from "./_lib/auth";
 import { canAccessStudent, visibleStudents } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
+import { notifyUsers } from "./lib/notify";
+import { assertTrackOpenForStudent, isStaffUser, openTrackIdSet } from "./lib/trackAccess";
 import {
   bestScoredAttempts,
   bumpUserStreak,
   homeworkAverageFromSubmissions,
+  needsInstructorGrade,
   testAverageForAttempts,
   type LessonMeta,
 } from "./lib/scoring";
@@ -49,25 +52,47 @@ export const getStudentQuizDetail = query({
       .withIndex("by_user_lesson", (q) => q.eq("userId", args.studentId).eq("lessonId", args.lessonId))
       .collect();
 
-    if (!attempts.length || !sortedQ.length) return { questions: sortedQ, attempts: [] };
+    const latest = attempts.length
+      ? attempts.reduce((b, a) => (a.completedAt > b.completedAt ? a : b))
+      : null;
+    const best = attempts.length
+      ? attempts.reduce((b, a) => (a.score > b.score ? a : b))
+      : null;
+    const suggestedPct =
+      best && best.maxScore > 0 ? Math.round((best.score / best.maxScore) * 100) : null;
 
-    const best = attempts.reduce((b, a) => (a.score > b.score ? a : b));
+    if (!attempts.length || !sortedQ.length) {
+      return {
+        questions: sortedQ,
+        attempts: [],
+        attemptId: latest?._id ?? null,
+        gradeStatus: latest?.gradeStatus ?? null,
+        teacherGrade: latest?.teacherGrade ?? null,
+        suggestedPct,
+        completedAt: latest?.completedAt,
+        totalAttempts: attempts.length,
+      };
+    }
 
     const results = sortedQ.map((q, i) => ({
       question: q.question,
       options: q.options,
       correctIndex: q.correctIndex,
       explanation: q.explanation,
-      studentAnswer: best.answers?.[i] ?? null,
-      correct: best.answers?.[i] === q.correctIndex,
+      studentAnswer: latest!.answers?.[i] ?? best!.answers?.[i] ?? null,
+      correct: (latest!.answers?.[i] ?? best!.answers?.[i]) === q.correctIndex,
     }));
 
     return {
       questions: results,
-      score: best.score,
-      maxScore: best.maxScore,
-      completedAt: best.completedAt,
+      score: best!.score,
+      maxScore: best!.maxScore,
+      completedAt: latest!.completedAt,
       totalAttempts: attempts.length,
+      attemptId: latest!._id,
+      gradeStatus: latest!.gradeStatus ?? null,
+      teacherGrade: latest!.teacherGrade ?? null,
+      suggestedPct: suggestedPct ?? 0,
     };
   },
 });
@@ -90,11 +115,13 @@ export const submit = mutation({
   returns: v.object({
     score: v.number(),
     maxScore: v.number(),
+    gradeStatus: v.union(v.literal("pending"), v.literal("graded")),
   }),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson || !lesson.published) throw new Error("Lesson not found");
+    await assertTrackOpenForStudent(ctx, user, lesson.trackId);
 
     const questions = (
       await ctx.db
@@ -121,6 +148,10 @@ export const submit = mutation({
       maxScore = graded.maxScore;
     }
 
+    const gradeStatus: "pending" | "graded" = needsInstructorGrade(lesson.type)
+      ? "pending"
+      : "graded";
+
     await ctx.db.insert("attempts", {
       userId: user._id,
       lessonId: lesson._id,
@@ -129,10 +160,11 @@ export const submit = mutation({
       maxScore,
       answers: args.answers,
       completedAt: Date.now(),
+      gradeStatus,
     });
 
     await bumpUserStreak(ctx, user);
-    return { score, maxScore };
+    return { score, maxScore, gradeStatus };
   },
 });
 
@@ -191,7 +223,103 @@ export const getBestForLesson = query({
       )
       .collect();
     if (!attempts.length) return null;
-    return attempts.reduce((best, a) => (a.score > best.score ? a : best));
+    return attempts.reduce((best, a) => (a.completedAt > best.completedAt ? a : best));
+  },
+});
+
+export const gradeAttempt = mutation({
+  args: {
+    attemptId: v.id("attempts"),
+    grade: v.number(),
+    feedback: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const teacher = await requireStaff(ctx);
+    const attempt = await ctx.db.get(args.attemptId);
+    if (!attempt) throw new Error("Attempt not found");
+    if (!(await canAccessStudent(ctx, teacher, attempt.userId))) {
+      throw new Error("Unauthorized");
+    }
+    if (args.grade < 0 || args.grade > 100 || !Number.isFinite(args.grade)) {
+      throw new Error("Grade must be between 0 and 100");
+    }
+
+    const lesson = await ctx.db.get(attempt.lessonId);
+    if (!lesson || !needsInstructorGrade(lesson.type)) {
+      throw new Error("This lesson is not instructor-graded");
+    }
+
+    const grade = Math.round(args.grade);
+    const feedback = args.feedback?.trim() || undefined;
+    await ctx.db.patch(args.attemptId, {
+      gradeStatus: "graded",
+      teacherGrade: grade,
+      teacherFeedback: feedback,
+      gradedBy: teacher._id,
+      gradedAt: Date.now(),
+    });
+
+    const track = await ctx.db.get(attempt.trackId);
+    await notifyUsers(ctx, [attempt.userId], {
+      type: "submission_graded",
+      title: `Graded: ${lesson.title} — ${grade}%`,
+      body: feedback ? `${teacher.name}: “${feedback}”` : `Graded by ${teacher.name}.`,
+      href: track ? `/learn/${track.slug}/${lesson._id}` : "/learn",
+      actorId: teacher._id,
+    });
+    return null;
+  },
+});
+
+export const listPendingTests = query({
+  args: { cohortId: v.optional(v.id("cohorts")) },
+  handler: async (ctx, args) => {
+    const teacher = await getCurrentUserOrNull(ctx);
+    if (!teacher || !isStaffRole(teacher.role)) return [];
+
+    const students = await visibleStudents(ctx, teacher, args.cohortId);
+    const allowed = new Set(students.map((s) => s._id));
+    const nameById = new Map(students.map((s) => [s._id, s.name]));
+
+    const pending = await ctx.db
+      .query("attempts")
+      .withIndex("by_grade_status", (q) => q.eq("gradeStatus", "pending"))
+      .collect();
+
+    const latestByKey = new Map<string, (typeof pending)[number]>();
+    for (const attempt of pending) {
+      if (!allowed.has(attempt.userId)) continue;
+      const key = `${attempt.userId}:${attempt.lessonId}`;
+      const existing = latestByKey.get(key);
+      if (!existing || attempt.completedAt > existing.completedAt) {
+        latestByKey.set(key, attempt);
+      }
+    }
+
+    const rows = [];
+    for (const attempt of latestByKey.values()) {
+      const lesson = await ctx.db.get(attempt.lessonId);
+      if (!lesson || !needsInstructorGrade(lesson.type)) continue;
+      const track = await ctx.db.get(attempt.trackId);
+      const suggestedPct =
+        attempt.maxScore > 0 ? Math.round((attempt.score / attempt.maxScore) * 100) : 0;
+      rows.push({
+        attemptId: attempt._id,
+        studentId: attempt.userId,
+        studentName: nameById.get(attempt.userId) ?? "Student",
+        lessonId: attempt.lessonId,
+        lessonTitle: lesson.title,
+        lessonType: lesson.type,
+        trackName: track?.name ?? "Track",
+        trackSlug: track?.slug ?? "",
+        trackColor: track?.color ?? "#2563EB",
+        completedAt: attempt.completedAt,
+        suggestedPct,
+      });
+    }
+
+    return rows.sort((a, b) => b.completedAt - a.completedAt);
   },
 });
 
@@ -255,12 +383,17 @@ export const getContinueLearning = query({
     const user = await getCurrentUserOrNull(ctx);
     if (!user) return null;
 
-    const tracks = (
+    const published = (
       await ctx.db
         .query("tracks")
         .withIndex("by_published", (q) => q.eq("published", true))
         .collect()
     ).sort((a, b) => a.order - b.order);
+
+    const openIds = isStaffUser(user) ? null : await openTrackIdSet(ctx, user._id);
+    const tracks = openIds
+      ? published.filter((track) => openIds.has(track._id))
+      : published;
 
     const attempts = await ctx.db
       .query("attempts")
@@ -348,13 +481,27 @@ export const getStudentDetailForTeacher = query({
       .collect();
     const lessonsById = await lessonsByIdMap(ctx);
 
-    // Best attempt per lesson for the lesson list (any type).
-    const bestPerLesson = new Map<string, { score: number; maxScore: number; completedAt: number }>();
+    // Latest attempt per lesson for the lesson list (any type).
+    const bestPerLesson = new Map<string, {
+      attemptId: typeof allAttempts[number]["_id"];
+      score: number;
+      maxScore: number;
+      completedAt: number;
+      gradeStatus?: "pending" | "graded";
+      teacherGrade?: number;
+    }>();
     for (const attempt of allAttempts) {
       const key = attempt.lessonId;
       const existing = bestPerLesson.get(key);
-      if (!existing || attempt.score > existing.score) {
-        bestPerLesson.set(key, { score: attempt.score, maxScore: attempt.maxScore, completedAt: attempt.completedAt });
+      if (!existing || attempt.completedAt > existing.completedAt) {
+        bestPerLesson.set(key, {
+          attemptId: attempt._id,
+          score: attempt.score,
+          maxScore: attempt.maxScore,
+          completedAt: attempt.completedAt,
+          gradeStatus: attempt.gradeStatus,
+          teacherGrade: attempt.teacherGrade,
+        });
       }
     }
 
@@ -383,6 +530,9 @@ export const getStudentDetailForTeacher = query({
               bestScore: best?.score ?? 0,
               bestMax: best?.maxScore ?? 1,
               completedAt: best?.completedAt ?? null,
+              gradeStatus: best?.gradeStatus ?? null,
+              teacherGrade: best?.teacherGrade ?? null,
+              attemptId: best?.attemptId ?? null,
             };
           });
 

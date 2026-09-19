@@ -3,7 +3,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import Link from "next/link";
-import { ArrowRight, Tv, ExternalLink } from "lucide-react";
+import { ArrowRight, Tv, ExternalLink, Lock } from "lucide-react";
 import { useInstructorName } from "@/components/cohort/useInstructorName";
 import { TrackIcon } from "@/lib/trackIcons";
 
@@ -19,7 +19,7 @@ export default function LearnPage() {
         <div className="mb-8">
           <p className="eyebrow mb-3">The library</p>
           <h1 className="font-serif text-4xl font-bold tracking-tight mb-2" style={{ color: "var(--text)" }}>Learning tracks</h1>
-          <p style={{ color: "var(--text-muted)" }}>Pull a textbook off the shelf. Read the chapters, take the quizzes, and finish the mandatory crossword in each one.</p>
+          <p style={{ color: "var(--text-muted)" }}>Tracks open when your instructor releases them. Quizzes and mandatory work are graded by instructors.</p>
         </div>
 
         {!tracks ? (
@@ -34,19 +34,36 @@ export default function LearnPage() {
             <div className="bookshelf mb-12 pt-6 overflow-x-auto">
               {[...tracks]
                 .sort((a, b) => a.order - b.order)
-                .map((track, i) => (
-                  <Link
-                    key={track._id}
-                    href={`/learn/${track.slug}`}
-                    className={`book-spine ${["tall", "", "short", "wide", ""][i % 5]}`}
-                    style={{ ["--book-color" as string]: track.color }}
-                    title={track.name}
-                  >
-                    <span className="spine-badge text-[10px] font-black">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="spine-title">{track.name}</span>
-                    <span className="text-[9px] font-bold tracking-widest opacity-80">CS</span>
-                  </Link>
-                ))}
+                .map((track, i) => {
+                  const locked = track.open === false;
+                  const spine = (
+                    <>
+                      <span className="spine-badge text-[10px] font-black">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="spine-title">{track.name}</span>
+                      <span className="text-[9px] font-bold tracking-widest opacity-80">{locked ? "LOCK" : "CS"}</span>
+                    </>
+                  );
+                  const cls = `book-spine ${["tall", "", "short", "wide", ""][i % 5]}`;
+                  const style = { ["--book-color" as string]: track.color };
+                  if (locked) {
+                    return (
+                      <span key={track._id} className={`${cls} opacity-60 cursor-not-allowed`} style={style} title={`${track.name} — not open yet`}>
+                        {spine}
+                      </span>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={track._id}
+                      href={`/learn/${track.slug}`}
+                      className={cls}
+                      style={style}
+                      title={track.name}
+                    >
+                      {spine}
+                    </Link>
+                  );
+                })}
             </div>
 
             {/* Catalog */}
@@ -54,13 +71,8 @@ export default function LearnPage() {
               {[...tracks]
                 .sort((a, b) => a.order - b.order)
                 .map((track, i) => {
-                  return (
-                    <Link
-                      key={track._id}
-                      href={`/learn/${track.slug}`}
-                      className="book-cover hover:-translate-y-0.5 transition-transform group"
-                      style={{ ["--book-color" as string]: track.color }}
-                    >
+                  const locked = track.open === false;
+                  const body = (
                       <div className="relative z-10 p-6 flex items-center gap-6 flex-1 min-w-0">
                         <div
                           className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -73,10 +85,34 @@ export default function LearnPage() {
                             Volume {String(i + 1).padStart(2, "0")}
                           </p>
                           <h2 className="font-serif text-xl font-bold mb-1 leading-tight" style={{ color: "var(--text)" }}>{track.name}</h2>
-                          <p className="text-sm" style={{ color: "var(--text-muted)" }}>{track.description}</p>
+                          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                            {locked ? "Not open yet — your instructor will release this track in class." : track.description}
+                          </p>
                         </div>
-                        <ArrowRight size={20} className="flex-shrink-0 group-hover:translate-x-1 transition-transform" style={{ color: track.color }} />
+                        {locked
+                          ? <Lock size={18} className="flex-shrink-0" style={{ color: "var(--text-muted)" }} />
+                          : <ArrowRight size={20} className="flex-shrink-0 group-hover:translate-x-1 transition-transform" style={{ color: track.color }} />}
                       </div>
+                  );
+                  if (locked) {
+                    return (
+                      <div
+                        key={track._id}
+                        className="book-cover opacity-80"
+                        style={{ ["--book-color" as string]: track.color }}
+                      >
+                        {body}
+                      </div>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={track._id}
+                      href={`/learn/${track.slug}`}
+                      className="book-cover hover:-translate-y-0.5 transition-transform group"
+                      style={{ ["--book-color" as string]: track.color }}
+                    >
+                      {body}
                     </Link>
                   );
                 })}

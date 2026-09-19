@@ -4,9 +4,9 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { use, useMemo } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Play, RotateCcw, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Play, RotateCcw, Trophy, Lock } from "lucide-react";
 import { TrackIcon } from "@/lib/trackIcons";
-import { LESSON_TYPE_ICON, LESSON_TYPE_LABEL, estimateMinutes, isScoredType, pctOf } from "@/lib/lessonMeta";
+import { LESSON_TYPE_ICON, LESSON_TYPE_LABEL, estimateMinutes, isScoredType, needsInstructorGrade, pctOf } from "@/lib/lessonMeta";
 
 function ProgressRing({ pct, color }: { pct: number; color: string }) {
   const r = 44;
@@ -53,13 +53,19 @@ export default function TrackPage({ params }: { params: Promise<{ track: string 
 
   // Best attempt per lesson, scoped to this track.
   const bestByLesson = useMemo(() => {
-    const map = new Map<string, { score: number; max: number }>();
+    const map = new Map<string, { score: number; max: number; pending: boolean; gradedPct: number | null; completedAt: number }>();
     if (!myAttempts || !trackData) return map;
     for (const a of myAttempts) {
       if (a.trackId !== trackData._id) continue;
       const prev = map.get(a.lessonId);
-      if (!prev || pctOf(a.score, a.maxScore) > pctOf(prev.score, prev.max)) {
-        map.set(a.lessonId, { score: a.score, max: a.maxScore });
+      if (!prev || a.completedAt > prev.completedAt) {
+        map.set(a.lessonId, {
+          score: a.score,
+          max: a.maxScore,
+          pending: a.gradeStatus === "pending",
+          gradedPct: typeof a.teacherGrade === "number" ? a.teacherGrade : null,
+          completedAt: a.completedAt,
+        });
       }
     }
     return map;
@@ -73,9 +79,16 @@ export default function TrackPage({ params }: { params: Promise<{ track: string 
     ? [...allTracks].sort((a, b) => a.order - b.order).findIndex((t) => t.slug === slug) + 1
     : 0;
 
-  const scored = sorted.filter((l) => isScoredType(l.type) && bestByLesson.has(l._id));
-  const trackTestAvg = scored.length
-    ? Math.round(scored.reduce((s, l) => { const b = bestByLesson.get(l._id)!; return s + pctOf(b.score, b.max); }, 0) / scored.length)
+  const scoredPcts = sorted.flatMap((l) => {
+    const b = bestByLesson.get(l._id);
+    if (!b || !isScoredType(l.type)) return [];
+    if (needsInstructorGrade(l.type)) {
+      return b.gradedPct != null ? [b.gradedPct] : [];
+    }
+    return [pctOf(b.score, b.max)];
+  });
+  const trackTestAvg = scoredPcts.length
+    ? Math.round(scoredPcts.reduce((s, n) => s + n, 0) / scoredPcts.length)
     : null;
   const minutesLeft = sorted
     .filter((l) => !bestByLesson.has(l._id))
@@ -96,6 +109,23 @@ export default function TrackPage({ params }: { params: Promise<{ track: string 
   }
 
   const color = trackData.color;
+
+  if (trackData.open === false) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
+        <Link href="/learn" className="inline-flex items-center gap-2 text-sm mb-6 hover:opacity-70 transition-opacity" style={{ color: "var(--text-muted)" }}>
+          <ArrowLeft size={14} /> Back to the library
+        </Link>
+        <div className="card p-10 text-center space-y-4">
+          <Lock size={28} className="mx-auto" style={{ color: "var(--text-muted)" }} />
+          <h1 className="font-serif text-3xl font-bold" style={{ color: "var(--text)" }}>{trackData.name}</h1>
+          <p className="text-sm max-w-md mx-auto" style={{ color: "var(--text-muted)" }}>
+            This learning track is not open yet. Your instructor will release it when the class is ready so everyone stays on the same pace.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
@@ -154,7 +184,7 @@ export default function TrackPage({ params }: { params: Promise<{ track: string 
         <Stat
           label="Test avg · this track"
           value={trackTestAvg === null ? "—" : `${trackTestAvg}%`}
-          sub={trackTestAvg === null ? "Finish a quiz or game to get a score" : `Best attempt on ${scored.length} graded ${scored.length === 1 ? "chapter" : "chapters"}`}
+          sub={trackTestAvg === null ? "Instructor-graded quizzes count here" : `Best graded score on ${scoredPcts.length} ${scoredPcts.length === 1 ? "chapter" : "chapters"}`}
         />
         <Stat
           label="Graded chapters"
@@ -209,7 +239,7 @@ export default function TrackPage({ params }: { params: Promise<{ track: string 
                     <p className="font-semibold text-[15px] truncate" style={{ color: "var(--text)" }}>{lesson.title}</p>
                     <span className="toc-leader hidden sm:block" />
                     <span className="text-sm font-semibold flex-shrink-0 hidden sm:inline" style={{ color: isDone ? "#15803D" : "var(--text-muted)" }}>
-                      {isDone ? `${pctOf(best.score, best.max)}%` : isNext ? "Up next" : ""}
+                      {isDone && best.pending ? "Submitted" : isDone && best.gradedPct != null ? `${best.gradedPct}%` : isDone ? `${pctOf(best.score, best.max)}%` : isNext ? "Up next" : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: "var(--text-muted)" }}>

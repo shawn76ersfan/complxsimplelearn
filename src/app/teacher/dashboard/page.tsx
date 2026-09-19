@@ -16,22 +16,28 @@ import { AttendanceRoster } from "@/components/teacher/AttendanceRoster";
 import { BoardPanel } from "@/components/teacher/BoardPanel";
 import { CohortSwitcher } from "@/components/teacher/CohortSwitcher";
 import { CohortScopeProvider, useCohortScope } from "@/components/teacher/CohortContext";
-import { BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck, ClipboardCheck, MessageSquare } from "lucide-react";
+import { LearningAnalytics } from "@/components/teacher/LearningAnalytics";
+import { TrackUnlockPanel } from "@/components/teacher/TrackUnlockPanel";
+import { GradeTestsPanel } from "@/components/teacher/GradeTestsPanel";
+import { BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck, ClipboardCheck, MessageSquare, Activity, Unlock, PenLine } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../../../convex/_generated/api";
+import { api } from "../../../../convex/_generated/api";
 
 type Tab = { id: string; label: string; icon: React.ElementType; adminOnly?: boolean };
 
 const PRIMARY_TABS = [
+  { id: "cohorts", label: "Cohorts", icon: Layers, adminOnly: true },
   { id: "scores", label: "Scores", icon: BarChart3 },
+  { id: "analytics", label: "Analytics", icon: Activity },
   { id: "students", label: "Students", icon: Users },
   { id: "homework", label: "Homework", icon: BookMarked },
+  { id: "tests", label: "Grade tests", icon: PenLine },
+  { id: "tracks", label: "Open tracks", icon: Unlock },
   { id: "announcements", label: "Announcements", icon: Megaphone },
   { id: "board", label: "Board", icon: MessageSquare },
   { id: "attendance", label: "Attendance", icon: ClipboardCheck },
-  { id: "cohorts", label: "Cohorts", icon: Layers, adminOnly: true },
 ] as const satisfies readonly Tab[];
 
 const MORE_TABS = [
@@ -47,7 +53,7 @@ const MORE_TABS = [
 type TabId = (typeof PRIMARY_TABS)[number]["id"] | (typeof MORE_TABS)[number]["id"];
 
 /** Tabs whose content depends on the selected cohort (shown with the switcher). */
-const SCOPED_TABS: ReadonlySet<string> = new Set(["scores", "students", "homework", "announcements", "board", "attendance", "calendar", "videos", "email"]);
+const SCOPED_TABS: ReadonlySet<string> = new Set(["scores", "analytics", "students", "homework", "tests", "tracks", "announcements", "board", "attendance", "calendar", "videos", "email"]);
 
 function QuoteEditor() {
   const current = useQuery(api.quotes.getCurrent);
@@ -244,7 +250,7 @@ function greeting(): string {
 
 function TeacherHub() {
   const { isAdmin, profile, selected, cohortId, cohorts } = useCohortScope();
-  const [requestedTab, setActiveTab] = useState<TabId>("scores");
+  const [requestedTab, setActiveTab] = useState<TabId>("cohorts");
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const [hello] = useState(greeting);
@@ -261,7 +267,7 @@ function TeacherHub() {
   const scopeLabel = selected
     ? selected.cohort.name
     : isAdmin
-      ? "the whole school"
+      ? "the whole program"
       : (cohorts?.length ?? 0) > 1
         ? "all your cohorts"
         : "your cohort";
@@ -396,6 +402,20 @@ function TeacherHub() {
         <StudentManagementTab />
       )}
 
+      {activeTab === "analytics" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>
+              {selected ? `${selected.cohort.name} analytics` : "Learning analytics"}
+            </h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Who is stuck, which quiz items fail, homework lag, and what Stark helped with — for {scopeLabel}
+            </p>
+          </div>
+          <LearningAnalytics />
+        </div>
+      )}
+
       {activeTab === "scores" && (
         <div>
           <div className="mb-6">
@@ -467,6 +487,30 @@ function TeacherHub() {
             </p>
           </div>
           <HomeworkTab />
+        </div>
+      )}
+
+      {activeTab === "tests" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Grade tests</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Quizzes and mandatory work for {scopeLabel} wait here until you assign a grade.
+            </p>
+          </div>
+          <GradeTestsPanel />
+        </div>
+      )}
+
+      {activeTab === "tracks" && (
+        <div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold" style={{ color: "var(--text)" }}>Open learning tracks</h2>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Release one track at a time so students follow class pace instead of finishing everything early.
+            </p>
+          </div>
+          <TrackUnlockPanel />
         </div>
       )}
 

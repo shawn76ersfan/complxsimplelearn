@@ -6,26 +6,30 @@ import { Id } from "./_generated/dataModel";
 import { chatComplete, type ChatMessage } from "./lib/llmChat";
 import { PLATFORM_FACTS } from "./lib/platformFacts";
 import { requireActiveProfile } from "./lib/actionAuth";
+import { classifyStarkHelp } from "./lib/starkTopics";
+import { timezoneLabel } from "./lib/timezones";
 
 const EMBEDDING_MODEL = "jina-embeddings-v3";
 const EMBEDDING_URL = "https://api.jina.ai/v1/embeddings";
 const EMBEDDING_DIMENSIONS = 1024;
 
-const SYSTEM_PERSONA = `You are Stark, the friendly AI assistant for ComplxSimple — an interactive tech education platform created by Cassandra Carter.
+const SYSTEM_PERSONA = `You are Stark, ComplxSimple's helpful AI chatbot — created for Cassandra Carter's students learning DevOps, cloud, and IT from anywhere in the country.
 
-You are a helpful general-purpose AI assistant (like ChatGPT or Claude). You can answer questions on ANY topic and help with writing, explanations, code, study help, and more. You are not limited to tech or the course.
+You are a general-purpose assistant first (like ChatGPT): writing, explanations, study planning, code, career questions, time-zone math for live class, how the site works, and everyday student life. You are not limited to tutoring, and you should not sound like a quiz machine.
+
+When they need to learn a course concept, teach it Socratically: ask a short check question, give an analogy, then a small ungraded practice item. Never dump an answer key.
 
 Grounding rules:
-- For anything specific to ComplxSimple (its tracks, lessons, schedules, policies, who Cassandra is, how the site works), rely on the PLATFORM SNAPSHOT and COURSE CONTEXT provided below and do NOT invent platform-specific details. If that info isn't there, say you don't have it and suggest asking Cassandra.
-- For general knowledge and tech questions, use your own knowledge freely. Treat the course context as helpful reference, not a hard limit.
-- You still know the full course: when asked about course topics, answer accurately using the context.
+- For anything specific to ComplxSimple (tracks, lessons, schedules, policies, who Cassandra is, how the site works), rely on the PLATFORM SNAPSHOT, COURSE CONTEXT, and STUDENT CONTEXT below. Do not invent platform details. If that info isn't there, say you don't have it and suggest asking Cassandra.
+- For general knowledge and tech questions, use your own knowledge freely. Course context is helpful reference, not a hard limit.
+- If STUDENT CONTEXT lists a weak lesson, offer to walk through the underlying idea. Do not mention their exact score unless they bring it up. Never reveal quiz answers.
+- If they have a timezone, help them convert class times. Live sessions are typically posted in the cohort's class timezone.
 
 Style:
-- Be warm, encouraging, and clear. You're often talking to students who are learning.
-- Keep responses concise unless asked to explain in depth.
-- Write ONE complete answer. Do not repeat yourself, restate, add a second version, or finish with a summary that repeats the same points.
+- Be warm, practical, and concise. Students are often tired after work or joining from another time zone.
+- Write ONE complete answer. Do not repeat yourself or add a second summary.
 - When showing code or commands, always use markdown fenced code blocks with the language tag (e.g. \`\`\`bash, \`\`\`js).
-- If the PLATFORM SNAPSHOT or COURSE CONTEXT already has a ComplxSimple fact (tracks, lessons, pages, pricing, homework), answer from it. Do not say you don't know or send the student to another page for facts that are listed.
+- If the PLATFORM SNAPSHOT or COURSE CONTEXT already has a ComplxSimple fact, answer from it. Do not send them hunting for a page that is already listed.
 
 ASSESSMENT INTEGRITY (absolute rule):
 - Never provide, confirm, reveal, list, encode, transform, or imply an answer to any ComplxSimple quiz, test, exam, crossword, mandatory work, fill-in-the-blank, matching activity, or graded question.
@@ -54,7 +58,7 @@ const REFUSAL_MESSAGE =
   "I can't help with that. Let's keep things respectful and on-topic — I'm happy to help you with your coursework or any tech question instead!";
 
 const POLITICS_REFUSAL_MESSAGE =
-  "I don't discuss politics, political figures, or politically charged topics here — ComplxSimple is a learning space for everyone. I'm happy to help with your coursework, tech questions, study help, or anything else school-related!";
+  "I don't discuss politics, political figures, or politically charged topics here — ComplxSimple is a learning space for everyone. I'm happy to help with your coursework, tech questions, study help, or anything else program-related!";
 
 const ASSESSMENT_REFUSAL_MESSAGE =
   "I can help you learn the material, but I can't provide, confirm, or disguise answers to ComplxSimple quizzes, crosswords, tests, or mandatory work. I can explain the underlying concept or make a different practice question for you.";
@@ -425,6 +429,62 @@ export const redactHistoricalAssessmentAnswers = internalMutation({
   },
 });
 
+export const getStudentChatContext = internalQuery({
+  args: { userId: v.id("users"), now: v.number() },
+  returns: v.string(),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return "No student profile.";
+
+    const attempts = await ctx.db
+      .query("attempts")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    const best = new Map<string, (typeof attempts)[number]>();
+    for (const attempt of attempts) {
+      const existing = best.get(attempt.lessonId);
+      if (!existing || attempt.score > existing.score) best.set(attempt.lessonId, attempt);
+    }
+
+    const weak: string[] = [];
+    for (const attempt of best.values()) {
+      if (attempt.maxScore <= 0) continue;
+      if (attempt.score / attempt.maxScore >= 0.7) continue;
+      const lesson = await ctx.db.get(attempt.lessonId);
+      if (!lesson || lesson.type === "content") continue;
+      const track = await ctx.db.get(attempt.trackId);
+      weak.push(
+        `- ${track?.name ?? "Track"} / ${lesson.title} (scored ${attempt.score}/${attempt.maxScore})`,
+      );
+      if (weak.length >= 4) break;
+    }
+
+    const assignments = await ctx.db.query("assignments").collect();
+    const submissions = await ctx.db
+      .query("assignmentSubmissions")
+      .withIndex("by_student", (q) => q.eq("studentId", args.userId))
+      .collect();
+    const submitted = new Set(submissions.map((s) => s.assignmentId));
+    const upcoming = assignments
+      .filter((a) => a.dueDate >= args.now && !submitted.has(a._id))
+      .sort((a, b) => a.dueDate - b.dueDate)
+      .slice(0, 4)
+      .map((a) => `- ${a.title} (due ${new Date(a.dueDate).toISOString().slice(0, 10)})`);
+
+    return [
+      `Name: ${user.firstName ?? user.name}`,
+      `State: ${user.state ?? "unknown"}`,
+      `Timezone: ${user.timezone ? timezoneLabel(user.timezone) : "not set"} (${user.timezone ?? "n/a"})`,
+      "",
+      "Recent lessons they struggled with (teach the concept; never give quiz answers):",
+      weak.length > 0 ? weak.join("\n") : "- None recorded.",
+      "",
+      "Upcoming homework they have not submitted:",
+      upcoming.length > 0 ? upcoming.join("\n") : "- None, or nothing due.",
+    ].join("\n");
+  },
+});
+
 export const getPlatformSnapshot = internalQuery({
   args: {},
   returns: v.string(),
@@ -549,6 +609,14 @@ export const sendMessage = action({
     const immediateRefusal = getSafetyRefusal(userText);
     if (immediateRefusal) {
       const convId = await persistExchange(ctx, args.conversationId, profile._id, userText, immediateRefusal);
+      await ctx.runMutation(internal.analytics.logEvent, {
+        userId: profile._id,
+        conversationId: convId,
+        mode: "default",
+        kind: "refused",
+        topic: "Safety refusal",
+        createdAt: Date.now(),
+      });
       return { reply: immediateRefusal, conversationId: convId };
     }
 
@@ -558,6 +626,14 @@ export const sendMessage = action({
     const inputRefusal = getSafetyRefusal(userText, assessmentPrompts);
     if (inputRefusal) {
       const convId = await persistExchange(ctx, args.conversationId, profile._id, userText, inputRefusal);
+      await ctx.runMutation(internal.analytics.logEvent, {
+        userId: profile._id,
+        conversationId: convId,
+        mode: "default",
+        kind: "refused",
+        topic: "Assessment integrity",
+        createdAt: Date.now(),
+      });
       return { reply: inputRefusal, conversationId: convId };
     }
 
@@ -580,6 +656,11 @@ export const sendMessage = action({
       : "No extra lesson snippets matched this question.";
 
     const platformSnapshot = await ctx.runQuery(internal.chat.getPlatformSnapshot, {});
+    const studentContext = await ctx.runQuery(internal.chat.getStudentChatContext, {
+      userId: profile._id,
+      now: Date.now(),
+    });
+    const hadWeakLessonContext = studentContext.includes("scored ");
 
     // 4. Build prompt (inject today's real date so Stark isn't stuck in its training year)
     const today = new Date().toLocaleDateString("en-US", {
@@ -589,7 +670,7 @@ export const sendMessage = action({
       day: "numeric",
     });
     const dateNote = `Today's date is ${today}. Treat this as the current date. Your training data has a cutoff in the past, so for very recent events you may not have information — if so, say honestly that it may be beyond your knowledge rather than guessing or assuming it's an earlier year.`;
-    const systemPrompt = `${SYSTEM_PERSONA}\n\n${dateNote}\n\n=== PLATFORM SNAPSHOT ===\n${platformSnapshot}\n=== END SNAPSHOT ===\n\n=== COURSE CONTEXT ===\n${context}\n=== END CONTEXT ===`;
+    const systemPrompt = `${SYSTEM_PERSONA}\n\n${dateNote}\n\n=== PLATFORM SNAPSHOT ===\n${platformSnapshot}\n=== END SNAPSHOT ===\n\n=== STUDENT CONTEXT ===\n${studentContext}\n=== END STUDENT CONTEXT ===\n\n=== COURSE CONTEXT ===\n${context}\n=== END CONTEXT ===`;
 
     // Do not let an answer leaked in an older exchange re-enter the model's
     // context. Drop both sides of any detected assessment-answer exchange.
@@ -624,6 +705,15 @@ export const sendMessage = action({
 
     // 6. Persist to DB (and auto-title new conversations)
     const convId = await persistExchange(ctx, args.conversationId, profile._id, userText, reply);
+    const classified = classifyStarkHelp(userText, hadWeakLessonContext);
+    await ctx.runMutation(internal.analytics.logEvent, {
+      userId: profile._id,
+      conversationId: convId,
+      mode: "default",
+      kind: classified.kind,
+      topic: classified.topic,
+      createdAt: Date.now(),
+    });
 
     return { reply, conversationId: convId };
   },

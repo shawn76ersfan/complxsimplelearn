@@ -24,12 +24,20 @@ export async function assertUploadAllowed(
   return user;
 }
 
+/**
+ * Record who uploaded an R2 key. Call from the R2 client API's `onUpload`
+ * hook: that runs inside the public `syncMetadata` mutation with the
+ * uploader's auth, so the ownership row exists before `useUploadFile`
+ * resolves on the client and later mutations can call `assertOwnedUpload`.
+ *
+ * R2 metadata (size, content type) is not in Convex yet at this point; the
+ * component fetches it in a scheduled action. Validate it in
+ * `validateUpload` from the `onSyncMetadata` callback.
+ */
 export async function claimUpload(
   ctx: MutationCtx,
-  r2: R2,
   key: string,
   kind: UploadKind,
-  limits: { maxBytes: number; contentTypes?: Set<string> },
 ): Promise<void> {
   const user = await getCurrentUser(ctx);
   const existing = await ctx.db
@@ -41,34 +49,48 @@ export async function claimUpload(
     return;
   }
 
-  const meta = await r2.getMetadata(ctx, key);
-  if (meta?.size !== undefined && meta.size > limits.maxBytes) {
-    try {
-      await r2.deleteObject(ctx, key);
-    } catch {
-      // still reject the claim
-    }
-    throw new Error("File is too large");
-  }
-  if (
-    limits.contentTypes &&
-    meta?.contentType &&
-    !limits.contentTypes.has(meta.contentType)
-  ) {
-    try {
-      await r2.deleteObject(ctx, key);
-    } catch {
-      // still reject the claim
-    }
-    throw new Error("That file type is not allowed");
-  }
-
   await ctx.db.insert("uploadedObjects", {
     key,
     userId: user._id,
     kind,
     createdAt: Date.now(),
   });
+}
+
+/**
+ * Enforce size / content-type limits once the component has synced the
+ * object's metadata. Runs from the internal `onSyncMetadata` mutation (no
+ * user auth on ctx). A violating object is deleted from R2 and its
+ * ownership row removed so nothing downstream can reference it.
+ */
+export async function validateUpload(
+  ctx: MutationCtx,
+  r2: R2,
+  key: string,
+  limits: { maxBytes: number; contentTypes?: Set<string> },
+): Promise<void> {
+  const meta = await r2.getMetadata(ctx, key);
+  const tooLarge = meta?.size !== undefined && meta.size > limits.maxBytes;
+  const badType =
+    limits.contentTypes !== undefined &&
+    !!meta?.contentType &&
+    !limits.contentTypes.has(meta.contentType);
+  if (!tooLarge && !badType) return;
+
+  const row = await ctx.db
+    .query("uploadedObjects")
+    .withIndex("by_key", (q) => q.eq("key", key))
+    .unique();
+  if (row) await ctx.db.delete(row._id);
+  try {
+    await r2.deleteObject(ctx, key);
+  } catch (err) {
+    console.warn("Could not delete rejected upload", key, err);
+  }
+  console.warn(
+    tooLarge ? "Rejected upload: too large" : "Rejected upload: bad content type",
+    { key, size: meta?.size, contentType: meta?.contentType },
+  );
 }
 
 export async function assertOwnedUpload(

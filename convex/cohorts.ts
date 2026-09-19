@@ -12,6 +12,7 @@ import {
 } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
 import { notifyUsers } from "./lib/notify";
+import { DEFAULT_CLASS_TIMEZONE, isUsTimezone } from "./lib/timezones";
 
 const cohortStatus = v.union(
   v.literal("upcoming"),
@@ -29,6 +30,7 @@ const cohortDoc = v.object({
   startDate: v.string(),
   endDate: v.optional(v.string()),
   schedule: v.optional(v.string()),
+  scheduleTimezone: v.optional(v.string()),
   meetingUrl: v.optional(v.string()),
   color: v.string(),
   status: cohortStatus,
@@ -220,6 +222,7 @@ export const create = mutation({
     startDate: v.string(),
     endDate: v.optional(v.string()),
     schedule: v.optional(v.string()),
+    scheduleTimezone: v.optional(v.string()),
     meetingUrl: v.optional(v.string()),
     color: v.optional(v.string()),
     status: v.optional(cohortStatus),
@@ -245,6 +248,9 @@ export const create = mutation({
       startDate: args.startDate,
       endDate: args.endDate || undefined,
       schedule: args.schedule?.trim() || undefined,
+      scheduleTimezone: args.scheduleTimezone && isUsTimezone(args.scheduleTimezone)
+        ? args.scheduleTimezone
+        : DEFAULT_CLASS_TIMEZONE,
       meetingUrl: args.meetingUrl?.trim() || undefined,
       color,
       status: args.status ?? "upcoming",
@@ -269,6 +275,7 @@ export const update = mutation({
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
     schedule: v.optional(v.string()),
+    scheduleTimezone: v.optional(v.string()),
     meetingUrl: v.optional(v.string()),
     color: v.optional(v.string()),
     status: v.optional(cohortStatus),
@@ -299,6 +306,12 @@ export const update = mutation({
     const end = patch.endDate !== undefined ? patch.endDate : cohort.endDate;
     if (end && end < start) throw new Error("End date is before the start date");
     if (args.schedule !== undefined) patch.schedule = args.schedule.trim() || undefined;
+    if (args.scheduleTimezone !== undefined) {
+      if (args.scheduleTimezone && !isUsTimezone(args.scheduleTimezone)) {
+        throw new Error("Pick a valid class timezone");
+      }
+      patch.scheduleTimezone = args.scheduleTimezone || DEFAULT_CLASS_TIMEZONE;
+    }
     if (args.meetingUrl !== undefined) patch.meetingUrl = args.meetingUrl.trim() || undefined;
     if (args.color !== undefined) patch.color = args.color;
     if (args.status !== undefined) patch.status = args.status;

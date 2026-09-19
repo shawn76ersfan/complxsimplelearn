@@ -5,12 +5,12 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { Id } from "../../../../../../convex/_generated/dataModel";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Clock, List, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Clock, List, Trophy, Lock } from "lucide-react";
 import { LessonRenderer } from "@/components/learn/LessonRenderer";
 import { QuizQuestion } from "@/components/learn/QuizQuestion";
 import { PcPartsGame } from "@/components/game/PcPartsGame";
 import { TrackIcon } from "@/lib/trackIcons";
-import { LESSON_TYPE_ICON, LESSON_TYPE_LABEL, estimateMinutes, isScoredType, pctOf } from "@/lib/lessonMeta";
+import { LESSON_TYPE_ICON, LESSON_TYPE_LABEL, estimateMinutes, isScoredType, needsInstructorGrade, pctOf } from "@/lib/lessonMeta";
 import toast from "react-hot-toast";
 
 export default function LessonPage({ params }: { params: Promise<{ track: string; lesson: string }> }) {
@@ -25,7 +25,7 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
   const myAttempts = useQuery(api.attempts.getMyAttempts);
   const submitAttempt = useMutation(api.attempts.submit);
 
-  const [result, setResult] = useState<{ score: number; max: number } | null>(null);
+  const [result, setResult] = useState<{ score: number; max: number; pending: boolean } | null>(null);
 
   const ordered = useMemo(() => (siblings ? [...siblings].sort((a, b) => a.order - b.order) : []), [siblings]);
   const index = ordered.findIndex((l) => l._id === lessonId);
@@ -46,13 +46,33 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
         answers: payload.answers,
         blockAnswers: payload.blockAnswers,
       });
-      setResult({ score: graded.score, max: graded.maxScore });
-      const pct = pctOf(graded.score, graded.maxScore);
-      const praise = pct >= 80 ? "Excellent" : pct >= 60 ? "Good job" : "Keep going";
-      toast.success(`${praise} · ${pct}%`, { duration: 3000 });
+      const pending = graded.gradeStatus === "pending";
+      setResult({ score: graded.score, max: graded.maxScore, pending });
+      if (pending) {
+        toast.success("Submitted — your instructor will grade this", { duration: 4000 });
+      } else {
+        const pct = pctOf(graded.score, graded.maxScore);
+        const praise = pct >= 80 ? "Excellent" : pct >= 60 ? "Good job" : "Keep going";
+        toast.success(`${praise} · ${pct}%`, { duration: 3000 });
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save your score");
     }
+  }
+
+  if (trackData && trackData.open === false) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <Link href="/learn" className="inline-flex items-center gap-2 text-sm mb-6 hover:opacity-70" style={{ color: "var(--text-muted)" }}>
+          <ArrowLeft size={14} /> Back to the library
+        </Link>
+        <div className="card p-10 text-center space-y-3">
+          <Lock size={28} className="mx-auto" style={{ color: "var(--text-muted)" }} />
+          <h1 className="font-serif text-2xl font-bold" style={{ color: "var(--text)" }}>{trackData.name}</h1>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>This track is not open yet. Your instructor will release it in class.</p>
+        </div>
+      </div>
+    );
   }
 
   if (!lesson || !trackData) {
@@ -74,8 +94,14 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
   const isLegacyQuiz = lesson.type === "quiz";
   const isLegacyGame = lesson.type === "game";
   const isContentBased = lesson.type === "content" || lesson.type === "mandatory";
-  const bestPct = bestAttempt ? pctOf(bestAttempt.score, bestAttempt.maxScore) : null;
-  const resultPct = result ? pctOf(result.score, result.max) : 0;
+  const instructorGraded = needsInstructorGrade(lesson.type);
+  const bestPct = bestAttempt && !instructorGraded
+    ? pctOf(bestAttempt.score, bestAttempt.maxScore)
+    : bestAttempt && typeof bestAttempt.teacherGrade === "number"
+      ? bestAttempt.teacherGrade
+      : null;
+  const awaitingGrade = instructorGraded && bestAttempt && bestAttempt.gradeStatus !== "graded";
+  const resultPct = result && !result.pending ? pctOf(result.score, result.max) : 0;
   const chapterLabel = index >= 0 ? `Chapter ${index + 1} of ${ordered.length}` : "Chapter";
 
   return (
@@ -126,12 +152,20 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
           <span className="inline-flex items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
             <Clock size={12} /> {minutes} min
           </span>
-          {isScoredType(lesson.type) && (
+          {instructorGraded && (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>· graded by your instructor</span>
+          )}
+          {isScoredType(lesson.type) && !instructorGraded && (
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>· counts toward your test average</span>
+          )}
+          {awaitingGrade && (
+            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "#F59E0B1a", color: "#F59E0B" }}>
+              Awaiting instructor grade
+            </span>
           )}
           {bestPct !== null && (
             <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "#15803D1a", color: "#15803D" }}>
-              <Trophy size={12} /> Best {bestPct}%
+              <Trophy size={12} /> {instructorGraded ? "Grade" : "Best"} {bestPct}%
             </span>
           )}
         </div>
@@ -144,8 +178,19 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
         <div className="index-card plain relative px-6 sm:px-10 pb-8 pt-0 mb-6 text-center">
           <span className="washi-tape" />
           <div className="index-card-title justify-center">
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>Chapter complete</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
+              {result.pending ? "Submitted for grading" : "Chapter complete"}
+            </span>
           </div>
+          {result.pending ? (
+            <>
+              <p className="font-serif text-3xl font-bold mt-5 mb-3" style={{ color: "var(--text)" }}>Waiting on your instructor</p>
+              <p className="text-sm mb-7" style={{ color: "var(--text-muted)" }}>
+                This test does not count toward your average until an instructor grades it. You&apos;ll get a notification when it&apos;s in.
+              </p>
+            </>
+          ) : (
+            <>
           <div className="mt-4 flex justify-center">
             <span className={`stamp ${resultPct >= 60 ? "green" : ""}`}>
               {resultPct >= 80 ? "Excellent" : resultPct >= 60 ? "Passed" : "Recorded"}
@@ -156,6 +201,8 @@ export default function LessonPage({ params }: { params: Promise<{ track: string
             {result.max > 1 ? `${result.score} of ${result.max} points. ` : ""}
             {resultPct >= 80 ? "You've got this material down." : resultPct >= 60 ? "Solid. A quick re-read would lock it in." : "Re-read the chapter and try again — your best score is what counts."}
           </p>
+            </>
+          )}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             {next ? (
               <Link href={`/learn/${slug}/${next._id}`} className="btn-ink">

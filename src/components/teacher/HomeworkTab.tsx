@@ -68,7 +68,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         cohortId,
       });
       const target = cohorts?.find((c) => c.cohort._id === cohortId)?.cohort.name;
-      toast.success(target ? `Assigned to ${target}` : "Assignment created for the whole school");
+      toast.success(target ? `Assigned to ${target}` : "Assignment created for the whole program");
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create");
@@ -385,7 +385,7 @@ export function HomeworkTab() {
                       className="text-xs px-2 py-0.5 rounded-full font-semibold"
                       style={{ background: `${cohort?.color ?? "#6B7280"}20`, color: cohort?.color ?? "var(--text-muted)" }}
                     >
-                      {cohort?.name ?? "Whole school"}
+                      {cohort?.name ?? "Whole program"}
                     </span>
                     {requiresSubmission && (
                       <span

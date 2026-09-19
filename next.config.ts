@@ -4,6 +4,8 @@ import path from "path";
 const projectRoot = process.cwd();
 
 const nextConfig: NextConfig = {
+  // Docker / Railway / Fly (`next start`) without Vercel-specific bundling.
+  output: "standalone",
   // Keep Turbopack rooted on this app so a parent-folder lockfile cannot
   // steal module resolution (which 404s routes and breaks tailwindcss).
   // process.cwd() is more reliable on Windows than import.meta.url.

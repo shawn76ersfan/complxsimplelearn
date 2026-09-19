@@ -86,6 +86,13 @@ type Props = {
   activeDiagnosis?: Diagnosis | null;
   onDiagnose?: (milestone: Milestone) => void;
   onRewriteAffected?: (bulletIds: string[]) => void;
+  onGenerateKit?: () => void;
+  kitBusy?: boolean;
+  careerKit?: {
+    rewritePlan: Array<{ title: string; why: string; action: string }>;
+    interview: Array<{ question: string; why: string; talkingPoint: string }>;
+    portfolio: Array<{ title: string; skills: string[]; howToShow: string }>;
+  } | null;
 };
 
 function score100(score0to10: number): number {
@@ -116,6 +123,9 @@ export function CoachProgressCard({
   activeDiagnosis,
   onDiagnose,
   onRewriteAffected,
+  onGenerateKit,
+  kitBusy,
+  careerKit,
 }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -254,6 +264,76 @@ export function CoachProgressCard({
           {improvementSummary}
         </p>
       )}
+
+      <div
+        className="rounded-xl p-4 space-y-3"
+        style={{ background: "var(--stark-bg)", border: "1px solid var(--stark-border)" }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--stark-muted)" }}>
+              Career kit
+            </p>
+            <p className="text-sm mt-1" style={{ color: "var(--stark-text)" }}>
+              Rewrite plan, interview questions, and portfolio ideas from this scored resume.
+            </p>
+          </div>
+          {onGenerateKit && (
+            <button
+              type="button"
+              disabled={!!kitBusy || !!rewriting || !!diagnosingKey}
+              onClick={onGenerateKit}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-50 flex-shrink-0"
+              style={{ background: "var(--stark-accent)" }}
+            >
+              {kitBusy ? "Building…" : careerKit ? "Refresh kit" : "Build career kit"}
+            </button>
+          )}
+        </div>
+        {careerKit && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--stark-muted)" }}>
+                Rewrite this week
+              </p>
+              <ul className="space-y-2">
+                {careerKit.rewritePlan.map((step) => (
+                  <li key={step.title} className="text-xs leading-relaxed" style={{ color: "var(--stark-text)" }}>
+                    <span className="font-semibold">{step.title}.</span> {step.why} {step.action}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--stark-muted)" }}>
+                Interview prep
+              </p>
+              <ul className="space-y-2">
+                {careerKit.interview.map((q) => (
+                  <li key={q.question} className="text-xs leading-relaxed" style={{ color: "var(--stark-text)" }}>
+                    <span className="font-semibold">{q.question}</span>
+                    <span style={{ color: "var(--stark-muted)" }}> — {q.talkingPoint}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--stark-muted)" }}>
+                Portfolio
+              </p>
+              <ul className="space-y-2">
+                {careerKit.portfolio.map((p) => (
+                  <li key={p.title} className="text-xs leading-relaxed" style={{ color: "var(--stark-text)" }}>
+                    <span className="font-semibold">{p.title}</span>
+                    {p.skills.length > 0 ? ` · ${p.skills.join(", ")}` : ""}
+                    <span style={{ color: "var(--stark-muted)" }}> — {p.howToShow}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
 
       {scoreChangeSummary && (
         <p className="text-xs leading-relaxed" style={{ color: "var(--stark-muted)" }}>

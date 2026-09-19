@@ -73,7 +73,7 @@ export function AnnouncementsPanel() {
         <h3 className="font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
           <Megaphone size={16} style={{ color: "#F97316" }} /> New announcement
         </h3>
-        <CohortPicker value={target} onChange={setTarget} label="Post to" schoolWideLabel="Whole school" required />
+        <CohortPicker value={target} onChange={setTarget} label="Post to" schoolWideLabel="Whole program" required />
         <input required minLength={2} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title — e.g. No class Thursday" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none font-semibold" style={inputStyle} />
         <textarea required minLength={2} rows={5} value={body} onChange={(e) => setBody(e.target.value)} placeholder="What do students need to know?" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
         <div className="flex flex-col gap-2 text-sm" style={{ color: "var(--text)" }}>
@@ -113,7 +113,7 @@ export function AnnouncementsPanel() {
                     {a.pinned && <Pin size={12} style={{ color: "#F97316" }} />}
                     <h4 className="font-bold text-sm" style={{ color: "var(--text)" }}>{a.title}</h4>
                     <span className="text-[11px] px-1.5 py-0.5 rounded-md font-semibold" style={{ background: `${a.cohortColor ?? "#2563EB"}18`, color: a.cohortColor ?? "#2563EB" }}>
-                      {a.cohortName ?? "Whole school"}
+                      {a.cohortName ?? "Whole program"}
                     </span>
                   </div>
                   <p className="text-sm mt-1 whitespace-pre-wrap" style={{ color: "var(--text)" }}>{a.body}</p>

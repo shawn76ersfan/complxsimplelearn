@@ -31,6 +31,7 @@ import { cn, formatDate, getInitials } from "@/lib/utils";
 import { COHORT_STATUS_LABEL, CohortSummary, cohortWeek, formatCohortDate, useCohortScope } from "./CohortContext";
 import { InviteStudentPanel } from "./InviteStudentPanel";
 import { StaffManager } from "./StaffManager";
+import { US_TIMEZONES } from "@/lib/timezones";
 
 type Status = CohortSummary["cohort"]["status"];
 
@@ -254,6 +255,7 @@ function CohortForm({
   const [startDate, setStartDate] = useState(existing?.startDate ?? "");
   const [endDate, setEndDate] = useState(existing?.endDate ?? "");
   const [schedule, setSchedule] = useState(existing?.schedule ?? "");
+  const [scheduleTimezone, setScheduleTimezone] = useState(existing?.scheduleTimezone ?? "America/New_York");
   const [meetingUrl, setMeetingUrl] = useState(existing?.meetingUrl ?? "");
   const [color, setColor] = useState(existing?.color ?? PALETTE[0]!);
   const [status, setStatus] = useState<Status>(existing?.status ?? "upcoming");
@@ -272,6 +274,7 @@ function CohortForm({
           startDate,
           endDate,
           schedule,
+          scheduleTimezone,
           meetingUrl,
           color,
           status,
@@ -285,6 +288,7 @@ function CohortForm({
           startDate,
           endDate: endDate || undefined,
           schedule: schedule || undefined,
+          scheduleTimezone,
           meetingUrl: meetingUrl || undefined,
           color,
           status,
@@ -337,10 +341,17 @@ function CohortForm({
         <Field label="Meeting schedule">
           <input value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="Tue & Thu · 6–8pm ET" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
         </Field>
-        <Field label="Class link (Zoom / Meet)">
-          <input type="url" value={meetingUrl} onChange={(e) => setMeetingUrl(e.target.value)} placeholder="https://zoom.us/j/…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+        <Field label="Class timezone">
+          <select value={scheduleTimezone} onChange={(e) => setScheduleTimezone(e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle}>
+            {US_TIMEZONES.map((z) => (
+              <option key={z.id} value={z.id}>{z.label}</option>
+            ))}
+          </select>
         </Field>
       </div>
+      <Field label="Class link (Zoom / Meet)">
+        <input type="url" value={meetingUrl} onChange={(e) => setMeetingUrl(e.target.value)} placeholder="https://zoom.us/j/…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+      </Field>
 
       <Field label="Description">
         <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Who this cohort is for, what it covers, anything students should know." className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
@@ -698,7 +709,7 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
               ) : (
                 <div className="space-y-2">
                   <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    Removes the roster. Homework, recordings and events tagged to it become school-wide. Students keep their accounts.
+                    Removes the roster. Homework, recordings and events tagged to it become program-wide. Students keep their accounts.
                   </p>
                   <div className="flex gap-2">
                     <button onClick={deleteCohort} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: "#EF4444" }}>Yes, delete</button>
@@ -734,7 +745,7 @@ const STUDENT_RELEASE_REASONS = [
 const TEACHER_RELEASE_REASONS = [
   "No longer teaching this cohort",
   "Transferred to another cohort",
-  "Left the school",
+  "Left the program",
   "Other",
 ];
 

@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import { v } from "convex/values";
-import { R2 } from "@convex-dev/r2";
+import { R2, type R2Callbacks } from "@convex-dev/r2";
 import type { DataModel } from "./_generated/dataModel";
 import { getCurrentUser, requireStaff } from "./_lib/auth";
 import { activeStudentIds, notifyUsers } from "./lib/notify";
@@ -13,9 +13,15 @@ import {
   visibleToStudent,
 } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
-import { assertOwnedUpload, assertUploadAllowed, claimUpload } from "./lib/uploads";
+import {
+  assertOwnedUpload,
+  assertUploadAllowed,
+  claimUpload,
+  validateUpload,
+} from "./lib/uploads";
 
 export const r2 = new R2(components.r2);
+const callbacks: R2Callbacks = internal.videos;
 
 /**
  * Consumed by the `useUploadFile` hook on the client. The file uploads straight
@@ -24,17 +30,22 @@ export const r2 = new R2(components.r2);
  *
  * `checkUpload` gates who may request an upload URL (teachers only).
  */
-export const { generateUploadUrl, syncMetadata } = r2.clientApi<DataModel>({
-  checkUpload: async (ctx) => {
-    await requireStaff(ctx);
-    await assertUploadAllowed(ctx);
-  },
-  onSyncMetadata: async (ctx, { key }) => {
-    await claimUpload(ctx, r2, key, "video", {
-      maxBytes: 8 * 1024 * 1024 * 1024, // 8 GB class recordings
-    });
-  },
-});
+export const { generateUploadUrl, syncMetadata, onSyncMetadata } =
+  r2.clientApi<DataModel>({
+    checkUpload: async (ctx) => {
+      await requireStaff(ctx);
+      await assertUploadAllowed(ctx);
+    },
+    onUpload: async (ctx, _bucket, key) => {
+      await claimUpload(ctx, key, "video");
+    },
+    callbacks,
+    onSyncMetadata: async (ctx, { key }) => {
+      await validateUpload(ctx, r2, key, {
+        maxBytes: 8 * 1024 * 1024 * 1024, // 8 GB class recordings
+      });
+    },
+  });
 
 /**
  * Teacher-only: save video metadata after the file has finished uploading to R2.
