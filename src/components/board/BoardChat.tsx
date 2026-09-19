@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useUploadFile } from "@convex-dev/r2/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Code2, ImagePlus, Pin, Reply, Send, Trash2, X } from "lucide-react";
+import { Code2, ImagePlus, Pin, Reply, Send, ThumbsUp, Trash2, X } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { linkifyText } from "@/lib/linkify";
 import { isStaff } from "@/lib/roles";
@@ -15,6 +15,13 @@ function roleLabel(role: string): string {
   if (role === "admin") return "Lead";
   if (role === "teacher") return "Instructor";
   return "Student";
+}
+
+function typingLine(names: string[]): string {
+  if (names.length === 0) return "";
+  if (names.length === 1) return `${names[0]} is typing`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are typing`;
+  return `${names[0]} and ${names.length - 1} others are typing`;
 }
 
 function renderBoardBody(text: string) {
@@ -51,14 +58,29 @@ export function BoardChat({
 }) {
   const me = useQuery(api.users.getMyProfile);
   const [limit, setLimit] = useState(40);
+  const [now, setNow] = useState(() => Date.now());
   const page = useQuery(api.board.list, { cohortId, limit });
+  const boardReady = page !== undefined;
+  const typers = useQuery(
+    api.board.listTyping,
+    boardReady ? { cohortId, now } : "skip",
+  );
   const post = useMutation(api.board.post);
   const remove = useMutation(api.board.remove);
   const setPinned = useMutation(api.board.setPinned);
+  const toggleLike = useMutation(api.board.toggleLike);
+  const setTyping = useMutation(api.board.setTyping);
   const markBoardRead = useMutation(api.notifications.markTypeRead);
   const uploadFile = useUploadFile(api.board);
   const fileRef = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+  const pinAfterSend = useRef(false);
+  const lastBottomId = useRef<string | null>(null);
+  const prevLimit = useRef(limit);
+  const prevHeight = useRef(0);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSent = useRef(0);
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
@@ -70,13 +92,70 @@ export function BoardChat({
   const staff = isStaff(me?.role);
 
   useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    stickToBottom.current = true;
+    pinAfterSend.current = false;
+    lastBottomId.current = null;
+    prevLimit.current = 40;
+    prevHeight.current = 0;
+  }, [cohortId]);
+
+  useEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [page?.messages.length]);
+    if (!el || page === undefined) return;
+
+    const latestId = page.messages.at(-1)?._id ?? null;
+
+    if (limit !== prevLimit.current) {
+      const delta = el.scrollHeight - prevHeight.current;
+      if (delta > 0) el.scrollTop += delta;
+      prevLimit.current = limit;
+      prevHeight.current = el.scrollHeight;
+      lastBottomId.current = latestId;
+      return;
+    }
+
+    const shouldFollow =
+      pinAfterSend.current ||
+      lastBottomId.current === null ||
+      (stickToBottom.current && latestId !== lastBottomId.current);
+
+    lastBottomId.current = latestId;
+    prevHeight.current = el.scrollHeight;
+    if (shouldFollow) {
+      el.scrollTop = el.scrollHeight;
+      pinAfterSend.current = false;
+    }
+  }, [page, limit]);
 
   useEffect(() => {
     void markBoardRead({ type: "board_post" }).catch(() => undefined);
   }, [cohortId, markBoardRead]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (!boardReady) return;
+      void setTyping({ cohortId, typing: false }).catch(() => undefined);
+    };
+  }, [boardReady, cohortId, setTyping]);
+
+  function bumpTyping() {
+    if (!boardReady) return;
+    const t = Date.now();
+    if (t - lastTypingSent.current > 2000) {
+      lastTypingSent.current = t;
+      void setTyping({ cohortId, typing: true }).catch(() => undefined);
+    }
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      void setTyping({ cohortId, typing: false }).catch(() => undefined);
+    }, 2800);
+  }
 
   async function handleSend() {
     if (sending) return;
@@ -101,6 +180,9 @@ export function BoardChat({
         imageContentType = file.type;
         imageSize = file.size;
       }
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      pinAfterSend.current = true;
+      stickToBottom.current = true;
       await post({
         cohortId,
         body: body.trim(),
@@ -124,9 +206,101 @@ export function BoardChat({
     setBody((prev) => (prev ? `${prev}\n\`\`\`\n\n\`\`\`\n` : "```\n\n```"));
   }
 
+  function PinnedNote({
+    m,
+  }: {
+    m: {
+      _id: Id<"boardMessages">;
+      body: string;
+      imageUrl: string | null;
+      createdAt: number;
+      author: { name: string; imageUrl?: string };
+      likeCount: number;
+      likedByMe: boolean;
+    };
+  }) {
+    return (
+      <div
+        className="flex gap-2.5 items-start rounded-xl px-2.5 py-2"
+        style={{ background: "color-mix(in srgb, var(--surface) 70%, transparent)" }}
+      >
+        <div
+          className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 mt-0.5"
+          style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}
+        >
+          {m.author.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={m.author.imageUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            getInitials(m.author.name)
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] leading-tight">
+            <span className="font-semibold" style={{ color: "var(--text)" }}>{m.author.name}</span>
+            <span className="ml-1.5" style={{ color: "var(--text-muted)" }}>
+              {new Date(m.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </span>
+          </p>
+          {m.body ? (
+            <p className="text-[13px] leading-snug mt-0.5 line-clamp-3 whitespace-pre-wrap" style={{ color: "var(--text)" }}>
+              {linkifyText(m.body.replace(/```[\s\S]*?```/g, "[code]"))}
+            </p>
+          ) : null}
+          {m.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={m.imageUrl} alt="" className="mt-1.5 rounded-lg max-h-20 w-auto" />
+          )}
+          <div className="flex flex-wrap items-center gap-2.5 mt-1">
+            <button
+              type="button"
+              onClick={() =>
+                toggleLike({ messageId: m._id }).catch((err: unknown) =>
+                  toast.error(err instanceof Error ? err.message : "Could not react"),
+                )
+              }
+              className="inline-flex items-center gap-1 text-[11px]"
+              style={{ color: m.likedByMe ? cohortColor : "var(--text-muted)" }}
+            >
+              <ThumbsUp size={11} fill={m.likedByMe ? "currentColor" : "none"} />
+              {m.likeCount > 0 ? m.likeCount : null}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setReplyTo({
+                  _id: m._id,
+                  authorName: m.author.name,
+                  preview: m.body.trim().slice(0, 80) || (m.imageUrl ? "Photo" : ""),
+                })
+              }
+              className="text-[11px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Reply
+            </button>
+            {staff && (
+              <button
+                type="button"
+                onClick={() =>
+                  setPinned({ messageId: m._id, pinned: false }).catch((err: unknown) =>
+                    toast.error(err instanceof Error ? err.message : "Could not unpin"),
+                  )
+                }
+                className="text-[11px]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Unpin
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function MessageCard({
     m,
-    compact,
   }: {
     m: {
       _id: Id<"boardMessages">;
@@ -142,13 +316,14 @@ export function BoardChat({
         imageUrl?: string;
         role: string;
       };
+      likeCount: number;
+      likedByMe: boolean;
     };
-    compact?: boolean;
   }) {
     const mine = me?._id === m.authorId;
     const canDelete = mine || staff;
     return (
-      <article className={`flex gap-3 ${mine && !compact ? "flex-row-reverse" : ""}`}>
+      <article className={`flex gap-3 ${mine ? "flex-row-reverse" : ""}`}>
         <div
           className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
           style={{ background: "linear-gradient(135deg, var(--primary), var(--accent))" }}
@@ -160,9 +335,9 @@ export function BoardChat({
             getInitials(m.author.name)
           )}
         </div>
-        <div className={`max-w-[min(100%,28rem)] ${mine && !compact ? "items-end" : ""} flex flex-col gap-1`}>
+        <div className={`max-w-[min(100%,28rem)] ${mine ? "items-end" : ""} flex flex-col gap-1`}>
           <div
-            className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs ${mine && !compact ? "flex-row-reverse" : ""}`}
+            className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs ${mine ? "flex-row-reverse" : ""}`}
             style={{ color: "var(--text-muted)" }}
           >
             <span className="font-semibold" style={{ color: "var(--text)" }}>{m.author.name}</span>
@@ -199,7 +374,21 @@ export function BoardChat({
               />
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={`flex flex-wrap items-center gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+            <button
+              type="button"
+              onClick={() =>
+                toggleLike({ messageId: m._id }).catch((err: unknown) =>
+                  toast.error(err instanceof Error ? err.message : "Could not react"),
+                )
+              }
+              className="inline-flex items-center gap-1 text-[11px] hover:opacity-100"
+              style={{ color: m.likedByMe ? cohortColor : "var(--text-muted)", opacity: m.likedByMe || m.likeCount > 0 ? 1 : 0.6 }}
+              title={m.likedByMe ? "Remove thumbs up" : "Thumbs up"}
+            >
+              <ThumbsUp size={11} fill={m.likedByMe ? "currentColor" : "none"} />
+              {m.likeCount > 0 ? m.likeCount : "Like"}
+            </button>
             <button
               type="button"
               onClick={() => setReplyTo({ _id: m._id, authorName: m.author.name, preview: m.body.trim().slice(0, 80) || (m.imageUrl ? "Photo" : "") })}
@@ -240,6 +429,9 @@ export function BoardChat({
 
   const messages = page?.messages;
   const pinned = page?.pinned ?? [];
+  const pinnedIds = new Set(pinned.map((m) => m._id));
+  const thread = (messages ?? []).filter((m) => !pinnedIds.has(m._id));
+  const typerNames = (typers ?? []).map((t) => t.name);
 
   return (
     <div className="card overflow-hidden flex flex-col" style={{ minHeight: "28rem", maxHeight: "min(72vh, 760px)" }}>
@@ -253,12 +445,39 @@ export function BoardChat({
         </span>
       </div>
 
-      <div ref={scroller} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      {pinned.length > 0 && (
+        <div
+          className="flex-shrink-0 px-3 py-2 space-y-1.5"
+          style={{
+            borderBottom: "1px solid var(--border)",
+            background: `color-mix(in srgb, ${cohortColor} 6%, var(--surface))`,
+            maxHeight: "30%",
+            overflowY: "auto",
+          }}
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] px-1 inline-flex items-center gap-1" style={{ color: cohortColor }}>
+            <Pin size={10} /> Pinned
+          </p>
+          {pinned.map((m) => (
+            <PinnedNote key={`pin-${m._id}`} m={m} />
+          ))}
+        </div>
+      )}
+
+      <div
+        ref={scroller}
+        onScroll={() => {
+          const el = scroller.current;
+          if (!el) return;
+          stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+        }}
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4"
+      >
         {messages === undefined ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: "var(--surface-2)" }} />)}
           </div>
-        ) : messages.length === 0 && pinned.length === 0 ? (
+        ) : thread.length === 0 && pinned.length === 0 ? (
           <div className="notebook-sheet card p-8 text-center">
             <p className="font-serif font-bold" style={{ color: "var(--text)" }}>Blank board</p>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
@@ -279,16 +498,25 @@ export function BoardChat({
                 </button>
               </div>
             )}
-            {pinned.length > 0 && (
-              <div className="space-y-3 pb-2" style={{ borderBottom: "1px dashed var(--border)" }}>
-                {pinned.map((m) => (
-                  <MessageCard key={`pin-${m._id}`} m={m} compact />
-                ))}
+            {thread.length === 0 && pinned.length > 0 ? (
+              <p className="text-sm text-center py-6" style={{ color: "var(--text-muted)" }}>
+                Everything so far is pinned above. New posts will show up here.
+              </p>
+            ) : (
+              thread.map((m) => (
+                <MessageCard key={m._id} m={m} />
+              ))
+            )}
+            {typerNames.length > 0 && (
+              <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                <span className="inline-flex gap-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: cohortColor, animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: cohortColor, animationDelay: "120ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: cohortColor, animationDelay: "240ms" }} />
+                </span>
+                {typingLine(typerNames)}
               </div>
             )}
-            {messages.map((m) => (
-              <MessageCard key={m._id} m={m} />
-            ))}
           </>
         )}
       </div>
@@ -336,7 +564,10 @@ export function BoardChat({
           <textarea
             rows={2}
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => {
+              setBody(e.target.value);
+              if (e.target.value.trim()) bumpTyping();
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

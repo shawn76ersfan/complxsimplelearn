@@ -451,6 +451,22 @@ export default defineSchema({
     .index("by_author_created", ["authorId", "createdAt"])
     .index("by_cohort_pinned", ["cohortId", "pinned", "createdAt"]),
 
+  boardTyping: defineTable({
+    cohortId: v.id("cohorts"),
+    userId: v.id("users"),
+    updatedAt: v.number(),
+  })
+    .index("by_cohort_user", ["cohortId", "userId"])
+    .index("by_cohort", ["cohortId"]),
+
+  boardReactions: defineTable({
+    messageId: v.id("boardMessages"),
+    userId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_message", ["messageId"])
+    .index("by_message_user", ["messageId", "userId"]),
+
   // Who uploaded an R2 object. Keys are claimed at sync time so later
   // posts/extracts can reject files the caller does not own.
   uploadedObjects: defineTable({

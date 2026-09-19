@@ -62,11 +62,14 @@ const messageReturn = v.object({
   parentId: v.optional(v.id("boardMessages")),
   replyTo: v.union(replyToReturn, v.null()),
   author: authorReturn,
+  likeCount: v.number(),
+  likedByMe: v.boolean(),
 });
 
 async function hydrateMessages(
   ctx: QueryCtx,
   rows: Doc<"boardMessages">[],
+  viewerId: Id<"users"> | null,
 ): Promise<
   Array<{
     _id: Id<"boardMessages">;
@@ -87,6 +90,8 @@ async function hydrateMessages(
       imageUrl?: string;
       role: "admin" | "teacher" | "student";
     };
+    likeCount: number;
+    likedByMe: boolean;
   }>
 > {
   const messages = [];
@@ -119,6 +124,10 @@ async function hydrateMessages(
         replyTo = { _id: row.parentId, authorName: "Classmate", preview: "Original post removed" };
       }
     }
+    const likes = await ctx.db
+      .query("boardReactions")
+      .withIndex("by_message", (q) => q.eq("messageId", row._id))
+      .take(200);
     messages.push({
       _id: row._id,
       cohortId: row.cohortId,
@@ -138,6 +147,8 @@ async function hydrateMessages(
         imageUrl: author.imageUrl,
         role: author.role,
       },
+      likeCount: likes.length,
+      likedByMe: viewerId ? likes.some((like) => like.userId === viewerId) : false,
     });
   }
   return messages;
@@ -228,8 +239,8 @@ export const list = query({
     ).reverse();
 
     return {
-      pinned: await hydrateMessages(ctx, pinnedRows),
-      messages: await hydrateMessages(ctx, page.reverse()),
+      pinned: await hydrateMessages(ctx, pinnedRows, me._id),
+      messages: await hydrateMessages(ctx, page.reverse(), me._id),
       hasMore,
     };
   },
@@ -332,6 +343,14 @@ export const post = mutation({
     const recipients = new Set<Id<"users">>([...students, ...staff]);
     if (parentAuthorId) recipients.add(parentAuthorId);
 
+    const typingRow = await ctx.db
+      .query("boardTyping")
+      .withIndex("by_cohort_user", (q) =>
+        q.eq("cohortId", args.cohortId).eq("userId", me._id),
+      )
+      .unique();
+    if (typingRow) await ctx.db.delete(typingRow._id);
+
     await notifyUsers(ctx, recipients, {
       type: "board_post",
       title: parentId
@@ -365,6 +384,13 @@ export const remove = mutation({
         // ignore orphan cleanup
       }
     }
+    const likes = await ctx.db
+      .query("boardReactions")
+      .withIndex("by_message", (q) => q.eq("messageId", args.messageId))
+      .take(200);
+    for (const like of likes) {
+      await ctx.db.delete(like._id);
+    }
     await ctx.db.delete(args.messageId);
     return null;
   },
@@ -397,6 +423,93 @@ export const setPinned = mutation({
 
     await ctx.db.patch(args.messageId, { pinned: args.pinned });
     return null;
+  },
+});
+
+export const toggleLike = mutation({
+  args: { messageId: v.id("boardMessages") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const me = await getCurrentUser(ctx);
+    const row = await ctx.db.get(args.messageId);
+    if (!row) throw new Error("Post not found");
+    await assertBoardAccess(ctx, me, row.cohortId);
+
+    const existing = await ctx.db
+      .query("boardReactions")
+      .withIndex("by_message_user", (q) =>
+        q.eq("messageId", args.messageId).eq("userId", me._id),
+      )
+      .unique();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    } else {
+      await ctx.db.insert("boardReactions", {
+        messageId: args.messageId,
+        userId: me._id,
+        createdAt: Date.now(),
+      });
+    }
+    return null;
+  },
+});
+
+export const setTyping = mutation({
+  args: {
+    cohortId: v.id("cohorts"),
+    typing: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const me = await getCurrentUser(ctx);
+    await assertBoardAccess(ctx, me, args.cohortId);
+    const existing = await ctx.db
+      .query("boardTyping")
+      .withIndex("by_cohort_user", (q) =>
+        q.eq("cohortId", args.cohortId).eq("userId", me._id),
+      )
+      .unique();
+    if (!args.typing) {
+      if (existing) await ctx.db.delete(existing._id);
+      return null;
+    }
+    if (existing) {
+      await ctx.db.patch(existing._id, { updatedAt: Date.now() });
+    } else {
+      await ctx.db.insert("boardTyping", {
+        cohortId: args.cohortId,
+        userId: me._id,
+        updatedAt: Date.now(),
+      });
+    }
+    return null;
+  },
+});
+
+export const listTyping = query({
+  args: {
+    cohortId: v.id("cohorts"),
+    now: v.number(),
+  },
+  returns: v.array(v.object({ userId: v.id("users"), name: v.string() })),
+  handler: async (ctx, args) => {
+    const me = await getCurrentUserOrNull(ctx);
+    if (!me) return [];
+    if (!(await canAccessBoard(ctx, me, args.cohortId))) return [];
+
+    const cutoff = args.now - 5000;
+    const rows = await ctx.db
+      .query("boardTyping")
+      .withIndex("by_cohort", (q) => q.eq("cohortId", args.cohortId))
+      .collect();
+    const out = [];
+    for (const row of rows) {
+      if (row.userId === me._id || row.updatedAt < cutoff) continue;
+      const user = await ctx.db.get(row.userId);
+      if (!user) continue;
+      out.push({ userId: user._id, name: rosterName(user).split(" ")[0] ?? rosterName(user) });
+    }
+    return out;
   },
 });
 
