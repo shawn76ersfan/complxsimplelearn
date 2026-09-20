@@ -355,6 +355,18 @@ export function visibleToStudent<T extends { cohortId?: Id<"cohorts"> }>(
   return rows.filter((r) => r.cohortId === undefined || mine.has(r.cohortId));
 }
 
+/**
+ * Homework is cohort-only. School-wide / unscoped rows are hidden so a
+ * future cohort does not see the current class's assignments.
+ */
+export function assignedToStudentCohorts<T extends { cohortId?: Id<"cohorts"> }>(
+  rows: T[],
+  myCohorts: Id<"cohorts">[],
+): T[] {
+  const mine = new Set(myCohorts);
+  return rows.filter((r) => r.cohortId !== undefined && mine.has(r.cohortId));
+}
+
 /** Filter cohort-tagged rows to a staff member's scope and optional switcher filter. */
 export function visibleToStaff<T extends { cohortId?: Id<"cohorts"> }>(
   rows: T[],

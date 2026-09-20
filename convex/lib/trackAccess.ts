@@ -10,21 +10,12 @@ export function isStaffUser(user: Doc<"users">): boolean {
   return isStaffRole(user.role) || isStaffEmail(user.email);
 }
 
-/** Track ids currently released to this student (cohort and/or school-wide). */
+/** Track ids opened for a cohort this student is actually in. */
 export async function openTrackIdSet(
   ctx: Ctx,
   userId: Id<"users">,
 ): Promise<Set<Id<"tracks">>> {
   const open = new Set<Id<"tracks">>();
-
-  const schoolWide = await ctx.db
-    .query("trackReleases")
-    .withIndex("by_cohort", (q) => q.eq("cohortId", undefined))
-    .collect();
-  for (const row of schoolWide) {
-    if (row.open) open.add(row.trackId);
-  }
-
   const cohortIds = await cohortIdsForUser(ctx, userId);
   for (const cohortId of cohortIds) {
     const rows = await ctx.db

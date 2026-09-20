@@ -1,7 +1,7 @@
 import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getStaffOrNull } from "./_lib/auth";
-import { canAccessStudent, resolveCohortFilter, visibleStudents, visibleToStaff } from "./lib/cohortAccess";
+import { assignedToStudentCohorts, canAccessStudent, cohortIdsForUser, resolveCohortFilter, visibleStudents, visibleToStaff } from "./lib/cohortAccess";
 import {
   homeworkAverageFromSubmissions,
   testAverageForAttempts,
@@ -166,7 +166,11 @@ export const getLearningAnalytics = query({
         .withIndex("by_student", (q) => q.eq("studentId", student._id))
         .collect();
       const submittedIds = new Set(submissions.map((s) => s.assignmentId));
-      const overdue = assignments.filter(
+      const theirHomework = assignedToStudentCohorts(
+        assignments,
+        await cohortIdsForUser(ctx, student._id),
+      );
+      const overdue = theirHomework.filter(
         (a) => a.dueDate < args.now && !submittedIds.has(a._id),
       ).length;
 
@@ -303,20 +307,25 @@ export const getLearningAnalytics = query({
       .slice(0, 8);
 
     const homeworkLag = [];
-    for (const assignment of assignments.filter((a) => a.dueDate < args.now)) {
+    for (const assignment of assignments.filter((a) => a.dueDate < args.now && a.cohortId)) {
+      const roster = [];
+      for (const s of students) {
+        const membership = await cohortIdsForUser(ctx, s._id);
+        if (assignment.cohortId && membership.includes(assignment.cohortId)) roster.push(s);
+      }
       const subs = await ctx.db
         .query("assignmentSubmissions")
         .withIndex("by_assignment", (q) => q.eq("assignmentId", assignment._id))
         .collect();
       const submitted = new Set(subs.map((s) => s.studentId));
-      const missing = students.filter((s) => !submitted.has(s._id)).length;
+      const missing = roster.filter((s) => !submitted.has(s._id)).length;
       if (missing === 0) continue;
       homeworkLag.push({
         assignmentId: assignment._id,
         title: assignment.title,
         dueDate: assignment.dueDate,
         missing,
-        roster: students.length,
+        roster: roster.length,
       });
     }
     homeworkLag.sort((a, b) => b.missing - a.missing);
@@ -423,7 +432,10 @@ export const getStudentInsight = query({
       .order("desc")
       .take(1);
 
-    const assignments = await ctx.db.query("assignments").collect();
+    const assignments = assignedToStudentCohorts(
+      await ctx.db.query("assignments").collect(),
+      await cohortIdsForUser(ctx, args.studentId),
+    );
     const submissions = await ctx.db
       .query("assignmentSubmissions")
       .withIndex("by_student", (q) => q.eq("studentId", args.studentId))

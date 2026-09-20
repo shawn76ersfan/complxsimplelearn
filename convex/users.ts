@@ -312,6 +312,13 @@ export const listStaff = query({
       role: roleValidator,
       createdAt: v.number(),
       cohortCount: v.number(),
+      cohorts: v.array(
+        v.object({
+          _id: v.id("cohorts"),
+          name: v.string(),
+          color: v.string(),
+        }),
+      ),
     }),
   ),
   handler: async (ctx) => {
@@ -325,6 +332,14 @@ export const listStaff = query({
         .query("cohortMembers")
         .withIndex("by_user", (q) => q.eq("userId", u._id))
         .collect();
+      const teaching = [];
+      for (const m of memberships) {
+        if (m.role !== "teacher") continue;
+        const cohort = await ctx.db.get(m.cohortId);
+        if (cohort && cohort.status !== "archived") {
+          teaching.push({ _id: cohort._id, name: cohort.name, color: cohort.color });
+        }
+      }
       out.push({
         _id: u._id,
         name: u.name,
@@ -332,7 +347,8 @@ export const listStaff = query({
         imageUrl: u.imageUrl,
         role: u.role,
         createdAt: u.createdAt,
-        cohortCount: memberships.filter((m) => m.role === "teacher").length,
+        cohortCount: teaching.length,
+        cohorts: teaching,
       });
     }
     return out.sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === "admin" ? -1 : 1));
@@ -345,7 +361,11 @@ export const listStaff = query({
  * cohorts they were teaching. Admins cannot demote themselves.
  */
 export const setRole = mutation({
-  args: { userId: v.id("users"), role: roleValidator },
+  args: {
+    userId: v.id("users"),
+    role: roleValidator,
+    cohortId: v.optional(v.id("cohorts")),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
@@ -354,7 +374,7 @@ export const setRole = mutation({
     }
     const target = await ctx.db.get(args.userId);
     if (!target) throw new Error("User not found");
-    if (target.role === args.role) return null;
+    if (target.role === args.role && !args.cohortId) return null;
 
     const envRole = envRoleForEmail(target.email);
     if (envRole === "admin" && args.role !== "admin") {
@@ -366,14 +386,19 @@ export const setRole = mutation({
       .withIndex("by_user", (q) => q.eq("userId", target._id))
       .collect();
     if (args.role === "student") {
-      // Leaving staff: drop teaching memberships.
       for (const m of memberships) if (m.role === "teacher") await ctx.db.delete(m._id);
     } else if (target.role === "student") {
-      // Becoming staff: drop student memberships.
       for (const m of memberships) if (m.role === "student") await ctx.db.delete(m._id);
     }
 
-    await ctx.db.patch(target._id, { role: args.role });
+    if (target.role !== args.role) {
+      await ctx.db.patch(target._id, { role: args.role });
+    }
+
+    if (args.cohortId) {
+      const seat = args.role === "student" ? "student" : "teacher";
+      await addMember(ctx, args.cohortId, target._id, seat, admin._id);
+    }
     return null;
   },
 });

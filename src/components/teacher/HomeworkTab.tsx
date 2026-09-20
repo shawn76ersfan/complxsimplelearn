@@ -38,7 +38,7 @@ const inputStyle = {
 function CreateForm({ onClose }: { onClose: () => void }) {
   const tracks = useQuery(api.curriculumAdmin.listTracks);
   const create = useMutation(api.assignments.create);
-  const { cohortId: scopeCohortId, isAdmin, cohorts } = useCohortScope();
+  const { cohortId: scopeCohortId, cohorts } = useCohortScope();
   const [cohortId, setCohortId] = useState<Id<"cohorts"> | undefined>(scopeCohortId);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -47,7 +47,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
   const [requiresSubmission, setRequiresSubmission] = useState(true);
   const [allowFileUpload, setAllowFileUpload] = useState(true);
   const [saving, setSaving] = useState(false);
-  const needsCohort = !isAdmin && !cohortId;
+  const needsCohort = !cohortId;
 
   async function handleCreate() {
     if (!title.trim() || !dueDate) return;
@@ -68,7 +68,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         cohortId,
       });
       const target = cohorts?.find((c) => c.cohort._id === cohortId)?.cohort.name;
-      toast.success(target ? `Assigned to ${target}` : "Assignment created for the whole program");
+      toast.success(target ? `Assigned to ${target}` : "Assignment created");
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create");
@@ -80,7 +80,13 @@ function CreateForm({ onClose }: { onClose: () => void }) {
   return (
     <div className="card p-5 space-y-4">
       <h3 className="font-bold" style={{ color: "var(--text)" }}>New Assignment</h3>
-      <CohortPicker value={cohortId} onChange={setCohortId} label="Assign to" required />
+      <CohortPicker
+        value={cohortId}
+        onChange={setCohortId}
+        label="Assign to"
+        required
+        allowSchoolWide={false}
+      />
       <div>
         <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-muted)" }}>Title *</label>
         <input

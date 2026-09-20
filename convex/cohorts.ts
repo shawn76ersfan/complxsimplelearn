@@ -393,6 +393,112 @@ export const addStudents = mutation({
   },
 });
 
+/** Move a student or instructor from one cohort roster to another. */
+export const transferMember = mutation({
+  args: {
+    userId: v.id("users"),
+    fromCohortId: v.id("cohorts"),
+    toCohortId: v.id("cohorts"),
+    role: v.union(v.literal("student"), v.literal("teacher")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (args.fromCohortId === args.toCohortId) {
+      throw new Error("They're already in that cohort");
+    }
+    const staff = await requireStaff(ctx);
+    if (args.role === "teacher" && staff.role !== "admin") {
+      throw new Error("Only admins can transfer instructors");
+    }
+    await assertCohortAccess(ctx, staff, args.fromCohortId);
+    const dest = await assertCohortAccess(ctx, staff, args.toCohortId);
+    if (dest.status === "archived") {
+      throw new Error("Can't transfer into an archived cohort");
+    }
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("Person not found");
+    if (args.role === "student" && user.role !== "student") {
+      throw new Error("Only student accounts can transfer on the student roster");
+    }
+    if (args.role === "teacher" && !isStaffRole(user.role)) {
+      throw new Error("Change their role to instructor first");
+    }
+
+    const fromRow = await ctx.db
+      .query("cohortMembers")
+      .withIndex("by_cohort_user", (q) =>
+        q.eq("cohortId", args.fromCohortId).eq("userId", args.userId),
+      )
+      .unique();
+    if (!fromRow || fromRow.role !== args.role) {
+      throw new Error("They're not on that roster");
+    }
+
+    await addMember(ctx, args.toCohortId, args.userId, args.role, staff._id);
+    await releaseMember(ctx, {
+      cohortId: args.fromCohortId,
+      userId: args.userId,
+      role: args.role,
+      reason: `Transferred to ${dest.name}`,
+      removedBy: staff._id,
+    });
+
+    const from = await ctx.db.get(args.fromCohortId);
+    await notifyUsers(ctx, [args.userId], {
+      type: "announcement",
+      title:
+        args.role === "teacher"
+          ? `You're now teaching ${dest.name}`
+          : `You've been moved to ${dest.name}`,
+      body: from
+        ? `You left ${from.name}. ${dest.schedule ? `Class meets ${dest.schedule}.` : "Your Board, homework, and tracks now follow this class."}`
+        : dest.schedule
+          ? `Class meets ${dest.schedule}.`
+          : "Your Board, homework, and tracks now follow this class.",
+      href: args.role === "teacher" ? "/teacher/dashboard" : "/dashboard",
+      actorId: staff._id,
+    });
+    return null;
+  },
+});
+
+export const membershipsForUser = query({
+  args: { userId: v.id("users") },
+  returns: v.array(
+    v.object({
+      cohortId: v.id("cohorts"),
+      name: v.string(),
+      color: v.string(),
+      status: cohortStatus,
+      role: v.union(v.literal("student"), v.literal("teacher")),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const staff = await getCurrentUserOrNull(ctx);
+    if (!staff || !isStaffRole(staff.role)) return [];
+    const scope = await teachingScope(ctx, staff);
+    const rows = await ctx.db
+      .query("cohortMembers")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    const out = [];
+    for (const row of rows) {
+      if (!scopeIncludes(scope, row.cohortId)) continue;
+      const cohort = await ctx.db.get(row.cohortId);
+      if (!cohort || cohort.status === "archived") continue;
+      out.push({
+        cohortId: cohort._id,
+        name: cohort.name,
+        color: cohort.color,
+        status: cohort.status,
+        role: row.role,
+      });
+    }
+    return out;
+  },
+});
+
 export const removeStudent = mutation({
   args: {
     cohortId: v.id("cohorts"),

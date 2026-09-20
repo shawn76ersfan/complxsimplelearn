@@ -909,35 +909,9 @@ async function syncCurriculum(
       lessonChanges += result.changes;
     }
 
-    for (const homework of definition.homework) {
-      const existingAssignment = await ctx.db
-        .query("assignments")
-        .withIndex("by_title", (q) => q.eq("title", homework.title))
-        .unique();
-
-      if (!existingAssignment) {
-        await ctx.db.insert("assignments", {
-          title: homework.title,
-          description: homework.description,
-          trackId: track._id,
-          dueDate: Date.now() + homework.dueInDays * 24 * 60 * 60 * 1000,
-          createdBy: teacherId,
-          assignedToAll: true,
-        });
-        assignmentChanges += 1;
-      } else if (
-        existingAssignment.description !== homework.description ||
-        existingAssignment.trackId !== track._id ||
-        !existingAssignment.assignedToAll
-      ) {
-        await ctx.db.patch(existingAssignment._id, {
-          description: homework.description,
-          trackId: track._id,
-          assignedToAll: true,
-        });
-        assignmentChanges += 1;
-      }
-    }
+    // Catalog homework is a teacher template only. Live assignments are
+    // created per cohort in Teacher Hub so upcoming classes do not inherit
+    // the current cohort's due dates.
   }
 
   const supplementaryOrders: Record<string, number> = {

@@ -9,6 +9,7 @@
  */
 
 import type * as _lib_auth from "../_lib/auth.js";
+import type * as accountDeletion from "../accountDeletion.js";
 import type * as analytics from "../analytics.js";
 import type * as announcements from "../announcements.js";
 import type * as assignments from "../assignments.js";
@@ -28,6 +29,7 @@ import type * as emailMutations from "../emailMutations.js";
 import type * as embeddings from "../embeddings.js";
 import type * as enrollments from "../enrollments.js";
 import type * as feedback from "../feedback.js";
+import type * as http from "../http.js";
 import type * as infoSessionActions from "../infoSessionActions.js";
 import type * as infoSessions from "../infoSessions.js";
 import type * as init from "../init.js";
@@ -42,6 +44,7 @@ import type * as lib_llmChat from "../lib/llmChat.js";
 import type * as lib_names from "../lib/names.js";
 import type * as lib_notify from "../lib/notify.js";
 import type * as lib_platformFacts from "../lib/platformFacts.js";
+import type * as lib_purgeUser from "../lib/purgeUser.js";
 import type * as lib_resumeRubrics from "../lib/resumeRubrics.js";
 import type * as lib_resumeScore from "../lib/resumeScore.js";
 import type * as lib_roles from "../lib/roles.js";
@@ -73,6 +76,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "_lib/auth": typeof _lib_auth;
+  accountDeletion: typeof accountDeletion;
   analytics: typeof analytics;
   announcements: typeof announcements;
   assignments: typeof assignments;
@@ -92,6 +96,7 @@ declare const fullApi: ApiFromModules<{
   embeddings: typeof embeddings;
   enrollments: typeof enrollments;
   feedback: typeof feedback;
+  http: typeof http;
   infoSessionActions: typeof infoSessionActions;
   infoSessions: typeof infoSessions;
   init: typeof init;
@@ -106,6 +111,7 @@ declare const fullApi: ApiFromModules<{
   "lib/names": typeof lib_names;
   "lib/notify": typeof lib_notify;
   "lib/platformFacts": typeof lib_platformFacts;
+  "lib/purgeUser": typeof lib_purgeUser;
   "lib/resumeRubrics": typeof lib_resumeRubrics;
   "lib/resumeScore": typeof lib_resumeScore;
   "lib/roles": typeof lib_roles;

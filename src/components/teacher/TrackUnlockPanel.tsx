@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -10,23 +10,22 @@ import { useCohortScope } from "./CohortContext";
 import { TrackIcon } from "@/lib/trackIcons";
 
 export function TrackUnlockPanel() {
-  const { cohortId, isAdmin, selected } = useCohortScope();
+  const { cohortId, selected } = useCohortScope();
   const tracks = useQuery(api.trackReleases.listForHub, { cohortId });
   const setOpen = useMutation(api.trackReleases.setOpen);
+  const confine = useMutation(api.trackReleases.confineSchoolWideOpens);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const schoolWide = isAdmin && !cohortId;
-  const needsCohort = !isAdmin && !cohortId;
+  useEffect(() => {
+    void confine().catch(() => undefined);
+  }, [confine]);
 
   async function toggle(trackId: Id<"tracks">, open: boolean) {
+    if (!cohortId) return;
     setBusy(String(trackId));
     try {
-      await setOpen({
-        trackId,
-        open,
-        cohortId: schoolWide ? undefined : cohortId,
-      });
-      toast.success(open ? "Track opened for students" : "Track closed");
+      await setOpen({ trackId, open, cohortId });
+      toast.success(open ? "Track opened for this cohort" : "Track closed for this cohort");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not update track");
     } finally {
@@ -34,10 +33,10 @@ export function TrackUnlockPanel() {
     }
   }
 
-  if (needsCohort) {
+  if (!cohortId) {
     return (
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        Pick a cohort above, then open one learning track at a time so students cannot rush the whole catalog.
+        Pick a cohort above, then open tracks for that class only. Upcoming cohorts will not see this class&apos;s quizzes or tests.
       </p>
     );
   }
@@ -45,9 +44,8 @@ export function TrackUnlockPanel() {
   return (
     <div className="space-y-4">
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        {schoolWide
-          ? "Opening a track here releases it to every student in the program. Use a specific cohort in the switcher to pace one class at a time."
-          : `Students in ${selected?.cohort.name ?? "this cohort"} only see tracks you open. Curriculum publish in CMS is separate — this is class pacing.`}
+        Students in {selected?.cohort.name ?? "this cohort"} only see tracks you open here — including quizzes and Mandatory Work.
+        Curriculum publish in CMS is separate; this is class pacing.
       </p>
 
       {!tracks ? (
@@ -61,8 +59,7 @@ export function TrackUnlockPanel() {
       ) : (
         <div className="card overflow-hidden">
           {tracks.map((track, i) => {
-            const open = schoolWide ? track.schoolWideOpen : track.cohortOpen;
-            const extra = !schoolWide && track.schoolWideOpen;
+            const open = track.cohortOpen;
             return (
               <div
                 key={track._id}
@@ -78,8 +75,7 @@ export function TrackUnlockPanel() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold truncate" style={{ color: "var(--text)" }}>{track.name}</p>
                   <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    {open ? "Open for students" : "Closed"}
-                    {extra ? " · also open program-wide" : ""}
+                    {open ? "Open for this cohort" : "Closed for this cohort"}
                   </p>
                 </div>
                 <button

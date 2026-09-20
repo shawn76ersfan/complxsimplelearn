@@ -7,7 +7,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { NotificationBell } from "./NotificationBell";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { BookOpen, BookMarked, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare, Users, Pin } from "lucide-react";
+import { BookOpen, BookMarked, ClipboardList, LayoutDashboard, GraduationCap, Menu, X, Bot, Video, MessageSquare, Users, Pin } from "lucide-react";
 import { useState } from "react";
 import { isStaff } from "@/lib/roles";
 
@@ -26,6 +26,7 @@ export function Navbar() {
     ...(!isTeacher ? [{ href: "/cohort", label: "My Class", icon: Users }] : []),
     { href: "/board", label: "Board", icon: Pin, badge: boardBadge },
     { href: "/learn",     label: "Learn",     icon: BookOpen },
+    ...(!isTeacher ? [{ href: "/homework", label: "Homework", icon: ClipboardList }] : []),
     { href: "/videos",    label: "Videos",    icon: Video },
     ...(!isTeacher
       ? [{ href: "/feedback", label: "Messages", icon: MessageSquare, badge: unreadCount }]

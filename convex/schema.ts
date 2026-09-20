@@ -155,8 +155,8 @@ export default defineSchema({
     .index("by_slug", ["slug"])
     .index("by_published", ["published"]),
 
-  // Instructors open a published track for a cohort (or school-wide when
-  // cohortId is unset). Unpublished CMS drafts stay hidden regardless.
+  // Instructors open a published track for one cohort. Unpublished CMS
+  // drafts stay hidden. Unset cohortId is legacy and ignored for students.
   trackReleases: defineTable({
     trackId: v.id("tracks"),
     cohortId: v.optional(v.id("cohorts")),
@@ -313,7 +313,7 @@ export default defineSchema({
     // When false/undefined, status is inferred from track lesson attempts (legacy).
     requiresSubmission: v.optional(v.boolean()),
     allowFileUpload: v.optional(v.boolean()),
-    cohortId: v.optional(v.id("cohorts")), // undefined = every cohort
+    cohortId: v.optional(v.id("cohorts")), // required for new posts; unset = legacy, hidden from students
   })
     .index("by_created_by", ["createdBy"])
     .index("by_title", ["title"])

@@ -2,12 +2,13 @@ import { action, internalMutation, internalQuery } from "./_generated/server";
 import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { chatComplete, type ChatMessage } from "./lib/llmChat";
 import { PLATFORM_FACTS } from "./lib/platformFacts";
 import { requireActiveProfile } from "./lib/actionAuth";
 import { classifyStarkHelp } from "./lib/starkTopics";
 import { timezoneLabel } from "./lib/timezones";
+import { assignedToStudentCohorts, cohortIdsForUser } from "./lib/cohortAccess";
 
 const EMBEDDING_MODEL = "jina-embeddings-v3";
 const EMBEDDING_URL = "https://api.jina.ai/v1/embeddings";
@@ -56,6 +57,22 @@ const BANNED_TERMS: string[] = [
 
 const REFUSAL_MESSAGE =
   "I can't help with that. Let's keep things respectful and on-topic — I'm happy to help you with your coursework or any tech question instead!";
+
+/** One-line cohort summary for Stark's prompt. Zoom URL is left out on purpose. */
+function describeCohort(cohort: Doc<"cohorts">): string {
+  const code = cohort.code ? ` [${cohort.code}]` : "";
+  const parts = [
+    `status: ${cohort.status}`,
+    `starts ${cohort.startDate}`,
+    cohort.endDate ? `ends ${cohort.endDate}` : "end date TBA",
+    cohort.schedule
+      ? `meets ${cohort.schedule} (${timezoneLabel(cohort.scheduleTimezone ?? "America/New_York")})`
+      : "meeting schedule TBA",
+    cohort.meetingUrl ? "Zoom link is on the My Class page" : undefined,
+    cohort.description ? `focus: ${cohort.description}` : undefined,
+  ].filter((p): p is string => p !== undefined);
+  return `- ${cohort.name}${code} — ${parts.join("; ")}`;
+}
 
 const POLITICS_REFUSAL_MESSAGE =
   "I don't discuss politics, political figures, or politically charged topics here — ComplxSimple is a learning space for everyone. I'm happy to help with your coursework, tech questions, study help, or anything else program-related!";
@@ -459,7 +476,18 @@ export const getStudentChatContext = internalQuery({
       if (weak.length >= 4) break;
     }
 
-    const assignments = await ctx.db.query("assignments").collect();
+    const myCohortIds = await cohortIdsForUser(ctx, args.userId);
+    const myCohorts: string[] = [];
+    for (const cohortId of myCohortIds) {
+      const cohort = await ctx.db.get(cohortId);
+      if (!cohort || cohort.status === "archived") continue;
+      myCohorts.push(describeCohort(cohort));
+    }
+
+    const assignments = assignedToStudentCohorts(
+      await ctx.db.query("assignments").collect(),
+      myCohortIds,
+    );
     const submissions = await ctx.db
       .query("assignmentSubmissions")
       .withIndex("by_student", (q) => q.eq("studentId", args.userId))
@@ -475,6 +503,11 @@ export const getStudentChatContext = internalQuery({
       `Name: ${user.firstName ?? user.name}`,
       `State: ${user.state ?? "unknown"}`,
       `Timezone: ${user.timezone ? timezoneLabel(user.timezone) : "not set"} (${user.timezone ?? "n/a"})`,
+      "",
+      "Their cohort (class dates and meeting schedule):",
+      myCohorts.length > 0
+        ? myCohorts.join("\n")
+        : "- Not enrolled in a cohort yet. Suggest they ask Cassandra about the next start date.",
       "",
       "Recent lessons they struggled with (teach the concept; never give quiz answers):",
       weak.length > 0 ? weak.join("\n") : "- None recorded.",
@@ -513,25 +546,25 @@ export const getPlatformSnapshot = internalQuery({
       );
     }
 
-    const assignments = await ctx.db.query("assignments").collect();
-    const homework =
-      assignments.length > 0
-        ? assignments
-            .map((assignment) => {
-              const due = new Date(assignment.dueDate).toISOString().slice(0, 10);
-              return `- ${assignment.title} (due ${due})${assignment.description ? `: ${assignment.description}` : ""}`;
-            })
-            .join("\n")
-        : "- No homework assignments are posted right now.";
+    const cohorts = await ctx.db.query("cohorts").collect();
+    const schedule = cohorts
+      .filter((c) => c.status === "upcoming" || c.status === "active")
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .map(describeCohort);
 
     return [
       PLATFORM_FACTS,
+      "",
+      "COHORT SCHEDULE (real cohorts right now; dates are YYYY-MM-DD):",
+      schedule.length > 0
+        ? schedule.join("\n")
+        : "No upcoming or active cohorts are scheduled yet. Next cohort date is TBA.",
       "",
       "LIVE LEARNING CATALOG (published tracks and lessons right now):",
       catalog.length > 0 ? catalog.join("\n") : "No published tracks yet.",
       "",
       "CURRENT HOMEWORK:",
-      homework,
+      "Homework is assigned per cohort. Use STUDENT CONTEXT for this student's due work. Do not invent assignments for another class.",
     ].join("\n");
   },
 });

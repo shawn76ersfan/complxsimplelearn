@@ -19,7 +19,9 @@ import { CohortScopeProvider, useCohortScope } from "@/components/teacher/Cohort
 import { LearningAnalytics } from "@/components/teacher/LearningAnalytics";
 import { TrackUnlockPanel } from "@/components/teacher/TrackUnlockPanel";
 import { GradeTestsPanel } from "@/components/teacher/GradeTestsPanel";
-import { BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck, ClipboardCheck, MessageSquare, Activity, Unlock, PenLine } from "lucide-react";
+import { TransferMemberDialog } from "@/components/teacher/TransferMemberDialog";
+import { Id } from "../../../../convex/_generated/dataModel";
+import { ArrowRightLeft, BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck, ClipboardCheck, MessageSquare, Activity, Unlock, PenLine } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
@@ -141,6 +143,7 @@ function StudentManagementTab() {
   const activeStudents = useQuery(api.users.listActive, { cohortId });
   const droppedStudents = useQuery(api.users.listDropped, { cohortId });
   const reactivate = useMutation(api.users.reactivateStudent);
+  const [transfer, setTransfer] = useState<{ id: Id<"users">; name: string } | null>(null);
 
   return (
     <div className="space-y-8">
@@ -164,20 +167,28 @@ function StudentManagementTab() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {activeStudents.map((s) => (
-              <Link
-                key={s._id}
-                href={`/teacher/students/${s._id}`}
-                className="card p-4 flex items-center gap-3 hover:scale-[1.02] transition-transform group"
-              >
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
-                  {s.imageUrl ? <img src={s.imageUrl} alt="" className="w-10 h-10 rounded-xl object-cover" /> : getInitials(s.name)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>{s.name}</p>
-                  <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{s.email}</p>
-                </div>
-                <UserCheck size={14} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" style={{ color: "#2563EB" }} />
-              </Link>
+              <div key={s._id} className="card p-4 flex items-center gap-3 group">
+                <Link href={`/teacher/students/${s._id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0" style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}>
+                    {s.imageUrl ? <img src={s.imageUrl} alt="" className="w-10 h-10 rounded-xl object-cover" /> : getInitials(s.name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>{s.name}</p>
+                    <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{s.email}</p>
+                  </div>
+                </Link>
+                {cohortId && (
+                  <button
+                    type="button"
+                    title="Transfer to another cohort"
+                    onClick={() => setTransfer({ id: s._id, name: s.name })}
+                    className="p-2 rounded-lg hover:opacity-70 flex-shrink-0"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <ArrowRightLeft size={14} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -228,6 +239,15 @@ function StudentManagementTab() {
             ))}
           </div>
         </div>
+      )}
+      {transfer && cohortId && (
+        <TransferMemberDialog
+          userId={transfer.id}
+          name={transfer.name}
+          fromCohortId={cohortId}
+          role="student"
+          onClose={() => setTransfer(null)}
+        />
       )}
     </div>
   );

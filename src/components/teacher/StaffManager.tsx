@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import toast from "react-hot-toast";
-import { Mail, RefreshCw, Shield, ShieldCheck, UserCog, XCircle } from "lucide-react";
+import { ArrowRightLeft, Mail, RefreshCw, Shield, ShieldCheck, UserCog, XCircle } from "lucide-react";
+import { TransferMemberDialog } from "./TransferMemberDialog";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { formatDate, getInitials } from "@/lib/utils";
@@ -33,6 +34,19 @@ export function StaffManager() {
   const [name, setName] = useState("");
   const [cohortId, setCohortId] = useState<Id<"cohorts"> | undefined>(undefined);
   const [sending, setSending] = useState(false);
+  const [pendingRole, setPendingRole] = useState<{
+    userId: Id<"users">;
+    name: string;
+    from: "admin" | "teacher" | "student";
+    to: "admin" | "teacher" | "student";
+  } | null>(null);
+  const [seatCohortId, setSeatCohortId] = useState<Id<"cohorts"> | undefined>(undefined);
+  const [savingRole, setSavingRole] = useState(false);
+  const [transfer, setTransfer] = useState<{
+    userId: Id<"users">;
+    name: string;
+    fromCohortId: Id<"cohorts">;
+  } | null>(null);
 
   const teacherInvites = (pending ?? []).filter((i) => i.role === "teacher");
   const cohortName = (id: Id<"cohorts"> | undefined) => cohorts?.find((c) => c.cohort._id === id)?.cohort;
@@ -68,12 +82,40 @@ export function StaffManager() {
     }
   }
 
-  async function changeRole(userId: Id<"users">, role: "admin" | "teacher" | "student") {
+  function startRoleChange(
+    person: { _id: Id<"users">; name: string; role: "admin" | "teacher" | "student" },
+    next: "admin" | "teacher" | "student",
+  ) {
+    if (person.role === next) return;
+    setPendingRole({ userId: person._id, name: person.name, from: person.role, to: next });
+    setSeatCohortId(undefined);
+  }
+
+  async function confirmRole() {
+    if (!pendingRole) return;
+    const needsSeat = pendingRole.to !== "admin";
+    if (needsSeat && !seatCohortId) {
+      toast.error(pendingRole.to === "student" ? "Pick the cohort they should sit in" : "Pick the cohort they'll teach");
+      return;
+    }
+    setSavingRole(true);
     try {
-      await setRole({ userId, role });
-      toast.success("Role updated");
+      await setRole({
+        userId: pendingRole.userId,
+        role: pendingRole.to,
+        cohortId: needsSeat ? seatCohortId : undefined,
+      });
+      const dest = cohortName(seatCohortId);
+      toast.success(
+        dest
+          ? `${pendingRole.name} is now ${pendingRole.to === "admin" ? "an admin" : pendingRole.to === "teacher" ? "an instructor" : "a student"} · ${dest.name}`
+          : `${pendingRole.name}'s role is updated`,
+      );
+      setPendingRole(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not change role");
+    } finally {
+      setSavingRole(false);
     }
   }
 
@@ -96,35 +138,92 @@ export function StaffManager() {
           ) : (
             staff.map((p) => {
               const me = p._id === profile?._id;
+              const editing = pendingRole?.userId === p._id;
               return (
-                <div key={p._id} className="flex items-center gap-3 px-4 py-3" style={{ borderColor: "var(--border)" }}>
-                  <span className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white overflow-hidden flex-shrink-0" style={{ background: p.role === "admin" ? "linear-gradient(135deg, #111827, #2563EB)" : "linear-gradient(135deg, #2563EB, #F97316)" }}>
-                    {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" /> : getInitials(p.name)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate flex items-center gap-1.5" style={{ color: "var(--text)" }}>
-                      {p.name}
-                      {me && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md" style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}>you</span>}
-                    </p>
-                    <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                      {p.email}
-                      {p.role === "teacher" && ` · ${p.cohortCount} cohort${p.cohortCount === 1 ? "" : "s"}`}
-                    </p>
+                <div key={p._id} className="px-4 py-3 space-y-2.5" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white overflow-hidden flex-shrink-0" style={{ background: p.role === "admin" ? "linear-gradient(135deg, #111827, #2563EB)" : "linear-gradient(135deg, #2563EB, #F97316)" }}>
+                      {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" /> : getInitials(p.name)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                        {p.name}
+                        {me && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md" style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}>you</span>}
+                        {p.role === "admin" ? <ShieldCheck size={13} style={{ color: "#2563EB" }} /> : <Shield size={13} style={{ color: "var(--text-muted)" }} />}
+                      </p>
+                      <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{p.email}</p>
+                      {p.cohorts.length > 0 && (
+                        <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>
+                          {p.cohorts.map((c) => c.name).join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                    {p.cohorts[0] && !me && (
+                      <button
+                        type="button"
+                        title="Transfer to another cohort"
+                        onClick={() => setTransfer({ userId: p._id, name: p.name, fromCohortId: p.cohorts[0]!._id })}
+                        className="p-1.5 rounded-lg hover:opacity-70"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        <ArrowRightLeft size={14} />
+                      </button>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {p.role === "admin" ? <ShieldCheck size={14} style={{ color: "#2563EB" }} /> : <Shield size={14} style={{ color: "var(--text-muted)" }} />}
-                    <select
-                      value={p.role}
-                      disabled={me}
-                      onChange={(e) => changeRole(p._id, e.target.value as "admin" | "teacher" | "student")}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold outline-none disabled:opacity-60"
-                      style={inputStyle}
-                    >
-                      <option value="admin">Admin</option>
-                      <option value="teacher">Instructor</option>
-                      <option value="student">Student</option>
-                    </select>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(["admin", "teacher", "student"] as const).map((role) => {
+                      const active = p.role === role;
+                      const label = role === "admin" ? "Admin" : role === "teacher" ? "Instructor" : "Student";
+                      return (
+                        <button
+                          key={role}
+                          type="button"
+                          disabled={me}
+                          onClick={() => startRoleChange(p, role)}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold disabled:opacity-50"
+                          style={{
+                            background: active ? "#2563EB" : "var(--surface-2)",
+                            color: active ? "#fff" : "var(--text)",
+                            border: `1px solid ${active ? "#2563EB" : "var(--border)"}`,
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
+                  {editing && (
+                    <div className="rounded-xl p-3 space-y-2.5" style={{ background: "var(--surface-2)" }}>
+                      <p className="text-xs" style={{ color: "var(--text)" }}>
+                        {pendingRole.to === "admin" && `Make ${p.name} an admin. They keep any classes they already teach.`}
+                        {pendingRole.to === "teacher" && `Make ${p.name} an instructor and seat them on a class.`}
+                        {pendingRole.to === "student" && `Make ${p.name} a student. They leave the Teacher Hub and join a roster.`}
+                      </p>
+                      {pendingRole.to !== "admin" && (
+                        <CohortPicker
+                          value={seatCohortId}
+                          onChange={setSeatCohortId}
+                          label={pendingRole.to === "student" ? "Student roster" : "They'll teach"}
+                          allowSchoolWide={false}
+                          required
+                        />
+                      )}
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setPendingRole(null)} className="flex-1 py-1.5 rounded-lg text-xs font-medium" style={inputStyle}>
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingRole}
+                          onClick={() => void confirmRole()}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40"
+                          style={{ background: "#2563EB" }}
+                        >
+                          {savingRole ? "Saving…" : "Confirm"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -198,6 +297,15 @@ export function StaffManager() {
           )}
         </div>
       </div>
+      {transfer && (
+        <TransferMemberDialog
+          userId={transfer.userId}
+          name={transfer.name}
+          fromCohortId={transfer.fromCohortId}
+          role="teacher"
+          onClose={() => setTransfer(null)}
+        />
+      )}
     </section>
   );
 }

@@ -224,7 +224,7 @@ export const sendDueSoonReminders = internalMutation({
     let sent = 0;
 
     for (const assignment of assignments) {
-      // Only the cohort the assignment belongs to (everyone when school-wide).
+      if (!assignment.cohortId) continue;
       const students = await activeStudentIds(ctx, assignment.cohortId);
       const recipients: typeof students = [];
       for (const studentId of students) {

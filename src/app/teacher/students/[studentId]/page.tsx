@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
@@ -14,10 +14,13 @@ import {
   UserCheck, Bell, AlertCircle, RotateCcw, Cloud, Container,
   Boxes, GitBranch, Layers, Wrench, Workflow, Gauge,
   GraduationCap,
+  ArrowRightLeft,
 } from "lucide-react";
 import { cn, percentageColor, percentageBg, getInitials, formatDate } from "@/lib/utils";
 import { QuizDetailAccordion } from "@/components/teacher/QuizDetailAccordion";
 import { isAdminRole } from "@/lib/roles";
+import { TransferMemberDialog } from "@/components/teacher/TransferMemberDialog";
+import type { CohortSummary } from "@/components/teacher/CohortContext";
 
 const TRACK_ICONS: Record<string, React.ElementType> = {
   hardware: Cpu,
@@ -71,10 +74,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
   const tracks = useQuery(api.tracks.list);
   const sendFeedback = useMutation(api.feedback.send);
   const previousFeedback = useQuery(api.feedback.getForStudent, { studentId: studentId as Id<"users"> });
-  const insightWindow = useMemo(() => {
+  const [insightWindow] = useState(() => {
     const now = Date.now();
     return { now, since: now - 14 * 24 * 60 * 60 * 1000 };
-  }, []);
+  });
   const insight = useQuery(api.analytics.getStudentInsight, {
     studentId: studentId as Id<"users">,
     now: insightWindow.now,
@@ -85,8 +88,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
   const dropStudent = useMutation(api.users.dropStudent);
   const reactivateStudent = useMutation(api.users.reactivateStudent);
   const setRole = useMutation(api.users.setRole);
+  const memberships = useQuery(api.cohorts.membershipsForUser, {
+    userId: studentId as Id<"users">,
+  });
+  const allCohorts = useQuery(api.cohorts.list, {}) as CohortSummary[] | undefined;
   const router = useRouter();
   const [promoting, setPromoting] = useState(false);
+  const [nextRole, setNextRole] = useState<"teacher" | "admin" | null>(null);
+  const [roleCohortId, setRoleCohortId] = useState<Id<"cohorts"> | "">("");
+  const [showTransfer, setShowTransfer] = useState(false);
 
   const [dropReason, setDropReason] = useState("");
   const [showDropForm, setShowDropForm] = useState(false);
@@ -115,12 +125,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
     await reactivateStudent({ studentId: studentId as Id<"users"> });
   }
 
-  async function handleMakeInstructor() {
-    if (promoting) return;
+  async function handleRoleChange() {
+    if (promoting || !nextRole) return;
+    if (nextRole === "teacher" && !roleCohortId) {
+      toast.error("Pick the cohort they'll teach");
+      return;
+    }
     setPromoting(true);
     try {
-      await setRole({ userId: studentId as Id<"users">, role: "teacher" });
-      toast.success("They're an instructor again. Assign them to a cohort under Cohorts → Instructors.");
+      await setRole({
+        userId: studentId as Id<"users">,
+        role: nextRole,
+        cohortId: nextRole === "teacher" && roleCohortId ? roleCohortId : undefined,
+      });
+      toast.success(nextRole === "admin" ? "They're an admin now" : "They're an instructor on that class");
       router.push("/teacher/dashboard");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not change their role");
@@ -310,24 +328,95 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
           <AlertCircle size={16} style={{ color: "#2563EB" }} /> Student Actions
         </h2>
 
-        {isAdminRole(profile?.role) && student.role === "student" && !isDropped && (
-          <div className="rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3" style={{ background: "#2563EB10", border: "1px solid #2563EB33" }}>
-            <div className="flex-1">
-              <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>This person should be an instructor</p>
-              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                Turns their account back into staff. They leave any student roster seats and show up under Staff. Re-assign them to a cohort afterwards.
-              </p>
+        {student.role === "student" && !isDropped && (
+          <div className="rounded-xl p-4 space-y-3" style={{ background: "#2563EB10", border: "1px solid #2563EB33" }}>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1">
+                <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>Class seat</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  {memberships && memberships.length > 0
+                    ? memberships.map((m) => m.name).join(" · ")
+                    : "Not on a cohort roster yet."}
+                </p>
+              </div>
+              {memberships?.[0] && (
+                <button
+                  type="button"
+                  onClick={() => setShowTransfer(true)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold flex-shrink-0"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
+                >
+                  <ArrowRightLeft size={14} /> Transfer cohort
+                </button>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={handleMakeInstructor}
-              disabled={promoting}
-              className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
-            >
-              <GraduationCap size={14} /> {promoting ? "Updating…" : "Make instructor"}
-            </button>
+            {isAdminRole(profile?.role) && (
+              <div className="pt-3 space-y-3" style={{ borderTop: "1px solid #2563EB33" }}>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Change their account in one step — they leave the student roster and land on staff (or admin) immediately.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setNextRole((r) => (r === "teacher" ? null : "teacher"))}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                    style={{
+                      background: nextRole === "teacher" ? "#2563EB" : "var(--surface)",
+                      color: nextRole === "teacher" ? "#fff" : "var(--text)",
+                    }}
+                  >
+                    Instructor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNextRole((r) => (r === "admin" ? null : "admin"))}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                    style={{
+                      background: nextRole === "admin" ? "#111827" : "var(--surface)",
+                      color: nextRole === "admin" ? "#fff" : "var(--text)",
+                    }}
+                  >
+                    Admin
+                  </button>
+                </div>
+                {nextRole === "teacher" && (
+                  <select
+                    value={roleCohortId}
+                    onChange={(e) => setRoleCohortId(e.target.value as Id<"cohorts"> | "")}
+                    className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                    style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
+                  >
+                    <option value="">Pick the cohort they&apos;ll teach…</option>
+                    {(allCohorts ?? [])
+                      .filter((c) => c.cohort.status !== "archived")
+                      .map((c) => (
+                        <option key={c.cohort._id} value={c.cohort._id}>{c.cohort.name}</option>
+                      ))}
+                  </select>
+                )}
+                {nextRole && (
+                  <button
+                    type="button"
+                    onClick={() => void handleRoleChange()}
+                    disabled={promoting}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                    style={{ background: "linear-gradient(135deg, #2563EB, #F97316)" }}
+                  >
+                    <GraduationCap size={14} /> {promoting ? "Updating…" : nextRole === "admin" ? "Confirm admin" : "Confirm instructor"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+        )}
+        {showTransfer && memberships?.[0] && (
+          <TransferMemberDialog
+            userId={studentId as Id<"users">}
+            name={student.name}
+            fromCohortId={memberships[0].cohortId}
+            role="student"
+            onClose={() => setShowTransfer(false)}
+          />
         )}
 
         {/* Drop / Reactivate */}

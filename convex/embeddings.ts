@@ -96,8 +96,7 @@ export const getAllContent = internalQuery({
       .withIndex("by_published", (q) => q.eq("published", true))
       .collect();
     const knowledge = await ctx.db.query("knowledgeDocs").collect();
-    const assignments = await ctx.db.query("assignments").collect();
-    return { tracks, lessons, knowledge, assignments };
+    return { tracks, lessons, knowledge };
   },
 });
 
@@ -152,7 +151,7 @@ export const insertEmbedding = internalMutation({
 // ── Shared rebuild logic ────────────────────────────────────────────────────
 
 async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
-  const { tracks, lessons, knowledge, assignments } = await ctx.runQuery(
+  const { tracks, lessons, knowledge } = await ctx.runQuery(
     internal.embeddings.getAllContent,
     {}
   );
@@ -228,7 +227,7 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
       },
       {
         title: "Homework and assignments",
-        text: "Teachers assign DevOps and cloud homework with due dates on the Teacher Hub. Students see homework status (pending, complete, or late) on the Homework page. Assignments include Linux administration reports, Bash automation, cloud architecture designs, GitHub pull requests, Docker builds, Kubernetes deployments, Terraform infrastructure, Ansible playbooks, CI/CD pipelines, and Prometheus/Grafana dashboards.",
+        text: "Teachers assign homework per cohort on the Teacher Hub. Students only see assignments posted to their class. A future cohort does not see the current class's due work. Status is pending, complete, or late on the Homework page.",
       },
       {
         title: "Student app pages",
@@ -258,25 +257,8 @@ async function rebuildIndex(ctx: ActionCtx): Promise<{ embedded: number }> {
       });
     });
 
-    // Homework is searchable so Stark can explain current assignments.
-    for (const assignment of assignments) {
-      const track = assignment.trackId
-        ? tracks.find((item) => item._id === assignment.trackId)
-        : undefined;
-      chunks.push({
-        trackId: assignment.trackId,
-        source: "assignment",
-        title: assignment.title,
-        chunkText: [
-          `Homework: ${assignment.title}`,
-          track ? `Track: ${track.name}` : "",
-          assignment.description ?? "",
-          `Due: ${new Date(assignment.dueDate).toISOString()}`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      });
-    }
+    // Live homework is per-cohort and belongs in student chat context, not
+    // the shared RAG index (that would leak one class's due work to another).
 
     // Teacher-authored knowledge docs (chunked if long)
     for (const doc of knowledge) {

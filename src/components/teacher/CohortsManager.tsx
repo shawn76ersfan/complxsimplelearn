@@ -20,6 +20,7 @@ import {
   ScrollText,
   Shield,
   Trash2,
+  ArrowRightLeft,
   UserMinus,
   UserPlus,
   Users,
@@ -31,6 +32,7 @@ import { cn, formatDate, getInitials } from "@/lib/utils";
 import { COHORT_STATUS_LABEL, CohortSummary, cohortWeek, formatCohortDate, useCohortScope } from "./CohortContext";
 import { InviteStudentPanel } from "./InviteStudentPanel";
 import { StaffManager } from "./StaffManager";
+import { TransferMemberDialog } from "./TransferMemberDialog";
 import { US_TIMEZONES } from "@/lib/timezones";
 
 type Status = CohortSummary["cohort"]["status"];
@@ -413,6 +415,7 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
   const [picking, setPicking] = useState<Set<Id<"users">>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [release, setRelease] = useState<{ kind: "student" | "teacher"; id: Id<"users">; name: string } | null>(null);
+  const [transfer, setTransfer] = useState<{ id: Id<"users">; name: string; role: "student" | "teacher" } | null>(null);
 
   const teacherIds = useMemo(() => new Set(data?.teachers.map((t) => t._id) ?? []), [data]);
 
@@ -577,6 +580,14 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
                       <Flame size={11} style={{ color: "#F97316" }} /> {s.streak ?? 0}-day
                     </span>
                     <button
+                      type="button"
+                      onClick={() => setTransfer({ id: s._id, name: s.name, role: "student" })}
+                      className="p-1.5 rounded-lg hover:opacity-70"
+                      title="Transfer to another cohort"
+                    >
+                      <ArrowRightLeft size={14} style={{ color: "var(--text-muted)" }} />
+                    </button>
+                    <button
                       onClick={() => setRelease({ kind: "student", id: s._id, name: s.name })}
                       className="p-1.5 rounded-lg hover:opacity-70"
                       title="Release from cohort"
@@ -728,6 +739,15 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
           kind={release.kind}
           onCancel={() => setRelease(null)}
           onConfirm={confirmRelease}
+        />
+      )}
+      {transfer && (
+        <TransferMemberDialog
+          userId={transfer.id}
+          name={transfer.name}
+          fromCohortId={cohortId}
+          role={transfer.role}
+          onClose={() => setTransfer(null)}
         />
       )}
     </div>

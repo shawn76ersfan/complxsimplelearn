@@ -10,7 +10,7 @@ import {
   resolveCohortFilter,
   visibleStudents,
   visibleToStaff,
-  visibleToStudent,
+  assignedToStudentCohorts,
 } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
 
@@ -113,13 +113,13 @@ const progressReturn = v.object({
   level: v.number(),
 });
 
-/** Assignments a given student should see: their cohorts' plus school-wide. */
+/** Assignments posted to a cohort this student is actually in. */
 async function assignmentsForStudent(
   ctx: QueryCtx,
   studentId: Id<"users">,
 ): Promise<Doc<"assignments">[]> {
   const all = await ctx.db.query("assignments").order("desc").collect();
-  return visibleToStudent(all, await cohortIdsForUser(ctx, studentId));
+  return assignedToStudentCohorts(all, await cohortIdsForUser(ctx, studentId));
 }
 
 export const create = mutation({
@@ -136,6 +136,9 @@ export const create = mutation({
   returns: v.id("assignments"),
   handler: async (ctx, args) => {
     const teacher = await requireStaff(ctx);
+    if (!args.cohortId) {
+      throw new Error("Pick a cohort — homework is assigned per class, not the whole program");
+    }
     await assertContentAccess(ctx, teacher, args.cohortId);
     const requiresSubmission = args.requiresSubmission ?? false;
     const title = args.title.trim();
@@ -354,7 +357,7 @@ export const getAllStudentStatuses = query({
           ? tracks.find((t) => t._id === a.trackId) ?? null
           : null;
         const applicable = students.filter(
-          (s) => a.cohortId === undefined || membership.get(s._id)?.has(a.cohortId),
+          (s) => a.cohortId !== undefined && membership.get(s._id)?.has(a.cohortId),
         );
         const studentStatuses = await Promise.all(
           applicable.map(async (s) => {

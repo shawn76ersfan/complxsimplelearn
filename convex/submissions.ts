@@ -5,7 +5,7 @@ import { R2, type R2Callbacks } from "@convex-dev/r2";
 import type { DataModel } from "./_generated/dataModel";
 import { getCurrentUser, requireStaff } from "./_lib/auth";
 import { notifyUsers, teacherIds } from "./lib/notify";
-import { assertStudentAccess, contentInScope, teachingScope, visibleToStudent, cohortIdsForUser } from "./lib/cohortAccess";
+import { assertStudentAccess, assignedToStudentCohorts, contentInScope, teachingScope, cohortIdsForUser } from "./lib/cohortAccess";
 import { isStaffRole } from "./lib/roles";
 import { bumpUserStreak } from "./lib/scoring";
 import {
@@ -108,7 +108,7 @@ export const submit = mutation({
       }
     }
     const studentCohorts = await cohortIdsForUser(ctx, user._id);
-    if (!visibleToStudent([assignment], studentCohorts).length && !isStaffRole(user.role)) {
+    if (!assignedToStudentCohorts([assignment], studentCohorts).length && !isStaffRole(user.role)) {
       throw new Error("This assignment is not available to you");
     }
 
