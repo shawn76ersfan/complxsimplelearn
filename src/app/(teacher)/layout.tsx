@@ -1,28 +1,15 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { isAdmin, isStaff } from "@/lib/roles";
+import { useSyncAppUser } from "@/lib/useSyncAppUser";
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoaded } = useUser();
-  const storeUser = useMutation(api.users.store);
-  const ensureSeeded = useMutation(api.init.ensureSeeded);
+  const { profile, isBootstrapping, syncState, retry } = useSyncAppUser();
   const syncDevOpsCurriculum = useMutation(api.curriculum.syncDevOpsCurriculum);
-  const profile = useQuery(api.users.getMyProfile);
-
-  useEffect(() => {
-    if (isLoaded && user) {
-      storeUser({
-        name: user.fullName ?? user.firstName ?? "Student",
-        imageUrl: user.imageUrl,
-      });
-      ensureSeeded();
-    }
-  }, [isLoaded, user, storeUser, ensureSeeded]);
 
   useEffect(() => {
     // Curriculum sync is a school-wide write; only admins trigger it.
@@ -30,10 +17,28 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     void syncDevOpsCurriculum();
   }, [profile?.role, syncDevOpsCurriculum]);
 
-  if (profile === undefined) {
+  if (isBootstrapping || (syncState === "ok" && profile === undefined)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
         <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (syncState === "error") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="index-card p-8 max-w-md w-full space-y-4 text-center">
+          <h1 className="font-serif text-2xl font-bold" style={{ color: "var(--text)" }}>
+            Couldn&apos;t open the lounge
+          </h1>
+          <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
+            Sign-in finished, but the classroom data connection didn&apos;t catch up. Try again — no need to refresh the whole page.
+          </p>
+          <button type="button" onClick={retry} className="btn-ink w-full">
+            Try again
+          </button>
+        </div>
       </div>
     );
   }

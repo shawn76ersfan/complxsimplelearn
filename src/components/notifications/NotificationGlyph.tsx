@@ -1,6 +1,6 @@
 "use client";
 
-import { BookMarked, Calendar, ClipboardCheck, Clock, Inbox, Megaphone, Pin, Video } from "lucide-react";
+import { BookMarked, Calendar, ClipboardCheck, Clock, GraduationCap, Inbox, Megaphone, MessageSquareHeart, Pin, Video } from "lucide-react";
 
 export type NotificationType =
   | "assignment_posted"
@@ -10,17 +10,21 @@ export type NotificationType =
   | "video_posted"
   | "calendar_event"
   | "announcement"
-  | "board_post";
+  | "board_post"
+  | "pulse_survey"
+  | "instructor_promoted";
 
 const META: Record<NotificationType, { icon: React.ElementType; accent: string; label: string }> = {
-  assignment_posted:   { icon: BookMarked,     accent: "#2563EB", label: "Assignment" },
-  assignment_due_soon: { icon: Clock,          accent: "#F59E0B", label: "Due soon" },
-  submission_graded:   { icon: ClipboardCheck, accent: "#0EA5E9", label: "Graded" },
-  submission_received: { icon: Inbox,          accent: "#8B5CF6", label: "Submission" },
-  video_posted:        { icon: Video,          accent: "#E11D48", label: "Recording" },
-  calendar_event:      { icon: Calendar,       accent: "#10B981", label: "Event" },
-  announcement:        { icon: Megaphone,      accent: "#F97316", label: "Announcement" },
-  board_post:          { icon: Pin,            accent: "#2563EB", label: "Board" },
+  assignment_posted:   { icon: BookMarked,          accent: "#2563EB", label: "Assignment" },
+  assignment_due_soon: { icon: Clock,               accent: "#F59E0B", label: "Due soon" },
+  submission_graded:   { icon: ClipboardCheck,      accent: "#0EA5E9", label: "Graded" },
+  submission_received: { icon: Inbox,               accent: "#8B5CF6", label: "Submission" },
+  video_posted:        { icon: Video,               accent: "#E11D48", label: "Recording" },
+  calendar_event:      { icon: Calendar,            accent: "#10B981", label: "Event" },
+  announcement:        { icon: Megaphone,           accent: "#F97316", label: "Announcement" },
+  board_post:          { icon: Pin,                 accent: "#2563EB", label: "Board" },
+  pulse_survey:        { icon: MessageSquareHeart,  accent: "#7C3AED", label: "Check-in" },
+  instructor_promoted: { icon: GraduationCap,       accent: "#2563EB", label: "Instructor" },
 };
 
 export function notificationAccent(type: string): string {

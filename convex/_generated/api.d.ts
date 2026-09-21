@@ -63,6 +63,7 @@ import type * as resumePdf from "../resumePdf.js";
 import type * as seed from "../seed.js";
 import type * as starkResumeFiles from "../starkResumeFiles.js";
 import type * as submissions from "../submissions.js";
+import type * as surveys from "../surveys.js";
 import type * as trackReleases from "../trackReleases.js";
 import type * as tracks from "../tracks.js";
 import type * as users from "../users.js";
@@ -130,6 +131,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   starkResumeFiles: typeof starkResumeFiles;
   submissions: typeof submissions;
+  surveys: typeof surveys;
   trackReleases: typeof trackReleases;
   tracks: typeof tracks;
   users: typeof users;

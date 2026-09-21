@@ -600,7 +600,7 @@ function CohortDetail({ cohortId, onBack }: { cohortId: Id<"cohorts">; onBack: (
             )}
             {dropped.length > 0 && (
               <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-                {dropped.length} dropped student{dropped.length === 1 ? "" : "s"} hidden. Reactivate from the Students tab.
+                {dropped.length} dropped student{dropped.length === 1 ? "" : "s"} hidden. Reactivate from the Roster tab.
               </p>
             )}
           </section>

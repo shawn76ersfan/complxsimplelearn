@@ -94,6 +94,11 @@ export async function purgeUser(ctx: MutationCtx, user: Doc<"users">): Promise<v
   const typing = await ctx.db.query("boardTyping").collect();
   await deleteAll(ctx, typing.filter((t) => t.userId === userId));
 
+  await deleteAll(
+    ctx,
+    await ctx.db.query("pulseSurveyResponses").withIndex("by_student", (q) => q.eq("studentId", userId)).collect(),
+  );
+
   // Stark: conversations, messages, Coach Mode resumes and reviews, usage topics.
   const conversations = await ctx.db
     .query("starkConversations")

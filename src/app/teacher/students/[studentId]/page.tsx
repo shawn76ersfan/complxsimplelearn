@@ -138,7 +138,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
         role: nextRole,
         cohortId: nextRole === "teacher" && roleCohortId ? roleCohortId : undefined,
       });
-      toast.success(nextRole === "admin" ? "They're an admin now" : "They're an instructor on that class");
+      toast.success(nextRole === "admin" ? "They're an admin now" : "They're a paid instructor on that class");
       router.push("/teacher/dashboard");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not change their role");
@@ -301,9 +301,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
             <p style={{ color: "var(--text)" }}>{insight.state ?? "—"} · {insight.timezoneLabel}</p>
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Stark (14d)</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Program progress</p>
             <p style={{ color: "var(--text)" }}>
-              {insight.starkChats} chats{insight.lastTopic ? ` · ${insight.lastTopic}` : ""}
+              {insight.progressPct == null ? "—" : `${insight.progressPct}%`}
+              {` · ${insight.completedLessons}/${insight.totalLessons} lessons`}
             </p>
           </div>
           <div>
@@ -353,7 +354,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ studen
             {isAdminRole(profile?.role) && (
               <div className="pt-3 space-y-3" style={{ borderTop: "1px solid #2563EB33" }}>
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Change their account in one step — they leave the student roster and land on staff (or admin) immediately.
+                  Students who finish the cohort can stay on as paid instructors. They leave the student roster and take a teacher seat immediately.
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   <button

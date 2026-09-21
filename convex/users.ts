@@ -10,7 +10,8 @@ import {
 } from "./lib/enrollmentAccess";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { addMember, addStudentToCohort, visibleStudents } from "./lib/cohortAccess";
+import { addMember, addStudentToCohort, resolveCohortFilter, visibleStudents } from "./lib/cohortAccess";
+import { notifyUsers } from "./lib/notify";
 import { splitDisplayName } from "./lib/names";
 import { isUsState } from "./lib/usStates";
 import { isUsTimezone } from "./lib/timezones";
@@ -392,13 +393,151 @@ export const setRole = mutation({
     }
 
     if (target.role !== args.role) {
-      await ctx.db.patch(target._id, { role: args.role });
+      const patch: {
+        role: "admin" | "teacher" | "student";
+        paidInstructor?: boolean;
+        promotedFromStudent?: boolean;
+        promotedAt?: number;
+      } = { role: args.role };
+      if (target.role === "student" && args.role === "teacher") {
+        patch.paidInstructor = true;
+        patch.promotedFromStudent = true;
+        patch.promotedAt = Date.now();
+      }
+      if (args.role === "student") {
+        patch.paidInstructor = false;
+      }
+      await ctx.db.patch(target._id, patch);
     }
 
     if (args.cohortId) {
       const seat = args.role === "student" ? "student" : "teacher";
       await addMember(ctx, args.cohortId, target._id, seat, admin._id);
     }
+
+    if (target.role === "student" && args.role === "teacher") {
+      await notifyUsers(ctx, [target._id], {
+        type: "instructor_promoted",
+        title: "You're an instructor now",
+        body: "You finished the cohort and joined the teaching team as a paid instructor. Open Teacher Hub to meet your class.",
+        href: "/teacher/dashboard",
+        actorId: admin._id,
+        dedupeKey: `instructor_promoted:${target._id}`,
+      });
+    }
+    return null;
+  },
+});
+
+const rosterInstructor = v.object({
+  _id: v.id("users"),
+  name: v.string(),
+  email: v.string(),
+  imageUrl: v.optional(v.string()),
+  role: roleValidator,
+  paidInstructor: v.optional(v.boolean()),
+  promotedFromStudent: v.optional(v.boolean()),
+});
+
+/** Instructors on the selected cohort (or the whole program). */
+export const listInstructorsForScope = query({
+  args: { cohortId: v.optional(v.id("cohorts")) },
+  returns: v.array(rosterInstructor),
+  handler: async (ctx, args) => {
+    const me = await getCurrentUserOrNull(ctx);
+    if (!me || !isStaffRole(me.role)) return [];
+    const { scope } = await resolveCohortFilter(ctx, me, args.cohortId);
+    const ids = new Set<Id<"users">>();
+
+    async function addTeachersOf(cohortId: Id<"cohorts">) {
+      const rows = await ctx.db
+        .query("cohortMembers")
+        .withIndex("by_cohort_role", (q) => q.eq("cohortId", cohortId).eq("role", "teacher"))
+        .collect();
+      for (const row of rows) ids.add(row.userId);
+    }
+
+    if (args.cohortId) {
+      await addTeachersOf(args.cohortId);
+    } else if (scope === "all") {
+      const admins = await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "admin")).collect();
+      const teachers = await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "teacher")).collect();
+      for (const u of [...admins, ...teachers]) ids.add(u._id);
+    } else {
+      for (const cohortId of scope) await addTeachersOf(cohortId);
+    }
+
+    const out = [];
+    for (const id of ids) {
+      const u = await ctx.db.get(id);
+      if (!u || u.status === "dropped") continue;
+      if (u.role !== "admin" && u.role !== "teacher") continue;
+      out.push({
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        imageUrl: u.imageUrl,
+        role: u.role,
+        paidInstructor: u.paidInstructor,
+        promotedFromStudent: u.promotedFromStudent,
+      });
+    }
+    return out.sort((a, b) => {
+      if (a.role !== b.role) return a.role === "admin" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  },
+});
+
+/**
+ * Promote a graduate onto the teaching team as a paid instructor.
+ * They leave the student roster and take a teacher seat on the cohort.
+ */
+export const promoteToPaidInstructor = mutation({
+  args: {
+    studentId: v.id("users"),
+    cohortId: v.optional(v.id("cohorts")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+    const student = await ctx.db.get(args.studentId);
+    if (!student || student.role !== "student") {
+      throw new Error("Only students can be promoted to instructor");
+    }
+    if (student.status === "dropped") {
+      throw new Error("Reactivate them before promoting");
+    }
+
+    const memberships = await ctx.db
+      .query("cohortMembers")
+      .withIndex("by_user", (q) => q.eq("userId", student._id))
+      .collect();
+    const studentSeats = memberships.filter((m) => m.role === "student");
+    const targetCohort = args.cohortId ?? studentSeats[0]?.cohortId;
+    for (const seat of studentSeats) {
+      await ctx.db.delete(seat._id);
+    }
+
+    await ctx.db.patch(student._id, {
+      role: "teacher",
+      paidInstructor: true,
+      promotedFromStudent: true,
+      promotedAt: Date.now(),
+    });
+
+    if (targetCohort) {
+      await addMember(ctx, targetCohort, student._id, "teacher", admin._id);
+    }
+
+    await notifyUsers(ctx, [student._id], {
+      type: "instructor_promoted",
+      title: "You're an instructor now",
+      body: "You finished the cohort and joined the teaching team as a paid instructor. Open Teacher Hub to meet your class.",
+      href: "/teacher/dashboard",
+      actorId: admin._id,
+      dedupeKey: `instructor_promoted:${student._id}`,
+    });
     return null;
   },
 });

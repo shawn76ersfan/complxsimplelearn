@@ -1,14 +1,15 @@
 "use client";
 
 import { useUser, useClerk } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { LogOut, AlertTriangle, Mail } from "lucide-react";
 import { US_STATES } from "@/lib/usStates";
 import { US_TIMEZONES, guessTimezone } from "@/lib/timezones";
+import { useSyncAppUser } from "@/lib/useSyncAppUser";
 
 function DroppedLockoutPage({ reason }: { reason?: string }) {
   const { signOut } = useClerk();
@@ -266,51 +267,61 @@ function NameSetupPage({
   );
 }
 
-type SyncState = "idle" | "syncing" | "ok" | "not_enrolled" | "error";
+function AuthSpinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
+      <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#2563EB", borderTopColor: "transparent" }} />
+    </div>
+  );
+}
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isStark = pathname.startsWith("/stark");
-  const { user, isLoaded } = useUser();
-  const storeUser = useMutation(api.users.store);
-  const ensureSeeded = useMutation(api.init.ensureSeeded);
-  const profile = useQuery(api.users.getMyProfile);
-  const [syncState, setSyncState] = useState<SyncState>("idle");
+  const { user, profile, syncState, isBootstrapping, retry } = useSyncAppUser();
 
-  useEffect(() => {
-    if (!isLoaded || !user) {
-      setSyncState("idle");
-      return;
-    }
-    setSyncState("syncing");
-    storeUser({
-      name: user.fullName ?? user.firstName ?? "Student",
-      imageUrl: user.imageUrl,
-    })
-      .then(() => setSyncState("ok"))
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        if (message.includes("NOT_ENROLLED")) {
-          setSyncState("not_enrolled");
-        } else {
-          setSyncState("error");
-          console.error("Failed to sync user profile:", err);
-        }
-      });
-    void ensureSeeded();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, user?.id]);
+  if (isBootstrapping) {
+    return <AuthSpinner />;
+  }
 
-  if (!isLoaded || syncState === "syncing" || (user && profile === undefined && syncState !== "not_enrolled")) {
+  if (syncState === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
-        <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#2563EB", borderTopColor: "transparent" }} />
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="index-card p-8 max-w-md w-full space-y-4 text-center">
+          <h1 className="font-serif text-2xl font-bold" style={{ color: "var(--text)" }}>
+            Couldn&apos;t open your locker
+          </h1>
+          <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
+            Sign-in finished, but the classroom data connection didn&apos;t catch up. Try again — no need to refresh the whole page.
+          </p>
+          <button type="button" onClick={retry} className="btn-ink w-full">
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
 
-  if (syncState === "not_enrolled" || (user && profile === null)) {
+  if (syncState === "not_enrolled") {
     return <NotEnrolledPage />;
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="index-card p-8 max-w-md w-full space-y-4 text-center">
+          <h1 className="font-serif text-2xl font-bold" style={{ color: "var(--text)" }}>
+            Couldn&apos;t open your locker
+          </h1>
+          <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
+            Sign-in finished, but your roster row hasn&apos;t shown up yet. Try again — no need to refresh the whole page.
+          </p>
+          <button type="button" onClick={retry} className="btn-ink w-full">
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Gate: dropped student (only checked once profile has actually loaded)

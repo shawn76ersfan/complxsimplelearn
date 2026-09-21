@@ -25,6 +25,10 @@ export default defineSchema({
     droppedBy: v.optional(v.id("users")),
     // Email a copy of in-app notifications. Undefined = on.
     notifyByEmail: v.optional(v.boolean()),
+    // Graduates who stay on as paid instructors after completing the cohort.
+    paidInstructor: v.optional(v.boolean()),
+    promotedFromStudent: v.optional(v.boolean()),
+    promotedAt: v.optional(v.number()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"])
@@ -44,6 +48,8 @@ export default defineSchema({
       v.literal("calendar_event"),
       v.literal("announcement"),
       v.literal("board_post"),
+      v.literal("pulse_survey"),
+      v.literal("instructor_promoted"),
     ),
     title: v.string(),
     body: v.optional(v.string()),
@@ -532,4 +538,29 @@ export default defineSchema({
   })
     .index("by_conversation", ["conversationId"])
     .index("by_user_created", ["userId", "createdAt"]),
+
+  // Biweekly "how is class going" check-ins, sent by staff to a cohort.
+  pulseSurveys: defineTable({
+    cohortId: v.optional(v.id("cohorts")),
+    title: v.string(),
+    prompt: v.optional(v.string()),
+    sentBy: v.id("users"),
+    sentAt: v.number(),
+  })
+    .index("by_cohort_sent", ["cohortId", "sentAt"])
+    .index("by_sentAt", ["sentAt"]),
+
+  pulseSurveyResponses: defineTable({
+    surveyId: v.id("pulseSurveys"),
+    studentId: v.id("users"),
+    pace: v.union(v.literal("too_slow"), v.literal("just_right"), v.literal("too_fast")),
+    difficulty: v.union(v.literal("too_easy"), v.literal("ok"), v.literal("too_hard")),
+    support: v.number(),
+    feeling: v.union(v.literal("struggling"), v.literal("ok"), v.literal("thriving")),
+    comment: v.optional(v.string()),
+    submittedAt: v.number(),
+  })
+    .index("by_survey", ["surveyId"])
+    .index("by_student", ["studentId", "submittedAt"])
+    .index("by_survey_student", ["surveyId", "studentId"]),
 });
