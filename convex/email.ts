@@ -440,3 +440,73 @@ export const sendInfoSessionReminder = internalAction({
     return null;
   },
 });
+
+function buildSurveySubmissionBody(args: {
+  studentName: string;
+  studentEmail: string;
+  surveyTitle: string;
+  pace: string;
+  difficulty: string;
+  support: number;
+  feeling: string;
+  comment?: string;
+}): string {
+  const commentRow = args.comment
+    ? `<p style="margin:16px 0 0;"><strong>Comment</strong></p><p style="margin:6px 0 0;white-space:pre-wrap;color:#374151;">${escapeHtml(args.comment)}</p>`
+    : "<p style=\"margin:16px 0 0;color:#6b7280;\">No written comment.</p>";
+
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:linear-gradient(135deg,#2563EB,#7C3AED);padding:24px;border-radius:8px 8px 0 0;">
+        <p style="color:rgba(255,255,255,.85);margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;">Class survey</p>
+        <h1 style="color:#fff;margin:8px 0 0;font-size:22px;">${escapeHtml(args.surveyTitle)}</h1>
+      </div>
+      <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;color:#111827;">
+        <p style="margin:0 0 16px;">${escapeHtml(args.studentName)} (${escapeHtml(args.studentEmail)}) just submitted the class survey.</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr><td style="padding:8px 0;color:#6b7280;width:140px;">Pace</td><td style="padding:8px 0;font-weight:700;">${escapeHtml(args.pace)}</td></tr>
+          <tr><td style="padding:8px 0;color:#6b7280;">Difficulty</td><td style="padding:8px 0;font-weight:700;">${escapeHtml(args.difficulty)}</td></tr>
+          <tr><td style="padding:8px 0;color:#6b7280;">Support</td><td style="padding:8px 0;font-weight:700;">${args.support}/5</td></tr>
+          <tr><td style="padding:8px 0;color:#6b7280;">How they feel</td><td style="padding:8px 0;font-weight:700;">${escapeHtml(args.feeling)}</td></tr>
+        </table>
+        ${commentRow}
+        <p style="margin-top:24px;"><a href="${escapeHtml(`${appBaseUrl()}/teacher/dashboard`)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2563EB;color:#fff;text-decoration:none;font-weight:700;">Open Analytics</a></p>
+      </div>
+    </div>
+  `;
+}
+
+export const sendCheckInSubmissionEmail = internalAction({
+  args: {
+    studentName: v.string(),
+    studentEmail: v.string(),
+    surveyTitle: v.string(),
+    pace: v.string(),
+    difficulty: v.string(),
+    support: v.number(),
+    feeling: v.string(),
+    comment: v.optional(v.string()),
+    staffEmails: v.array(v.string()),
+  },
+  returns: v.null(),
+  handler: async (_ctx, args) => {
+    const extra = process.env.SURVEY_NOTIFY_EMAIL ?? process.env.GMAIL_USER;
+    const to = [...args.staffEmails];
+    if (extra && !to.includes(extra)) to.push(extra);
+    if (to.length === 0) return null;
+    const subject = `Survey from ${args.studentName}: ${args.feeling.toLowerCase()}, pace ${args.pace.toLowerCase()}`;
+    try {
+      await sendConfiguredEmail({
+        to,
+        subject,
+        html: buildSurveySubmissionBody(args),
+      });
+    } catch (error) {
+      console.error("Survey submission email failed:", {
+        student: args.studentEmail,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return null;
+  },
+});

@@ -4,7 +4,8 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge, Play, Lock } from "lucide-react";
+import { useState } from "react";
+import { Cpu, Brain, Shield, Terminal, ArrowRight, BookOpen, Trophy, Flame, Star, Quote, AlertTriangle, Cloud, Container, Boxes, GitBranch, Layers, Wrench, Workflow, Gauge, Play, Lock, MessageSquareHeart } from "lucide-react";
 import { StudentHomework } from "@/components/learn/StudentHomework";
 import { FeedbackPreviewCard } from "@/components/learn/FeedbackPreviewCard";
 import { MyCohortCard } from "@/components/cohort/MyCohortCard";
@@ -261,6 +262,29 @@ function QuoteCard() {
   );
 }
 
+function CheckInBanner() {
+  const [now] = useState(() => Date.now());
+  const pending = useQuery(api.surveys.pendingMine, { now });
+  if (!pending) return null;
+  return (
+    <Link
+      href="/check-in"
+      className="card p-5 mb-6 flex items-center gap-3 hover:opacity-90"
+    >
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#7C3AED22" }}>
+        <MessageSquareHeart size={18} style={{ color: "#7C3AED" }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>{pending.title}</p>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Your instructor sent a class survey. Two minutes — they read every answer.
+        </p>
+      </div>
+      <span className="text-sm font-semibold flex-shrink-0" style={{ color: "#7C3AED" }}>Open</span>
+    </Link>
+  );
+}
+
 export default function StudentDashboard() {
   const { user } = useUser();
   const tracks = useQuery(api.tracks.list);
@@ -319,6 +343,8 @@ export default function StudentDashboard() {
       )}
 
       <MyCohortCard className="mb-6" />
+
+      <CheckInBanner />
 
       <BookOfficeHours className="mb-6" />
 
