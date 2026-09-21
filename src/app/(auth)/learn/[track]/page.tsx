@@ -6,6 +6,7 @@ import { use, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Play, RotateCcw, Trophy, Lock } from "lucide-react";
 import { TrackIcon } from "@/lib/trackIcons";
+import { weekLabel } from "@/lib/weeks";
 import { LESSON_TYPE_ICON, LESSON_TYPE_LABEL, estimateMinutes, isScoredType, needsInstructorGrade, pctOf } from "@/lib/lessonMeta";
 
 function ProgressRing({ pct, color }: { pct: number; color: string }) {
@@ -142,7 +143,7 @@ export default function TrackPage({ params }: { params: Promise<{ track: string 
                 <TrackIcon slug={trackData.slug} icon={trackData.icon} size={24} style={{ color }} />
               </div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color }}>
-                {volume > 0 ? `Volume ${String(volume).padStart(2, "0")}` : "Track"} · {total} {total === 1 ? "chapter" : "chapters"}
+                {volume > 0 ? weekLabel(volume - 1) : "Track"} · {total} {total === 1 ? "chapter" : "chapters"}
               </p>
             </div>
             <h1 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-2" style={{ color: "var(--text)" }}>

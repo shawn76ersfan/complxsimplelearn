@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowRight, Tv, ExternalLink, Lock } from "lucide-react";
 import { useInstructorName } from "@/components/cohort/useInstructorName";
 import { TrackIcon } from "@/lib/trackIcons";
+import { weekLabel } from "@/lib/weeks";
 
 export default function LearnPage() {
   const tracks = useQuery(api.tracks.list);
@@ -82,7 +83,7 @@ export default function LearnPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1" style={{ color: track.color }}>
-                            Volume {String(i + 1).padStart(2, "0")}
+                            {weekLabel(i)}
                           </p>
                           <h2 className="font-serif text-xl font-bold mb-1 leading-tight" style={{ color: "var(--text)" }}>{track.name}</h2>
                           <p className="text-sm" style={{ color: "var(--text-muted)" }}>

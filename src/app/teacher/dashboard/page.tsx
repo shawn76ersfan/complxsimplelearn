@@ -21,11 +21,12 @@ import { TrackUnlockPanel } from "@/components/teacher/TrackUnlockPanel";
 import { GradeTestsPanel } from "@/components/teacher/GradeTestsPanel";
 import { TransferMemberDialog } from "@/components/teacher/TransferMemberDialog";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { ArrowRightLeft, BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck, ClipboardCheck, MessageSquare, Activity, Unlock, PenLine } from "lucide-react";
+import { ArrowRightLeft, BarChart3, Calendar, CalendarClock, Mail, Quote, Save, Users, UserX, UserCheck, BookMarked, Sparkles, Video, Library, ChevronDown, Layers, Megaphone, ShieldCheck, ClipboardCheck, MessageSquare, Activity, Unlock, PenLine, GraduationCap } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import toast from "react-hot-toast";
 
 type Tab = { id: string; label: string; icon: React.ElementType; adminOnly?: boolean };
 
@@ -33,7 +34,7 @@ const PRIMARY_TABS = [
   { id: "cohorts", label: "Cohorts", icon: Layers, adminOnly: true },
   { id: "scores", label: "Scores", icon: BarChart3 },
   { id: "analytics", label: "Analytics", icon: Activity },
-  { id: "students", label: "Students", icon: Users },
+  { id: "roster", label: "Roster", icon: Users },
   { id: "homework", label: "Homework", icon: BookMarked },
   { id: "tests", label: "Grade tests", icon: PenLine },
   { id: "tracks", label: "Open tracks", icon: Unlock },
@@ -55,7 +56,7 @@ const MORE_TABS = [
 type TabId = (typeof PRIMARY_TABS)[number]["id"] | (typeof MORE_TABS)[number]["id"];
 
 /** Tabs whose content depends on the selected cohort (shown with the switcher). */
-const SCOPED_TABS: ReadonlySet<string> = new Set(["scores", "analytics", "students", "homework", "tests", "tracks", "announcements", "board", "attendance", "calendar", "videos", "email"]);
+const SCOPED_TABS: ReadonlySet<string> = new Set(["scores", "analytics", "roster", "homework", "tests", "tracks", "announcements", "board", "attendance", "calendar", "videos", "email"]);
 
 function QuoteEditor() {
   const current = useQuery(api.quotes.getCurrent);
@@ -142,19 +143,84 @@ function StudentManagementTab() {
   const { cohortId, selected, isAdmin } = useCohortScope();
   const activeStudents = useQuery(api.users.listActive, { cohortId });
   const droppedStudents = useQuery(api.users.listDropped, { cohortId });
+  const instructors = useQuery(api.users.listInstructorsForScope, { cohortId });
   const reactivate = useMutation(api.users.reactivateStudent);
-  const [transfer, setTransfer] = useState<{ id: Id<"users">; name: string } | null>(null);
+  const promote = useMutation(api.users.promoteToPaidInstructor);
+  const [transfer, setTransfer] = useState<{ id: Id<"users">; name: string; role: "student" | "teacher" } | null>(null);
+  const [promotingId, setPromotingId] = useState<Id<"users"> | null>(null);
+
+  async function handlePromote(studentId: Id<"users">) {
+    if (promotingId) return;
+    setPromotingId(studentId);
+    try {
+      await promote({ studentId, cohortId });
+      toast.success("They're a paid instructor on this roster now");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not promote them");
+    } finally {
+      setPromotingId(null);
+    }
+  }
 
   return (
     <div className="space-y-8">
       <InviteStudentPanel />
 
-      {/* Active students */}
       <div>
         <h2 className="text-xl font-bold mb-1" style={{ color: "var(--text)" }}>
-          {selected ? `${selected.cohort.name} roster` : "Active Students"}
+          {selected ? `${selected.cohort.name} instructors` : "Instructors"}
         </h2>
-        <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Click any student to view their progress and send feedback.</p>
+        <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
+          Teachers on this roster, including graduates who stayed on as paid instructors.
+        </p>
+        {!instructors ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[1, 2].map((i) => <div key={i} className="card h-20 animate-pulse" style={{ background: "var(--surface-2)" }} />)}
+          </div>
+        ) : instructors.length === 0 ? (
+          <div className="card p-8 text-center">
+            <GraduationCap size={32} className="mx-auto mb-2 opacity-25" />
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>No instructors assigned yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {instructors.map((s) => (
+              <div key={s._id} className="card p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0" style={{ background: "linear-gradient(135deg, #111827, #2563EB)" }}>
+                  {s.imageUrl ? <img src={s.imageUrl} alt="" className="w-10 h-10 rounded-xl object-cover" /> : getInitials(s.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>{s.name}</p>
+                  <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{s.email}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide mt-0.5" style={{ color: "#2563EB" }}>
+                    {s.role === "admin" ? "Admin" : s.paidInstructor ? "Paid instructor" : "Instructor"}
+                    {s.promotedFromStudent ? " · cohort graduate" : ""}
+                  </p>
+                </div>
+                {cohortId && s.role === "teacher" && (
+                  <button
+                    type="button"
+                    title="Transfer to another cohort"
+                    onClick={() => setTransfer({ id: s._id, name: s.name, role: "teacher" })}
+                    className="p-2 rounded-lg hover:opacity-70 flex-shrink-0"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <ArrowRightLeft size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold mb-1" style={{ color: "var(--text)" }}>
+          {selected ? `${selected.cohort.name} students` : "Students"}
+        </h2>
+        <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
+          Click any student to view their progress and send feedback. Completing the cohort can lead to a paid instructor seat.
+        </p>
         {!activeStudents ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[1,2,3].map(i => <div key={i} className="card h-20 animate-pulse" style={{ background: "var(--surface-2)" }} />)}
@@ -177,11 +243,23 @@ function StudentManagementTab() {
                     <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{s.email}</p>
                   </div>
                 </Link>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    title="Promote to paid instructor"
+                    onClick={() => void handlePromote(s._id)}
+                    disabled={promotingId === s._id}
+                    className="p-2 rounded-lg hover:opacity-70 flex-shrink-0 disabled:opacity-40"
+                    style={{ color: "#2563EB" }}
+                  >
+                    <GraduationCap size={14} />
+                  </button>
+                )}
                 {cohortId && (
                   <button
                     type="button"
                     title="Transfer to another cohort"
-                    onClick={() => setTransfer({ id: s._id, name: s.name })}
+                    onClick={() => setTransfer({ id: s._id, name: s.name, role: "student" })}
                     className="p-2 rounded-lg hover:opacity-70 flex-shrink-0"
                     style={{ color: "var(--text-muted)" }}
                   >
@@ -245,7 +323,7 @@ function StudentManagementTab() {
           userId={transfer.id}
           name={transfer.name}
           fromCohortId={cohortId}
-          role="student"
+          role={transfer.role}
           onClose={() => setTransfer(null)}
         />
       )}
@@ -418,7 +496,7 @@ function TeacherHub() {
         </div>
       </div>
 
-      {activeTab === "students" && (
+      {activeTab === "roster" && (
         <StudentManagementTab />
       )}
 
@@ -429,7 +507,7 @@ function TeacherHub() {
               {selected ? `${selected.cohort.name} analytics` : "Learning analytics"}
             </h2>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Who is stuck, which quiz items fail, homework lag, and what Stark helped with — for {scopeLabel}
+              Program progress, week-by-week completion, check-ins, and who needs a nudge — for {scopeLabel}
             </p>
           </div>
           <LearningAnalytics />

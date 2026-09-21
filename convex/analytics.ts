@@ -17,7 +17,7 @@ const studentRow = v.object({
   homeworkAvg: v.union(v.number(), v.null()),
   homeworkOverdue: v.number(),
   attendanceRate: v.union(v.number(), v.null()),
-  starkChats: v.number(),
+  progressPct: v.union(v.number(), v.null()),
   coachScore: v.union(v.number(), v.null()),
   reasons: v.array(v.string()),
 });
@@ -64,7 +64,7 @@ export const getLearningAnalytics = query({
       classTestAvg: v.union(v.number(), v.null()),
       classHomeworkAvg: v.union(v.number(), v.null()),
       classAttendanceRate: v.union(v.number(), v.null()),
-      starkUsers: v.number(),
+      classProgressAvg: v.union(v.number(), v.null()),
       atRisk: v.array(studentRow),
       hardQuestions: v.array(
         v.object({
@@ -84,19 +84,26 @@ export const getLearningAnalytics = query({
           roster: v.number(),
         }),
       ),
-      starkTopics: v.array(
+      weekProgress: v.array(
         v.object({
-          topic: v.string(),
-          kind: v.string(),
-          count: v.number(),
+          week: v.number(),
+          trackId: v.id("tracks"),
+          trackName: v.string(),
+          color: v.string(),
+          avgPct: v.number(),
+          open: v.boolean(),
         }),
       ),
-      starkByStudent: v.array(
+      studentProgress: v.array(
         v.object({
           studentId: v.id("users"),
           name: v.string(),
-          chats: v.number(),
-          lastTopic: v.union(v.string(), v.null()),
+          progressPct: v.number(),
+          completedLessons: v.number(),
+          totalLessons: v.number(),
+          testAvg: v.union(v.number(), v.null()),
+          homeworkAvg: v.union(v.number(), v.null()),
+          attendanceRate: v.union(v.number(), v.null()),
         }),
       ),
       coachScores: v.array(
@@ -120,7 +127,7 @@ export const getLearningAnalytics = query({
     const students = (await visibleStudents(ctx, staff, cohortId)).filter(
       (s) => s.status !== "dropped",
     );
-    const studentIds = new Set(students.map((s) => s._id));
+    void args.since;
     const lessons = await ctx.db.query("lessons").collect();
     const lessonsById = new Map<string, LessonMeta>(
       lessons.map((lesson) => [lesson._id, lesson]),
@@ -144,6 +151,18 @@ export const getLearningAnalytics = query({
       { lessonId: typeof lessons[number]["_id"]; lessonTitle: string; question: string; miss: number; total: number }
     >();
 
+    const publishedTracks = (await ctx.db.query("tracks").withIndex("by_published", (q) => q.eq("published", true)).collect())
+      .slice()
+      .sort((a, b) => a.order - b.order);
+    const publishedLessons = lessons.filter((l) => l.published);
+    const totalProgramLessons = publishedLessons.length;
+    const lessonsByTrackId = new Map<string, typeof publishedLessons>();
+    for (const lesson of publishedLessons) {
+      const list = lessonsByTrackId.get(lesson.trackId) ?? [];
+      list.push(lesson);
+      lessonsByTrackId.set(lesson.trackId, list);
+    }
+
     type Rollup = {
       testAvg: number | null;
       homeworkAvg: number | null;
@@ -153,6 +172,9 @@ export const getLearningAnalytics = query({
       coachScore: number | null;
       coachReady: string | null;
       coachTrack: string | null;
+      completedLessons: number;
+      progressPct: number;
+      byTrack: Map<string, number>;
     };
     const rollup = new Map<string, Rollup>();
 
@@ -219,6 +241,15 @@ export const getLearningAnalytics = query({
         .order("desc")
         .take(1);
       const latestCoach = reviews[0];
+      const completedIds = new Set(attempts.map((a) => a.lessonId));
+      const completedLessons = publishedLessons.filter((l) => completedIds.has(l._id)).length;
+      const byTrack = new Map<string, number>();
+      for (const track of publishedTracks) {
+        const trackLessons = lessonsByTrackId.get(track._id) ?? [];
+        if (trackLessons.length === 0) continue;
+        const done = trackLessons.filter((l) => completedIds.has(l._id)).length;
+        byTrack.set(track._id, Math.round((done / trackLessons.length) * 100));
+      }
 
       rollup.set(student._id, {
         testAvg: testAverageForAttempts(attempts, lessonsById),
@@ -231,31 +262,10 @@ export const getLearningAnalytics = query({
         coachScore: latestCoach?.overallScore ?? null,
         coachReady: latestCoach?.readinessLabel ?? null,
         coachTrack: latestCoach?.careerTrack ?? null,
+        completedLessons,
+        progressPct: totalProgramLessons > 0 ? Math.round((completedLessons / totalProgramLessons) * 100) : 0,
+        byTrack,
       });
-    }
-
-    const helpEvents = await ctx.db
-      .query("starkHelpEvents")
-      .withIndex("by_created", (q) => q.gte("createdAt", args.since))
-      .collect();
-    const scopedHelp = helpEvents.filter((e) => studentIds.has(e.userId));
-
-    const chatsByStudent = new Map<string, { chats: number; lastTopic: string | null; lastAt: number }>();
-    const topicCounts = new Map<string, { topic: string; kind: string; count: number }>();
-    for (const event of scopedHelp) {
-      if (event.kind === "refused") continue;
-      const row = chatsByStudent.get(event.userId) ?? { chats: 0, lastTopic: null, lastAt: 0 };
-      row.chats += 1;
-      if (event.createdAt >= row.lastAt) {
-        row.lastAt = event.createdAt;
-        row.lastTopic = event.topic;
-      }
-      chatsByStudent.set(event.userId, row);
-
-      const tKey = `${event.kind}:${event.topic}`;
-      const t = topicCounts.get(tKey) ?? { topic: event.topic, kind: event.kind, count: 0 };
-      t.count += 1;
-      topicCounts.set(tKey, t);
     }
 
     const testValues = [...rollup.values()].map((r) => r.testAvg).filter((n): n is number => n !== null);
@@ -277,6 +287,7 @@ export const getLearningAnalytics = query({
         if (row.testAvg !== null && row.testAvg < 60) reasons.push(`Tests ${row.testAvg}%`);
         if (row.homeworkOverdue >= 2) reasons.push(`${row.homeworkOverdue} overdue homework`);
         if (attendanceRate !== null && attendanceRate < 70) reasons.push(`Attendance ${attendanceRate}%`);
+        if (row.progressPct < 25 && totalProgramLessons > 0) reasons.push(`Program ${row.progressPct}%`);
         if (reasons.length === 0) return null;
         return {
           studentId: student._id,
@@ -285,7 +296,7 @@ export const getLearningAnalytics = query({
           homeworkAvg: row.homeworkAvg,
           homeworkOverdue: row.homeworkOverdue,
           attendanceRate,
-          starkChats: chatsByStudent.get(student._id)?.chats ?? 0,
+          progressPct: row.progressPct,
           coachScore: row.coachScore,
           reasons,
         };
@@ -354,6 +365,43 @@ export const getLearningAnalytics = query({
       .filter((row): row is NonNullable<typeof row> => row !== null)
       .sort((a, b) => b.overallScore - a.overallScore);
 
+    const progressValues = [...rollup.values()].map((r) => r.progressPct);
+    const weekProgress = publishedTracks.map((track, i) => {
+      const pcts = students
+        .map((s) => rollup.get(s._id)?.byTrack.get(track._id))
+        .filter((n): n is number => n !== undefined);
+      const avgPct = pcts.length ? Math.round(pcts.reduce((sum, n) => sum + n, 0) / pcts.length) : 0;
+      return {
+        week: i + 1,
+        trackId: track._id,
+        trackName: track.name,
+        color: track.color,
+        avgPct,
+        open: true,
+      };
+    });
+    const studentProgress = students
+      .map((student) => {
+        const row = rollup.get(student._id);
+        if (!row) return null;
+        const attendanceRate =
+          row.attendanceTotal > 0
+            ? Math.round((row.attendancePresent / row.attendanceTotal) * 100)
+            : null;
+        return {
+          studentId: student._id,
+          name: rosterName(student),
+          progressPct: row.progressPct,
+          completedLessons: row.completedLessons,
+          totalLessons: totalProgramLessons,
+          testAvg: row.testAvg,
+          homeworkAvg: row.homeworkAvg,
+          attendanceRate,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+      .sort((a, b) => a.progressPct - b.progressPct);
+
     return {
       studentCount: students.length,
       classTestAvg: testValues.length
@@ -364,21 +412,14 @@ export const getLearningAnalytics = query({
         : null,
       classAttendanceRate:
         attTotals.total > 0 ? Math.round((attTotals.present / attTotals.total) * 100) : null,
-      starkUsers: chatsByStudent.size,
+      classProgressAvg: progressValues.length
+        ? Math.round(progressValues.reduce((s, n) => s + n, 0) / progressValues.length)
+        : null,
       atRisk,
       hardQuestions,
       homeworkLag: homeworkLag.slice(0, 8),
-      starkTopics: [...topicCounts.values()].sort((a, b) => b.count - a.count).slice(0, 8),
-      starkByStudent: students
-        .map((s) => ({
-          studentId: s._id,
-          name: rosterName(s),
-          chats: chatsByStudent.get(s._id)?.chats ?? 0,
-          lastTopic: chatsByStudent.get(s._id)?.lastTopic ?? null,
-        }))
-        .filter((s) => s.chats > 0)
-        .sort((a, b) => b.chats - a.chats)
-        .slice(0, 12),
+      weekProgress,
+      studentProgress,
       coachScores: coachScores.slice(0, 12),
       states: [...stateCounts.entries()]
         .map(([state, count]) => ({ state, count }))
@@ -402,8 +443,9 @@ export const getStudentInsight = query({
       timezone: v.union(v.string(), v.null()),
       timezoneLabel: v.string(),
       state: v.union(v.string(), v.null()),
-      starkChats: v.number(),
-      lastTopic: v.union(v.string(), v.null()),
+      progressPct: v.union(v.number(), v.null()),
+      completedLessons: v.number(),
+      totalLessons: v.number(),
       coachScore: v.union(v.number(), v.null()),
       coachReady: v.union(v.string(), v.null()),
       homeworkOverdue: v.number(),
@@ -416,15 +458,19 @@ export const getStudentInsight = query({
     if (!(await canAccessStudent(ctx, staff, args.studentId))) return null;
     const student = await ctx.db.get(args.studentId);
     if (!student) return null;
+    void args.since;
 
-    const events = await ctx.db
-      .query("starkHelpEvents")
-      .withIndex("by_user_created", (q) =>
-        q.eq("userId", args.studentId).gte("createdAt", args.since),
-      )
+    const attempts = await ctx.db
+      .query("attempts")
+      .withIndex("by_user", (q) => q.eq("userId", args.studentId))
       .collect();
-    const chats = events.filter((e) => e.kind !== "refused");
-    const last = [...chats].sort((a, b) => b.createdAt - a.createdAt)[0];
+    const publishedLessons = await ctx.db
+      .query("lessons")
+      .withIndex("by_published", (q) => q.eq("published", true))
+      .collect();
+    const completedIds = new Set(attempts.map((a) => a.lessonId));
+    const completedLessons = publishedLessons.filter((l) => completedIds.has(l._id)).length;
+    const totalLessons = publishedLessons.length;
 
     const reviews = await ctx.db
       .query("resumeReviews")
@@ -453,8 +499,9 @@ export const getStudentInsight = query({
       timezone: student.timezone ?? null,
       timezoneLabel: timezoneLabel(student.timezone),
       state: student.state ?? null,
-      starkChats: chats.length,
-      lastTopic: last?.topic ?? null,
+      progressPct: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : null,
+      completedLessons,
+      totalLessons,
       coachScore: reviews[0]?.overallScore ?? null,
       coachReady: reviews[0]?.readinessLabel ?? null,
       homeworkOverdue: overdue,
