@@ -98,6 +98,7 @@ const CURRICULUM = [
   {
     number: "03",
     title: "Microsoft Azure",
+    spine: "Azure",
     color: "#0078D4",
     topics: ["Virtual Machines", "Storage", "Networking", "Virtual Networks", "Azure Active Directory", "Monitoring", "Security"],
   },
@@ -240,12 +241,12 @@ export default async function LandingPage() {
   const doubled = [...TESTIMONIALS, ...TESTIMONIALS];
 
   return (
-    <div className="min-h-screen relative" style={{ background: "transparent" }}>
+    <div className="min-h-screen relative overflow-x-clip" style={{ background: "transparent" }}>
       {/* Nav */}
-      <header className="relative z-10 max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-        <a href="#top" className="flex items-center gap-3">
+      <header className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-2 min-w-0 overflow-x-clip">
+        <a href="#top" className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
           <span
-            className="w-10 h-10 rounded-md flex items-center justify-center text-white"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-md flex items-center justify-center text-white flex-shrink-0"
             style={{
               background: "linear-gradient(160deg, #2563EB, #1e40af)",
               boxShadow: "3px 3px 0 var(--accent)",
@@ -254,7 +255,7 @@ export default async function LandingPage() {
           >
             <BookMarked size={18} />
           </span>
-          <span className="font-serif text-xl font-bold tracking-tight" style={{ color: "var(--text)" }}>
+          <span className="font-serif text-base sm:text-xl font-bold tracking-tight truncate" style={{ color: "var(--text)" }}>
             ComplxSimple
           </span>
         </a>
@@ -264,60 +265,61 @@ export default async function LandingPage() {
           <a href="#pricing" className="hover:opacity-70 transition-opacity">Tuition</a>
           <a href="#faq" className="hover:opacity-70 transition-opacity">Office hours</a>
         </nav>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
           <a
             href="#info-sessions"
-            className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-2 text-sm font-semibold hover:opacity-70 transition-opacity"
+            className="inline-flex items-center gap-1.5 px-1.5 sm:px-3 py-2 text-sm font-semibold hover:opacity-70 transition-opacity"
             style={{ color: "var(--text)" }}
+            aria-label="Info sessions"
           >
             <CalendarDays size={15} />
             <span className="hidden lg:inline">Info Sessions</span>
           </a>
           <ThemeToggle />
-          <SignInBtn className="btn-ink btn-sm" />
+          <SignInBtn className="btn-ink btn-sm !px-3 !text-sm" />
         </div>
       </header>
 
       {/* Hero */}
-      <section id="top" className="relative z-10 max-w-7xl mx-auto px-6 pt-10 pb-24 lg:pt-16">
-        <div className="grid lg:grid-cols-[1fr_1.1fr] gap-14 items-center">
-          <div>
+      <section id="top" className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-8 pb-16 sm:pt-10 sm:pb-24 lg:pt-16">
+        <div className="grid lg:grid-cols-[1fr_1.1fr] gap-10 lg:gap-14 items-center">
+          <div className="min-w-0">
             <p className="eyebrow mb-6">Cohort-based · Live instruction · Invite only</p>
             <h1
-              className="font-serif text-5xl sm:text-6xl lg:text-[4.4rem] font-bold tracking-tight mb-7 leading-[1.05]"
+              className="font-serif text-4xl sm:text-5xl lg:text-[4.4rem] font-bold tracking-tight mb-7 leading-[1.1] sm:leading-[1.05] text-balance"
               style={{ color: "var(--text)" }}
             >
               Become a job-ready{" "}
               <span className="highlighter">DevOps &amp; Cloud</span> Engineer.
             </h1>
-            <p className="text-lg sm:text-xl max-w-xl mb-9 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+            <p className="text-base sm:text-lg lg:text-xl max-w-xl mb-9 leading-relaxed" style={{ color: "var(--text-muted)" }}>
               Live, interactive classes and modules with dedicated instructors, plus a portfolio of real infrastructure. Hands-on labs and mentorship that follows you into the job hunt.
             </p>
             <EnrollmentButtons />
             <InviteOnlyNote className="mt-6" />
 
-            <dl className="mt-12 grid grid-cols-3 gap-4 max-w-md">
+            <dl className="mt-12 grid grid-cols-3 gap-3 sm:gap-4 max-w-md">
               {[
                 { k: "10+", v: "Interactive modules" },
                 { k: "7", v: "Portfolio projects" },
                 { k: "1", v: "AWS voucher" },
               ].map((s) => (
-                <div key={s.v} className="border-l-2 pl-4" style={{ borderColor: "var(--accent)" }}>
-                  <dt className="font-serif text-3xl font-bold leading-none" style={{ color: "var(--text)" }}>{s.k}</dt>
-                  <dd className="text-xs mt-1.5 font-medium" style={{ color: "var(--text-muted)" }}>{s.v}</dd>
+                <div key={s.v} className="border-l-2 pl-3 sm:pl-4 min-w-0" style={{ borderColor: "var(--accent)" }}>
+                  <dt className="font-serif text-2xl sm:text-3xl font-bold leading-none" style={{ color: "var(--text)" }}>{s.k}</dt>
+                  <dd className="text-[11px] sm:text-xs mt-1.5 font-medium leading-snug" style={{ color: "var(--text-muted)" }}>{s.v}</dd>
                 </div>
               ))}
             </dl>
           </div>
 
           {/* The shelf */}
-          <div className="relative pt-10">
-            <div className="sticky-note absolute -top-2 right-2 sm:right-6 z-20 w-44 p-4" style={{ ["--tilt" as string]: "4deg" }}>
+          <div className="relative pt-4 sm:pt-10 min-w-0">
+            <div className="sticky-note relative sm:absolute sm:-top-2 sm:right-2 lg:right-6 z-20 w-full max-w-xs sm:w-44 p-4 mb-6 sm:mb-0" style={{ ["--tilt" as string]: "4deg" }}>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-70 mb-1">Reminder</p>
               <p className="font-serif text-base font-bold leading-snug">Next cohort date TBA — limited seats.</p>
             </div>
 
-            <div className="index-card p-5 pt-0 mb-8 max-w-xs">
+            <div className="index-card p-5 pt-0 mb-8 max-w-full sm:max-w-xs">
               <div className="index-card-title">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
                   Course catalog · Fall syllabus
@@ -331,7 +333,7 @@ export default async function LandingPage() {
               </p>
             </div>
 
-            <div className="bookshelf overflow-x-auto sm:overflow-visible">
+            <div className="bookshelf">
               {CURRICULUM.map((m, i) => (
                 <a
                   key={m.number}
@@ -347,7 +349,7 @@ export default async function LandingPage() {
               ))}
             </div>
             <p className="text-center text-xs mt-6 font-medium" style={{ color: "var(--text-muted)" }}>
-              Ten volumes. Pull one off the shelf below.
+              Ten weeks. Pull one off the shelf below.
             </p>
           </div>
         </div>
@@ -356,22 +358,22 @@ export default async function LandingPage() {
       <InfoSessionsSection />
 
       {/* Tools — the supply list */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div className="index-card p-6 sm:p-8 pt-0">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
+        <div className="index-card plain p-5 sm:p-8 pt-0 pb-6 sm:pb-8 overflow-visible">
           <div className="index-card-title">
             <p className="eyebrow">Required supplies</p>
           </div>
-          <div className="flex flex-wrap gap-2.5 mt-3">
+          <div className="flex flex-wrap gap-2 sm:gap-2.5 mt-3">
             {TOOLS.map((tool) => (
               <span
                 key={tool}
-                className="px-4 py-2 rounded-lg text-sm font-bold font-serif transition-transform hover:-translate-y-0.5"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm font-bold font-serif"
                 style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text)" }}
               >
                 {tool}
               </span>
             ))}
-            <span className="px-4 py-2 rounded-lg text-sm italic" style={{ color: "var(--text-muted)" }}>
+            <span className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm italic" style={{ color: "var(--text-muted)" }}>
               …and a notebook. Laptop optional; curiosity mandatory.
             </span>
           </div>
@@ -379,7 +381,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Tracks — five books on the desk */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-24">
         <SectionHeading
           eyebrow="Core skills"
           title={<>Five textbooks, one <span className="pencil-underline">career</span>.</>}
@@ -410,7 +412,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Linux spotlight — on the chalkboard */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-28">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-28">
         <div className="chalkboard p-8 sm:p-12">
           <div className="flex flex-col sm:flex-row items-start gap-8">
             <div
@@ -435,7 +437,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Features — sticky notes on the cork board */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-24">
         <div className="cork-board rounded-2xl p-6 sm:p-10">
           <div className="flex items-center gap-2 mb-8">
             <Pin size={16} className="text-white/80" />
@@ -459,7 +461,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Why choose the program — index cards */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-24">
         <SectionHeading
           eyebrow="Why choose us"
           title="Everything you need to launch your cloud career"
@@ -484,7 +486,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Curriculum — table of contents in an open textbook */}
-      <section id="curriculum" className="relative z-10 max-w-7xl mx-auto px-6 pb-24 scroll-mt-20">
+      <section id="curriculum" className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-24 scroll-mt-20">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-12">
           <div className="max-w-2xl">
             <p className="eyebrow mb-4">Program curriculum</p>
@@ -541,7 +543,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Projects — lab notebook */}
-      <section id="projects" className="relative z-10 max-w-7xl mx-auto px-6 pb-24 scroll-mt-20">
+      <section id="projects" className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-24 scroll-mt-20">
         <SectionHeading
           eyebrow="Lab notebook"
           title="Build a portfolio recruiters take seriously"
@@ -573,7 +575,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Certification — the diploma */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-24">
+      <section className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pb-24">
         <div className="diploma p-10 sm:p-14 text-center">
           <p className="eyebrow justify-center mb-5">Certification track</p>
           <h2 className="font-serif text-2xl sm:text-4xl font-bold mb-3" style={{ color: "var(--text)" }}>
@@ -596,7 +598,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Stark teaser — teal chalk on the board */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 pb-28">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-28">
         <div className="chalkboard p-8 sm:p-12" style={{ ["--board" as string]: "#0b201e", ["--board-edge" as string]: "#07302b" }}>
           <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
             <div
@@ -691,7 +693,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Pricing — tuition folder */}
-      <section id="pricing" className="relative z-10 max-w-6xl mx-auto px-6 pb-24 scroll-mt-20">
+      <section id="pricing" className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pb-24 scroll-mt-20">
         <SectionHeading
           eyebrow="Tuition"
           title="Programs &amp; tuition"
@@ -771,7 +773,7 @@ export default async function LandingPage() {
       </section>
 
       {/* FAQ — office hours */}
-      <section id="faq" className="relative z-10 max-w-4xl mx-auto px-6 pb-24 scroll-mt-20">
+      <section id="faq" className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 pb-24 scroll-mt-20">
         <SectionHeading
           eyebrow="Office hours"
           title="Frequently asked questions"
@@ -793,7 +795,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-24">
+      <section className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pb-24">
         <div className="index-card relative p-10 sm:p-14 pt-0 text-center">
           <span className="washi-tape left" />
           <span className="washi-tape right" />

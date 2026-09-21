@@ -39,11 +39,11 @@ export function HeroButtons() {
 
 export function EnrollmentButtons({ align = "start" }: { align?: "start" | "center" }) {
   return (
-    <div className={`flex flex-col sm:flex-row gap-3 ${align === "center" ? "justify-center items-center" : "items-start"}`}>
-      <Link href="/sign-in" className="btn-ink text-base">
+    <div className={`flex flex-col sm:flex-row gap-3 w-full ${align === "center" ? "justify-center items-stretch sm:items-center" : "items-stretch sm:items-start"}`}>
+      <Link href="/sign-in" className="btn-ink text-base w-full sm:w-auto">
         Take your seat <ArrowRight size={18} />
       </Link>
-      <a href="#info-sessions" className="btn-paper text-base">
+      <a href="#info-sessions" className="btn-paper text-base w-full sm:w-auto">
         <CalendarDays size={17} /> Attend an info session
       </a>
     </div>
@@ -52,9 +52,9 @@ export function EnrollmentButtons({ align = "start" }: { align?: "start" | "cent
 
 export function InviteOnlyNote({ className }: { className?: string }) {
   return (
-    <p className={`text-sm flex items-center gap-2 ${className ?? ""}`} style={{ color: "var(--text-muted)" }}>
-      <Mail size={14} />
-      Enrollment is by invitation. Your instructor sends the link that unlocks your seat.
+    <p className={`text-sm flex items-start gap-2 ${className ?? ""}`} style={{ color: "var(--text-muted)" }}>
+      <Mail size={14} className="mt-0.5 flex-shrink-0" />
+      <span>Enrollment is by invitation. Your instructor sends the link that unlocks your seat.</span>
     </p>
   );
 }

@@ -4,6 +4,8 @@ import path from "path";
 const projectRoot = process.cwd();
 
 const nextConfig: NextConfig = {
+  // Hide the Next.js "N" badge so it doesn't cover landing cards in local preview.
+  devIndicators: false,
   // Docker / Railway / Fly (`next start`) without Vercel-specific bundling.
   output: "standalone",
   // Keep Turbopack rooted on this app so a parent-folder lockfile cannot

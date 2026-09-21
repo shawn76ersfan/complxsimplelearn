@@ -114,8 +114,10 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-
+html {
+  scroll-behavior: smooth;
+  overflow-x: clip;
+}
 body {
   background-color: var(--bg);
   /* faint dot-grid, like graph paper */
@@ -124,6 +126,7 @@ body {
   color: var(--text);
   font-family: var(--font-sans), Arial, sans-serif;
   min-height: 100vh;
+  overflow-x: clip;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 .dark body {
@@ -535,7 +538,10 @@ body {
   box-shadow: 0 18px 40px rgba(30, 20, 5, 0.12);
 }
 .dark .open-book { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4); }
-.open-book > .page { padding: 2rem; }
+.open-book > .page { padding: 1.25rem; }
+@media (min-width: 640px) {
+  .open-book > .page { padding: 2rem; }
+}
 @media (min-width: 768px) {
   .open-book { grid-template-columns: 1fr 1fr; }
   .open-book::before {
@@ -661,8 +667,9 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  width: clamp(40px, 3.8vw, 62px);
+  width: clamp(26px, 7.2vw, 62px);
   height: 204px;
+  flex-shrink: 0;
   padding: 14px 0;
   border-radius: 3px 6px 6px 3px;
   color: #fff;
@@ -722,9 +729,20 @@ body {
 .book-spine.tall .spine-title { max-height: 154px; }
 .book-spine.short { height: 182px; }
 .book-spine.short .spine-title { max-height: 106px; }
-.book-spine.wide { width: clamp(48px, 4.6vw, 74px); }
+.book-spine.wide { width: clamp(32px, 8vw, 74px); }
 .book-spine.lean { transform: rotate(-6deg) translateX(6px); }
 .book-spine.lean:hover { transform: rotate(-8deg) translate(6px, -8px); }
+@media (max-width: 640px) {
+  .book-spine { width: 28px; height: 156px; padding: 10px 0; }
+  .book-spine .spine-title { max-height: 86px; font-size: 10px; }
+  .book-spine.tall { height: 172px; }
+  .book-spine.tall .spine-title { max-height: 100px; }
+  .book-spine.short { height: 140px; }
+  .book-spine.short .spine-title { max-height: 70px; }
+  .book-spine.wide { width: 28px; }
+  .book-spine.lean { transform: none; }
+  .book-spine.lean:hover { transform: translateY(-8px) rotate(-2deg); }
+}
 
 /* Wooden shelf plank the books stand on */
 .bookshelf {
@@ -732,8 +750,21 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 6px;
-  padding: 12px 14px 18px;
+  gap: 3px;
+  padding: 12px 4px 22px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  max-width: 100%;
+}
+@media (min-width: 768px) {
+  .bookshelf {
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 14px 18px;
+    overflow-x: visible;
+  }
 }
 .bookshelf::after {
   content: "";

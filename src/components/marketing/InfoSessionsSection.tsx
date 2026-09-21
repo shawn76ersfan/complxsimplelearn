@@ -89,11 +89,11 @@ export function InfoSessionsSection() {
   return (
     <section
       id="info-sessions"
-      className="relative z-10 max-w-7xl mx-auto px-6 pb-24 scroll-mt-20"
+      className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24 scroll-mt-20"
     >
       <div className="text-center max-w-2xl mx-auto mb-12">
         <p className="eyebrow justify-center mb-4">Open house · Live information sessions</p>
-        <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight mb-4" style={{ color: "var(--text)" }}>
+        <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight mb-4 text-balance" style={{ color: "var(--text)" }}>
           Sit in before you sign up
         </h2>
         <p style={{ color: "var(--text-muted)" }}>
@@ -120,7 +120,7 @@ export function InfoSessionsSection() {
             const selected = selectedId === session._id;
             const registered = registeredId === session._id;
             return (
-              <article key={session._id} className="index-card p-6 sm:p-7 pt-0">
+              <article key={session._id} className="index-card p-5 sm:p-7 pt-0 overflow-visible min-w-0">
                 <div className="index-card-title justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
                     Info session
@@ -130,12 +130,13 @@ export function InfoSessionsSection() {
                 <div className="flex items-start gap-4 mt-2">
                   <div className="flex-1">
                     <h3 className="font-serif text-xl font-bold" style={{ color: "var(--text)" }}>{session.title}</h3>
-                    <p className="text-sm font-semibold mt-2 flex items-start gap-2" style={{ color: "var(--primary)" }}>
+                    <p className="text-sm font-semibold mt-2 flex items-start gap-2 break-words" style={{ color: "var(--primary)" }}>
                       <Clock size={15} className="mt-0.5 flex-shrink-0" />
                       {formatSessionDate(session)}
                     </p>
-                    {session.description && (
-                      <p className="text-sm leading-relaxed mt-3" style={{ color: "var(--text-muted)" }}>{session.description}</p>
+                    {session.description &&
+                      session.description.trim().toLowerCase() !== "info session" && (
+                      <p className="text-sm leading-relaxed mt-3 break-words" style={{ color: "var(--text-muted)" }}>{session.description}</p>
                     )}
                   </div>
                 </div>
