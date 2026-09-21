@@ -14,7 +14,7 @@ export default function VideosPage() {
           Class recordings
         </h1>
         <p style={{ color: "var(--text-muted)" }}>
-          Missed a live session? {instructor} posts the recording here so you can watch it on your own time.
+          Missed a live session? {instructor.sentence} {instructor.plural ? "post" : "posts"} the recording here so you can watch it on your own time.
         </p>
       </div>
 
