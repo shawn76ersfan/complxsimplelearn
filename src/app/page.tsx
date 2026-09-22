@@ -183,11 +183,6 @@ const FAQS = [
   { question: "Will I get support for AWS certification?", answer: "Yes. The program includes SAA-C03 preparation, practical labs, and an AWS Solutions Architect Associate exam voucher." },
   { question: "How long is the program?", answer: "The complete schedule will be shared when the next cohort dates are announced." },
   {
-    question: "What is the difference between the bootcamp and the instructor course?",
-    answer:
-      "The DevOps & Cloud Engineering Bootcamp is the full career program (labs, projects, mentorship, certification prep, and platform access). The instructor course is a separate program with its own tuition—see pricing on this page.",
-  },
-  {
     question: "How much does the bootcamp cost?",
     answer:
       "Bootcamp tuition depends on the cohort. Schedule a free consultation for current pricing, installment options, and seat availability.",
@@ -696,8 +691,8 @@ export default async function LandingPage() {
       <section id="pricing" className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pb-24 scroll-mt-20">
         <SectionHeading
           eyebrow="Tuition"
-          title="Programs &amp; tuition"
-          description="The DevOps bootcamp and the instructor course are separate programs with different pricing."
+          title="Bootcamp tuition"
+          description="Live classes, labs, mentorship, and certification prep. Schedule a consult for current tuition."
         />
 
         <div className="relative mt-8 mb-12">
@@ -712,7 +707,7 @@ export default async function LandingPage() {
                 </p>
                 <p className="font-serif text-xl font-bold mb-2">Tuition by cohort</p>
                 <p className="text-sm leading-relaxed mb-8 chalk-muted">
-                  Bootcamp pricing is not the same as the instructor course. Schedule a free consultation for current tuition, installment plans, and seat availability.
+                  Schedule a free consultation for current tuition, installment plans, and seat availability.
                 </p>
                 <a
                   href={CASSANDRA_CALENDLY_URL}
@@ -746,28 +741,6 @@ export default async function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="index-card p-8 sm:p-10 pt-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-          <div className="max-w-xl">
-            <div className="index-card-title">
-              <span className="stamp">Separate program</span>
-            </div>
-            <h3 className="font-serif text-2xl font-bold mb-2 mt-2" style={{ color: "var(--text)" }}>Instructor course</h3>
-            <p className="text-sm leading-7" style={{ color: "var(--text-muted)" }}>
-              This is not the DevOps bootcamp. It is Cassandra&apos;s instructor-focused program with its own curriculum and enrollment.
-            </p>
-          </div>
-          <div className="text-left sm:text-right flex-shrink-0 sm:pt-8">
-            <div className="flex items-end gap-2 sm:justify-end mb-1">
-              <span className="font-serif text-4xl font-bold" style={{ color: "var(--text)" }}>$1,600+</span>
-              <span className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>one-time</span>
-            </div>
-            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Installment payment available—contact the administrator for details.</p>
-            <a href="#info-sessions" className="btn-paper btn-sm">
-              Inquire about instructor course
-            </a>
           </div>
         </div>
       </section>
